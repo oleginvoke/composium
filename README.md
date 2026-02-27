@@ -12,6 +12,14 @@ It is useful for:
 - keeping a living UI playground inside the app.
 
 ## Media
+<img width="200" height="444" alt="image" src="https://github.com/user-attachments/assets/7ebded29-65be-4ff4-9156-a04a3bb0ef13" />
+<img width="200" height="444" alt="image" src="https://github.com/user-attachments/assets/8d842f20-84f7-4550-a72b-95a22cc7a0b1" />
+<img width="200" height="444" alt="image" src="https://github.com/user-attachments/assets/2a1af022-2b29-429a-a4b6-b7af79c2f7fb" />
+<img width="200" height="444" alt="image" src="https://github.com/user-attachments/assets/71e419e8-1f95-44f4-8507-d3ef3e88a310" />
+
+
+
+
 
 <!-- TODO: add overview screenshot -->
 <!-- TODO: add grouped scenes screenshot -->
