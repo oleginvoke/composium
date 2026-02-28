@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             var isDarkTheme by remember { mutableStateOf(false) }
 
-            SideEffect {
+            DisposableEffect(isDarkTheme) {
                 enableEdgeToEdge(
                     statusBarStyle = if (isDarkTheme) {
                         SystemBarStyle.dark(
@@ -53,6 +53,8 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                 )
+
+                onDispose {}
             }
 
             @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -65,7 +67,9 @@ class MainActivity : ComponentActivity() {
                     ComposiumScreen(
                         isDarkTheme = isDarkTheme,
                         contentWindowInsets = WindowInsets.systemBars,
-                        onThemeChange = { isDarkTheme = it },
+                        onThemeChange = {
+                            isDarkTheme = it
+                        },
                         scenePreviewDecorator = { scenePreview ->
                             Box(
                                 modifier = Modifier
