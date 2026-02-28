@@ -40,6 +40,8 @@ sample (https://github.com/user-attachments/assets/28d2ee6d-b742-4740-bc06-e150e
 ## Why Composium
 
 Composium is intentionally flexible:
+- you can place `ComposiumScreen()` anywhere in your app;
+- supports any parameter type, including nullable types;
 - scenes are just Compose code;
 - KSP is recommended, but not required;
 - scenes can be flat or deeply grouped;
