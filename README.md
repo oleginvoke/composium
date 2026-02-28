@@ -117,12 +117,21 @@ Use this mode when you do not want to add KSP to the consumer project. In this c
 
 ## Quick Start With KSP
 
-KSP is the primary integration path. You annotate either individual scene properties, or scene catalogs.
+KSP is the primary integration path.
+
+There are two discovery styles:
+- annotate individual scene properties with `@ComposiumScene`;
+- or annotate an object with `@ComposiumSceneCatalog`.
+
+You do not need to use both at the same time. Pick the style that matches how you want to organize scenes in your project.
+
+### Option 1: annotate individual scene properties
+
+Use this style when you want flat, explicit scene declarations and prefer to mark each scene directly.
 
 ```kotlin
 import androidx.compose.runtime.Composable
 import oleginvoke.com.composium.ComposiumScene
-import oleginvoke.com.composium.ComposiumSceneCatalog
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
 
@@ -155,6 +164,21 @@ val primaryButton by scene(
         size = size,
     )
 }
+@Composable
+fun DebugCatalog() {
+    ComposiumScreen()
+}
+```
+
+### Option 2: annotate a scene catalog object
+
+Use this style when you want to keep several related scenes together inside one object and let KSP collect all non-private `Scene` properties from it.
+
+```kotlin
+import androidx.compose.runtime.Composable
+import oleginvoke.com.composium.ComposiumSceneCatalog
+import oleginvoke.com.composium.ComposiumScreen
+import oleginvoke.com.composium.scene
 
 @ComposiumSceneCatalog
 object FormScenes {
@@ -176,6 +200,8 @@ fun DebugCatalog() {
 What KSP collects:
 - every property annotated with `@ComposiumScene`;
 - every non-private `Scene` property declared inside an object annotated with `@ComposiumSceneCatalog`.
+
+These are two independent discovery styles, not a required pair of annotations on the same scene setup.
 
 ## Quick Start Without KSP
 
