@@ -22,14 +22,17 @@ It is useful for:
 - quick local experiments when regular `@Preview` is not enough;
 - keeping a living UI playground inside the app.
 
-## Media
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/8c81089e-67bd-4237-8adc-44d55cfad472">
+    <img src="https://github.com/user-attachments/assets/bd3b5619-3620-4535-94e8-0f099ad2213f">
+</p>
+<p align="center">
+    <img src="https://github.com/user-attachments/assets/98e4cf27-f3ca-4ceb-914d-402543810ee4">
 </p>
 
+<p align="center">
+    <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
+</p>
 
-
-sample (https://github.com/user-attachments/assets/28d2ee6d-b742-4740-bc06-e150ece1297e)
 
 
 <!-- TODO: add overview screenshot -->
