@@ -1,8 +1,17 @@
 # Composium
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.oleginvoke/composium?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.oleginvoke/composium)
+[![KSP processor](https://img.shields.io/maven-central/v/io.github.oleginvoke/composium-processor?label=KSP%20processor)](https://central.sonatype.com/artifact/io.github.oleginvoke/composium-processor)
+
 Storybook-like scene browser for native Android Compose projects.
 
 Composium lets you describe UI states as regular Compose scenes, browse them inside the app, tweak parameters at runtime, and inspect components in isolation without building ad-hoc debug screens for every case.
+
+Current release: `0.3.0-alpha01`
+
+Artifacts:
+- `io.github.oleginvoke:composium:0.3.0-alpha01`
+- `io.github.oleginvoke:composium-processor:0.3.0-alpha01`
 
 It is useful for:
 - design systems and component libraries;
@@ -84,8 +93,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:<version>")
-    ksp("io.github.oleginvoke:composium-processor:<version>")
+    implementation("io.github.oleginvoke:composium:0.3.0-alpha01")
+    ksp("io.github.oleginvoke:composium-processor:0.3.0-alpha01")
 }
 ```
 
@@ -95,7 +104,7 @@ Use this mode when you want automatic scene collection.
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:<version>")
+    implementation("io.github.oleginvoke:composium:0.3.0-alpha01")
 }
 ```
 
