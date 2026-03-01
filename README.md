@@ -571,6 +571,15 @@ Give QA a stable in-app surface where they can switch component states without h
 
 Use scenes as a fast sandbox for composing UI states that would be awkward to wire into production navigation.
 
+## Contributing
+
+If you want to fix a bug, improve the API, or extend the library with new functionality, contributions are welcome.
+
+## Roadmap
+
+- [ ] color picker for scene parameters;
+- [ ] dedicated tokens section for things like typography and colors.
+
 ## Summary
 
 Composium is a runtime scene browser for Compose that aims to stay out of your way:
