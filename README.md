@@ -577,8 +577,8 @@ If you want to fix a bug, improve the API, or extend the library with new functi
 
 ## Roadmap
 
-- [ ] color picker for scene parameters;
-- [ ] dedicated tokens section for things like typography and colors.
+- [ ] dedicated tokens section for things like typography and colors;
+- [ ] color picker.
 
 ## Summary
 
