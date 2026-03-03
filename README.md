@@ -146,7 +146,7 @@ sealed interface ButtonSize {
 }
 
 @ComposiumScene
-val primaryButton by scene(
+internal val primaryButton by scene(
     group = "Buttons/Primary",
     name = "Filled",
 ) {
@@ -179,7 +179,7 @@ import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
 
 @ComposiumSceneCatalog
-object FormScenes {
+internal object FormScenes {
     val loginDefault by scene(group = "Forms/Auth", name = "Login / default") {
         LoginForm()
     }
@@ -212,11 +212,11 @@ import oleginvoke.com.composium.Composium
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
 
-val primaryButton by scene(group = "Buttons/Primary", name = "Filled") {
+internal val primaryButton by scene(group = "Buttons/Primary", name = "Filled") {
     AppButton(text = "Continue")
 }
 
-object FormScenes {
+internal object FormScenes {
     val loginDefault by scene(group = "Forms/Auth", name = "Login / default") {
         LoginForm()
     }
@@ -249,7 +249,7 @@ Composium does not force a single scene structure.
 Scenes without a `group` stay at the root level:
 
 ```kotlin
-val typographyTokens by scene {
+internal val typographyTokens by scene {
     TypographyShowcase()
 }
 ```
@@ -259,15 +259,15 @@ val typographyTokens by scene {
 Use slash-separated paths to build nested groups:
 
 ```kotlin
-val primaryFilled by scene(group = "Buttons/Primary/Filled") {
+internal val primaryFilled by scene(group = "Buttons/Primary/Filled") {
     PrimaryFilledButton()
 }
 
-val primaryOutlined by scene(group = "Buttons/Primary/Outlined") {
+internal val primaryOutlined by scene(group = "Buttons/Primary/Outlined") {
     PrimaryOutlinedButton()
 }
 
-val dangerFilled by scene(group = "Buttons/Danger/Filled") {
+internal val dangerFilled by scene(group = "Buttons/Danger/Filled") {
     DangerButton()
 }
 ```
@@ -284,7 +284,7 @@ That means you can:
 Scene parameters are declared inside the scene body with delegated properties:
 
 ```kotlin
-val buttonPlayground by scene(group = "Buttons") {
+internal val buttonPlayground by scene(group = "Buttons") {
     val enabled: Boolean by param(true)
     val title: String by param("Continue")
 
@@ -325,7 +325,7 @@ sealed interface ButtonSize {
     object Large : ButtonSize
 }
 
-val buttonPlayground by scene(group = "Buttons") {
+internal val buttonPlayground by scene(group = "Buttons") {
     val enabled: Boolean by param(true)
     val variant: ButtonVariant by param(ButtonVariant.Primary)
     val size: ButtonSize by param(ButtonSize.Medium)
@@ -350,7 +350,7 @@ For types like `Int`, `Long`, `Float`, `Double`, or custom objects, define the a
 ```kotlin
 import oleginvoke.com.composium.optionList
 
-val spacingPlayground by scene(group = "Spacing") {
+internal val spacingPlayground by scene(group = "Spacing") {
     val elevation: Int by param(
         default = 0 named "None",
         options = optionList(
@@ -432,7 +432,7 @@ If explicit option names collide inside the same parameter, Composium will appen
 Nullable parameters get an extra checkbox that controls whether the value is currently `null`.
 
 ```kotlin
-val cardPlayground by scene(group = "Cards") {
+internal val cardPlayground by scene(group = "Cards") {
     val maxLines: Int? by param(
         default = null,
         options = optionList(
