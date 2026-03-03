@@ -164,14 +164,14 @@ private fun ParamCard(
                                                     option = option,
                                                 )
                                             },
-                                        text = option.label,
-                                        selected = option.label == paramDescriptor.selectedOption.label,
+                                        text = option.name,
+                                        selected = option.name == paramDescriptor.selectedOption.name,
                                     )
                                 }
                             }
                         } else {
                             ComposiumText(
-                                text = paramDescriptor.selectedOption.label,
+                                text = paramDescriptor.selectedOption.name,
                                 style = Tokens.typography.bodySmall,
                                 color = Tokens.colors.onSurfaceVariant,
                             )
