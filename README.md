@@ -315,6 +315,8 @@ val buttonPlayground by scene(group = "Buttons") {
 
 Important detail: you can use any type as a parameter value, but interactive selection for custom and numeric types requires explicit options unless Composium can infer them automatically.
 
+For referential or non-static types such as `Painter`, prefer explicit labeled options.
+
 ### Automatic options for `Boolean`, `enum`, and sealed object hierarchies
 
 ```kotlin
@@ -383,6 +385,18 @@ val spacingPlayground by scene(group = "Spacing") {
 
 You can override how options are shown in the controls UI.
 
+`default` can also be passed as a labeled option with infix syntax:
+
+```kotlin
+val mode by param(
+    default = DisplayMode.Grid to "Grid",
+    options = optionListLabeled(
+        DisplayMode.Grid to "Grid",
+        DisplayMode.List to "List",
+    ),
+)
+```
+
 Using a label mapper:
 
 ```kotlin
@@ -412,6 +426,10 @@ val alignment by param(
     ),
 )
 ```
+
+For referential values such as `Painter`, labels act as the stable identity for explicit option chips. In these cases, label every option and label the default too when it is declared independently from the option list.
+
+If explicit option labels collide inside the same parameter, Composium will append numeric suffixes automatically until every label becomes unique.
 
 ### Nullable parameters
 
