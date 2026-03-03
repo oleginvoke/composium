@@ -60,7 +60,7 @@ internal enum class BannerTone {
     Warning,
 }
 
-private fun roleLabel(role: UserRole): String = when (role) {
+private fun roleName(role: UserRole): String = when (role) {
     UserRole.Admin -> "Administrator"
     UserRole.Member -> "Member"
     UserRole.Guest -> "Guest"
@@ -136,7 +136,7 @@ internal fun SampleActionButton(
             enabled = enabled,
             contentPadding = padding,
         ) {
-            ButtonLabel(
+            ButtonTitleRow(
                 title = title,
                 showLeadingBadge = showLeadingBadge,
             )
@@ -147,7 +147,7 @@ internal fun SampleActionButton(
             enabled = enabled,
             contentPadding = padding,
         ) {
-            ButtonLabel(
+            ButtonTitleRow(
                 title = title,
                 showLeadingBadge = showLeadingBadge,
             )
@@ -158,7 +158,7 @@ internal fun SampleActionButton(
             enabled = enabled,
             contentPadding = padding,
         ) {
-            ButtonLabel(
+            ButtonTitleRow(
                 title = title,
                 showLeadingBadge = showLeadingBadge,
             )
@@ -169,7 +169,7 @@ internal fun SampleActionButton(
             enabled = enabled,
             contentPadding = padding,
         ) {
-            ButtonLabel(
+            ButtonTitleRow(
                 title = title,
                 showLeadingBadge = showLeadingBadge,
             )
@@ -178,7 +178,7 @@ internal fun SampleActionButton(
 }
 
 @Composable
-private fun ButtonLabel(
+private fun ButtonTitleRow(
     title: String,
     showLeadingBadge: Boolean,
 ) {
@@ -214,7 +214,7 @@ internal fun ProfilePreviewCard(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Text(
-                text = "Nullable values and custom labels",
+                text = "Nullable values and custom names",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -236,7 +236,7 @@ internal fun ProfilePreviewCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = roleLabel(role).take(1),
+                        text = roleName(role).take(1),
                         style = MaterialTheme.typography.titleMedium,
                         color = if (avatarSize == null) {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -249,7 +249,7 @@ internal fun ProfilePreviewCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = roleLabel(role),
+                        text = roleName(role),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
@@ -272,7 +272,7 @@ internal fun ProfilePreviewCard(
 internal fun BannerPreviewCard(
     tone: BannerTone,
     spacing: Int,
-    actionLabel: String,
+    actionText: String,
 ) {
     val containerColor = when (tone) {
         BannerTone.Neutral -> MaterialTheme.colorScheme.surfaceVariant
@@ -303,12 +303,12 @@ internal fun BannerPreviewCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Banner tone is inferred automatically from an enum. Spacing uses explicit numeric options with custom labels.",
+                text = "Banner tone is inferred automatically from an enum. Spacing uses explicit numeric options with custom names.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(modifier = Modifier.height(4.dp))
             TextButton(onClick = {}) {
-                Text(actionLabel)
+                Text(actionText)
             }
         }
     }
@@ -340,7 +340,7 @@ internal fun GettingStartedSceneContent() {
             InfoLine(text = "Top-level scene without a group")
             InfoLine(text = "Catalog-based grouped scenes with @ComposiumSceneCatalog")
             InfoLine(text = "Automatic enum and sealed options")
-            InfoLine(text = "Explicit numeric options, custom labels, and nullable values")
+            InfoLine(text = "Explicit numeric options, custom names, and nullable values")
             InfoLine(text = "Bottom sheet scene inside a deep nested group")
         }
     }
@@ -389,7 +389,7 @@ internal fun NestedButtonSceneContent(
 }
 
 @Composable
-internal fun NullableLabelsSceneContent(
+internal fun NullableNamesSceneContent(
     role: UserRole,
     avatarSize: Int?,
     subtitle: String?,
@@ -405,12 +405,12 @@ internal fun NullableLabelsSceneContent(
 internal fun EnumAndNumericOptionsSceneContent(
     tone: BannerTone,
     spacing: Int,
-    actionLabel: String,
+    actionText: String,
 ) {
     BannerPreviewCard(
         tone = tone,
         spacing = spacing,
-        actionLabel = actionLabel,
+        actionText = actionText,
     )
 }
 

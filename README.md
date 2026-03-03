@@ -33,13 +33,6 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
 </p>
 
-
-
-<!-- TODO: add overview screenshot -->
-<!-- TODO: add grouped scenes screenshot -->
-<!-- TODO: add scene controls screenshot -->
-<!-- TODO: add theme + system params video / gif -->
-
 ## Why Composium
 
 Composium is intentionally flexible:
@@ -65,7 +58,7 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Runtime controls for scene parameters
 - Automatic controls for `Boolean`, `String`, `enum`, and sealed object hierarchies
 - Nullable parameter support with explicit null-state toggle
-- Custom labels for selectable options
+- Custom names for selectable options
 - Custom ordering for auto-inferred sealed options
 - Scene preview decorator for wrapping content
 - Built-in dark theme toggle
@@ -311,9 +304,11 @@ val buttonPlayground by scene(group = "Buttons") {
 | `enum` | Option chips | Values inferred automatically |
 | Sealed object hierarchy | Option chips | Values inferred automatically from object instances |
 | Nullable supported parameter | Checkbox + underlying control | Checkbox toggles null-state |
-| Any other type with explicit options | Option chips | Use `optionList(...)` or `optionListLabeled(...)` |
+| Any other type with explicit options | Option chips | Use `optionList(...)` |
 
 Important detail: you can use any type as a parameter value, but interactive selection for custom and numeric types requires explicit options unless Composium can infer them automatically.
+
+For referential or non-static types such as `Painter`, prefer explicit named options.
 
 ### Automatic options for `Boolean`, `enum`, and sealed object hierarchies
 
@@ -354,16 +349,15 @@ For types like `Int`, `Long`, `Float`, `Double`, or custom objects, define the a
 
 ```kotlin
 import oleginvoke.com.composium.optionList
-import oleginvoke.com.composium.optionListLabeled
 
 val spacingPlayground by scene(group = "Spacing") {
     val elevation: Int by param(
-        default = 0,
-        options = optionListLabeled(
-            0 to "None",
-            2 to "2dp",
-            8 to "8dp",
-            16 to "16dp",
+        default = 0 named "None",
+        options = optionList(
+            0 named "None",
+            2 named "2dp",
+            8 named "8dp",
+            16 named "16dp",
         ),
     )
 
@@ -379,11 +373,25 @@ val spacingPlayground by scene(group = "Spacing") {
 }
 ```
 
-### Custom labels
+### Custom names
 
 You can override how options are shown in the controls UI.
 
-Using a label mapper:
+`default` can also be passed as a named option with infix syntax:
+
+```kotlin
+import oleginvoke.com.composium.optionList
+
+val mode by param(
+    default = DisplayMode.Grid named "Grid",
+    options = optionList(
+        DisplayMode.Grid named "Grid",
+        DisplayMode.List named "List",
+    ),
+)
+```
+
+Using a name mapper:
 
 ```kotlin
 val role by param(
@@ -400,18 +408,24 @@ val role by param(
 )
 ```
 
-Using explicit value-label pairs:
+Using explicit named values:
 
 ```kotlin
+import oleginvoke.com.composium.optionList
+
 val alignment by param(
     default = AlignmentMode.Center,
-    options = optionListLabeled(
-        AlignmentMode.Start to "Start",
-        AlignmentMode.Center to "Center",
-        AlignmentMode.End to "End",
+    options = optionList(
+        AlignmentMode.Start named "Start",
+        AlignmentMode.Center named "Center",
+        AlignmentMode.End named "End",
     ),
 )
 ```
+
+For referential values such as `Painter`, names act as the stable identity for explicit option chips. In these cases, name every option and name the default too when it is declared independently from the option list.
+
+If explicit option names collide inside the same parameter, Composium will append numeric suffixes automatically until every name becomes unique.
 
 ### Nullable parameters
 
@@ -421,10 +435,10 @@ Nullable parameters get an extra checkbox that controls whether the value is cur
 val cardPlayground by scene(group = "Cards") {
     val maxLines: Int? by param(
         default = null,
-        options = optionListLabeled(
-            1 to "1 line",
-            2 to "2 lines",
-            3 to "3 lines",
+        options = optionList(
+            1 named "1 line",
+            2 named "2 lines",
+            3 named "3 lines",
         ),
     )
 
@@ -590,6 +604,3 @@ Composium is a runtime scene browser for Compose that aims to stay out of your w
 - let Composium own theme state or plug it into your own;
 - wrap scene rendering with your own decorator;
 - inspect components under different preview system settings.
-
-<!-- TODO: add final showcase screenshot -->
-<!-- TODO: add end-to-end demo video / gif -->

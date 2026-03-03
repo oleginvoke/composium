@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -165,14 +164,14 @@ private fun ParamCard(
                                                     option = option,
                                                 )
                                             },
-                                        text = option.label,
-                                        selected = option == paramDescriptor.selectedOption,
+                                        text = option.name,
+                                        selected = option.name == paramDescriptor.selectedOption.name,
                                     )
                                 }
                             }
                         } else {
                             ComposiumText(
-                                text = paramDescriptor.selectedOption.label,
+                                text = paramDescriptor.selectedOption.name,
                                 style = Tokens.typography.bodySmall,
                                 color = Tokens.colors.onSurfaceVariant,
                             )
