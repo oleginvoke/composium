@@ -100,7 +100,7 @@ class SceneScope internal constructor() {
     private data class ParamStateSnapshot(
         val stateValue: Any?,
         val isActive: Boolean?,
-        val selectedLabel: String? = null,
+        val selectedName: String? = null,
     )
 
     private data class ParamOptionsSignature(
@@ -114,7 +114,7 @@ class SceneScope internal constructor() {
         var hash = 17
         options.forEach { option ->
             hash = 31 * hash + (option.value?.hashCode() ?: 0)
-            hash = 31 * hash + option.label.hashCode()
+            hash = 31 * hash + option.name.hashCode()
         }
         return ParamOptionsSignature(
             size = options.size,
@@ -125,7 +125,7 @@ class SceneScope internal constructor() {
     private data class ParamBindingSignature(
         val name: String,
         val defaultValue: Any?,
-        val defaultLabel: String?,
+        val defaultName: String?,
         val optionsSignature: ParamOptionsSignature?,
         val delegatedType: KType?,
         val delegatedKClass: KClass<*>?,
@@ -139,7 +139,7 @@ class SceneScope internal constructor() {
     private data class ExplicitOptionsResolution<T>(
         val options: List<ParamOption<T>>,
         val defaultValue: T,
-        val defaultLabel: String?,
+        val defaultName: String?,
     )
 
     private data class BooleanParamBinding(
@@ -228,62 +228,62 @@ class SceneScope internal constructor() {
         override val activationState: MutableState<Boolean>?,
         val state: MutableState<Any?>,
         val lastNonNullState: MutableState<Any?>,
-        val selectedLabelState: MutableState<String?>,
-        val lastNonNullSelectedLabelState: MutableState<String?>,
+        val selectedNameState: MutableState<String?>,
+        val lastNonNullSelectedNameState: MutableState<String?>,
         val defaultRestoreValue: Any?,
-        val defaultRestoreLabel: String?,
+        val defaultRestoreName: String?,
         val options: List<ParamOption<Any>>,
-        val labelForValue: (Any?) -> String,
+        val nameForValue: (Any?) -> String,
     ) : ParamBinding {
         private fun matchedOptionByValue(value: Any?): ParamOption<Any>? {
             if (value == null) return null
             return options.firstOrNull { option -> option.value == value }
         }
 
-        private fun hasOptionWithLabel(label: String?): Boolean {
-            if (label == null) return false
-            return options.any { option -> option.label == label }
+        private fun hasOptionWithName(optionName: String?): Boolean {
+            if (optionName == null) return false
+            return options.any { option -> option.name == optionName }
         }
 
-        private fun resolvedSelectedLabel(currentValue: Any?): String? {
+        private fun resolvedSelectedName(currentValue: Any?): String? {
             if (currentValue == null) return null
 
             matchedOptionByValue(currentValue)?.let { matched ->
-                return matched.label
+                return matched.name
             }
 
-            selectedLabelState.value?.takeIf(::hasOptionWithLabel)?.let { selectedLabel ->
-                return selectedLabel
+            selectedNameState.value?.takeIf(::hasOptionWithName)?.let { selectedName ->
+                return selectedName
             }
 
-            labelForValue(currentValue).takeIf(::hasOptionWithLabel)?.let { inferredLabel ->
-                return inferredLabel
+            nameForValue(currentValue).takeIf(::hasOptionWithName)?.let { inferredName ->
+                return inferredName
             }
 
-            return defaultRestoreLabel?.takeIf(::hasOptionWithLabel)
+            return defaultRestoreName?.takeIf(::hasOptionWithName)
         }
 
         override fun toDescriptor(): ParamDescriptor {
             val currentValue = state.value
-            val selectedLabel = resolvedSelectedLabel(currentValue)
+            val selectedName = resolvedSelectedName(currentValue)
             val selectedOption: ParamOption<Any?> = when {
                 currentValue != null -> {
-                    val matched = selectedLabel?.let { label ->
-                        options.firstOrNull { option -> option.label == label }
+                    val matched = selectedName?.let { optionName ->
+                        options.firstOrNull { option -> option.name == optionName }
                     }
                     if (matched != null) {
-                        ParamOption(value = currentValue, label = matched.label)
+                        ParamOption(value = currentValue, name = matched.name)
                     } else {
-                        ParamOption(value = currentValue, label = labelForValue(currentValue))
+                        ParamOption(value = currentValue, name = nameForValue(currentValue))
                     }
                 }
 
                 else -> {
                     val firstOption = options.firstOrNull()
                     if (firstOption != null) {
-                        ParamOption(value = firstOption.value, label = firstOption.label)
+                        ParamOption(value = firstOption.value, name = firstOption.name)
                     } else {
-                        ParamOption(value = null, label = "Not selected")
+                        ParamOption(value = (null as Any?), name = "Not selected")
                     }
                 }
             }
@@ -299,30 +299,30 @@ class SceneScope internal constructor() {
         override fun snapshot(): ParamStateSnapshot = ParamStateSnapshot(
             stateValue = state.value,
             isActive = activationState?.value,
-            selectedLabel = selectedLabelState.value,
+            selectedName = selectedNameState.value,
         )
 
         override fun onActivationChanged(isActive: Boolean) {
             if (isActive) {
                 if (state.value == null) {
-                    val restoredLabel = lastNonNullSelectedLabelState.value
-                        ?: defaultRestoreLabel
-                        ?: options.firstOrNull()?.label
+                    val restoredName = lastNonNullSelectedNameState.value
+                        ?: defaultRestoreName
+                        ?: options.firstOrNull()?.name
                     val restored = lastNonNullState.value ?: defaultRestoreValue ?: options.firstOrNull()?.value
                     if (restored != null) {
                         state.value = restored
                         lastNonNullState.value = restored
-                        selectedLabelState.value = restoredLabel
-                        lastNonNullSelectedLabelState.value = restoredLabel
+                        selectedNameState.value = restoredName
+                        lastNonNullSelectedNameState.value = restoredName
                     }
                 }
             } else {
                 val current = state.value
                 if (current != null) {
                     lastNonNullState.value = current
-                    val selectedLabel = resolvedSelectedLabel(current)
-                    selectedLabelState.value = selectedLabel
-                    lastNonNullSelectedLabelState.value = selectedLabel
+                    val selectedName = resolvedSelectedName(current)
+                    selectedNameState.value = selectedName
+                    lastNonNullSelectedNameState.value = selectedName
                 }
                 state.value = null
             }
@@ -361,11 +361,11 @@ class SceneScope internal constructor() {
 
             is SceneParamIntent.ObjectParamChanged -> {
                 val binding = paramBindings[intent.paramName] as? ObjectParamBinding ?: return
-                if (binding.state.value != intent.option.value || binding.selectedLabelState.value != intent.option.label) {
+                if (binding.state.value != intent.option.value || binding.selectedNameState.value != intent.option.name) {
                     binding.state.value = intent.option.value
                     binding.lastNonNullState.value = intent.option.value
-                    binding.selectedLabelState.value = intent.option.label
-                    binding.lastNonNullSelectedLabelState.value = intent.option.label
+                    binding.selectedNameState.value = intent.option.name
+                    binding.lastNonNullSelectedNameState.value = intent.option.name
                     refreshDescriptorIfStateChanged(intent.paramName)
                 }
             }
@@ -430,39 +430,34 @@ class SceneScope internal constructor() {
             val defaultValue = default.value as Any?
             if (defaultValue == null) {
                 return@remember ExplicitOptionsResolution(
-                    options = nonNullItems.ensureUniqueLabels(),
+                    options = nonNullItems.ensureUniqueNames(),
                     defaultValue = default.value,
-                    defaultLabel = null,
+                    defaultName = null,
                 )
             }
 
-            val requestedDefaultLabel = default.label
+            val requestedDefaultName = default.name
             val existingIndexByValue = nonNullItems.indexOfFirst { option -> option.value == default.value }
                 .takeIf { it >= 0 }
-            val existingIndexByLabel = if (existingIndexByValue == null) {
-                nonNullItems.indexOfFirst { option -> option.label == requestedDefaultLabel }
+            val existingIndexByName = if (existingIndexByValue == null) {
+                nonNullItems.indexOfFirst { option -> option.name == requestedDefaultName }
                     .takeIf { it >= 0 }
             } else {
                 null
             }
 
             val baseOptions = when {
-                existingIndexByValue != null || existingIndexByLabel != null -> nonNullItems
+                existingIndexByValue != null || existingIndexByName != null -> nonNullItems
                 else -> buildList {
-                    add(
-                        ParamOption(
-                            value = default.value,
-                            label = requestedDefaultLabel,
-                        )
-                    )
+                    add(default.value named requestedDefaultName)
                     addAll(nonNullItems)
                 }
             }
-            val matchedIndex = existingIndexByValue ?: existingIndexByLabel ?: 0
-            val normalizedOptions = baseOptions.ensureUniqueLabels()
+            val matchedIndex = existingIndexByValue ?: existingIndexByName ?: 0
+            val normalizedOptions = baseOptions.ensureUniqueNames()
             val resolvedDefaultOption = normalizedOptions[matchedIndex]
             @Suppress("UNCHECKED_CAST")
-            val resolvedDefaultValue = if (existingIndexByLabel != null && existingIndexByValue == null) {
+            val resolvedDefaultValue = if (existingIndexByName != null && existingIndexByValue == null) {
                 resolvedDefaultOption.value
             } else {
                 default.value
@@ -471,19 +466,19 @@ class SceneScope internal constructor() {
             ExplicitOptionsResolution(
                 options = normalizedOptions,
                 defaultValue = resolvedDefaultValue,
-                defaultLabel = resolvedDefaultOption.label,
+                defaultName = resolvedDefaultOption.name,
             )
         }
 
         val resolvedDefault: T = explicitOptionsResolution?.defaultValue ?: default.value
-        val resolvedDefaultLabel: String? = explicitOptionsResolution?.defaultLabel
+        val resolvedDefaultName: String? = explicitOptionsResolution?.defaultName
 
         val state: MutableState<T> = remember { mutableStateOf(resolvedDefault) }
         val lastNonNullBooleanState: MutableState<Boolean?> = remember { mutableStateOf(resolvedDefault as? Boolean) }
         val lastNonNullStringState: MutableState<String?> = remember { mutableStateOf(resolvedDefault as? String) }
         val lastNonNullObjectState: MutableState<Any?> = remember { mutableStateOf(resolvedDefault as Any?) }
-        val selectedObjectLabelState: MutableState<String?> = remember { mutableStateOf(resolvedDefaultLabel) }
-        val lastNonNullSelectedObjectLabelState: MutableState<String?> = remember { mutableStateOf(resolvedDefaultLabel) }
+        val selectedObjectNameState: MutableState<String?> = remember { mutableStateOf(resolvedDefaultName) }
+        val lastNonNullSelectedObjectNameState: MutableState<String?> = remember { mutableStateOf(resolvedDefaultName) }
 
         val isActive: MutableState<Boolean>? = if (declaredNullable == true) {
             remember { mutableStateOf(resolvedDefault != null) }
@@ -519,7 +514,7 @@ class SceneScope internal constructor() {
             val signature = ParamBindingSignature(
                 name = resolvedName,
                 defaultValue = default.value as Any?,
-                defaultLabel = default.label,
+                defaultName = default.name,
                 optionsSignature = explicitOptionsSignature,
                 delegatedType = property.delegatedType,
                 delegatedKClass = property.delegatedKClass,
@@ -616,12 +611,12 @@ class SceneScope internal constructor() {
 
             val optionValues: List<T>? = optionItems?.map { it.value } ?: inferredSealedOptionValues
 
-            fun labelForValue(value: Any?): String {
-                val nonNullValue = value ?: return defaultOptionLabel(value)
+            fun nameForValue(value: Any?): String {
+                val nonNullValue = value ?: return defaultOptionName(value)
                 return optionItems
                     ?.firstOrNull { option -> option.value == nonNullValue }
-                    ?.label
-                    ?: defaultOptionLabel(nonNullValue)
+                    ?.name
+                    ?: defaultOptionName(nonNullValue)
             }
 
             val nullableMode = (default.value as Any?) == null
@@ -655,7 +650,7 @@ class SceneScope internal constructor() {
                 optionValues == null && !nullableMode && default.value is Enum<*> -> {
                     val enumConstants = default.value.javaClass.enumConstants as Array<Enum<*>>
                     val enumOptions: List<ParamOption<Any>> =
-                        enumConstants.map { enumValue -> ParamOption(value = enumValue as Any, label = enumValue.name) }
+                        enumConstants.map { enumValue -> (enumValue as Any) named enumValue.name }
 
                     @Suppress("UNCHECKED_CAST")
                     ObjectParamBinding(
@@ -664,12 +659,12 @@ class SceneScope internal constructor() {
                         activationState = isActive,
                         state = state as MutableState<Any?>,
                         lastNonNullState = lastNonNullObjectState,
-                        selectedLabelState = selectedObjectLabelState,
-                        lastNonNullSelectedLabelState = lastNonNullSelectedObjectLabelState,
+                        selectedNameState = selectedObjectNameState,
+                        lastNonNullSelectedNameState = lastNonNullSelectedObjectNameState,
                         defaultRestoreValue = resolvedDefault as Any?,
-                        defaultRestoreLabel = resolvedDefaultLabel,
-                        options = enumOptions.ensureUniqueLabels(),
-                        labelForValue = ::labelForValue,
+                        defaultRestoreName = resolvedDefaultName,
+                        options = enumOptions.ensureUniqueNames(),
+                        nameForValue = ::nameForValue,
                     )
                 }
 
@@ -690,7 +685,7 @@ class SceneScope internal constructor() {
                     @Suppress("UNCHECKED_CAST")
                     val enumOptions: List<ParamOption<Any>> =
                         requireNotNull(optionItems).map { option ->
-                            ParamOption(option.value as Any, option.label)
+                            (option.value as Any) named option.name
                         }
 
                     @Suppress("UNCHECKED_CAST")
@@ -700,12 +695,12 @@ class SceneScope internal constructor() {
                         activationState = isActive,
                         state = state as MutableState<Any?>,
                         lastNonNullState = lastNonNullObjectState,
-                        selectedLabelState = selectedObjectLabelState,
-                        lastNonNullSelectedLabelState = lastNonNullSelectedObjectLabelState,
+                        selectedNameState = selectedObjectNameState,
+                        lastNonNullSelectedNameState = lastNonNullSelectedObjectNameState,
                         defaultRestoreValue = resolvedDefault as Any?,
-                        defaultRestoreLabel = resolvedDefaultLabel,
-                        options = enumOptions.ensureUniqueLabels(),
-                        labelForValue = ::labelForValue,
+                        defaultRestoreName = resolvedDefaultName,
+                        options = enumOptions.ensureUniqueNames(),
+                        nameForValue = ::nameForValue,
                     )
                 }
 
@@ -713,12 +708,12 @@ class SceneScope internal constructor() {
                     val anyOptions: List<ParamOption<Any>> = if (optionItems != null) {
                         optionItems.mapNotNull { option ->
                             val nonNullValue = option.value as Any? ?: return@mapNotNull null
-                            ParamOption(value = nonNullValue, label = option.label)
+                            nonNullValue named option.name
                         }
                     } else {
                         optionValues.mapNotNull { optionValue ->
                             val nonNullValue = optionValue as Any? ?: return@mapNotNull null
-                            ParamOption(value = nonNullValue, label = labelForValue(nonNullValue))
+                            nonNullValue named nameForValue(nonNullValue)
                         }
                     }
 
@@ -729,12 +724,12 @@ class SceneScope internal constructor() {
                         activationState = isActive,
                         state = state as MutableState<Any?>,
                         lastNonNullState = lastNonNullObjectState,
-                        selectedLabelState = selectedObjectLabelState,
-                        lastNonNullSelectedLabelState = lastNonNullSelectedObjectLabelState,
+                        selectedNameState = selectedObjectNameState,
+                        lastNonNullSelectedNameState = lastNonNullSelectedObjectNameState,
                         defaultRestoreValue = resolvedDefault as Any?,
-                        defaultRestoreLabel = resolvedDefaultLabel,
-                        options = anyOptions.ensureUniqueLabels(),
-                        labelForValue = ::labelForValue,
+                        defaultRestoreName = resolvedDefaultName,
+                        options = anyOptions.ensureUniqueNames(),
+                        nameForValue = ::nameForValue,
                     )
                 }
 
@@ -746,12 +741,12 @@ class SceneScope internal constructor() {
                         activationState = isActive,
                         state = state as MutableState<Any?>,
                         lastNonNullState = lastNonNullObjectState,
-                        selectedLabelState = selectedObjectLabelState,
-                        lastNonNullSelectedLabelState = lastNonNullSelectedObjectLabelState,
+                        selectedNameState = selectedObjectNameState,
+                        lastNonNullSelectedNameState = lastNonNullSelectedObjectNameState,
                         defaultRestoreValue = resolvedDefault as Any?,
-                        defaultRestoreLabel = resolvedDefaultLabel,
+                        defaultRestoreName = resolvedDefaultName,
                         options = emptyList(),
-                        labelForValue = ::labelForValue,
+                        nameForValue = ::nameForValue,
                     )
                 }
             }
@@ -779,10 +774,7 @@ class SceneScope internal constructor() {
     ): ParamProperty<T> =
         paramImpl(
             name = name,
-            default = ParamOption(
-                value = default,
-                label = defaultOptionLabel(default as Any?),
-            ),
+            default = default named defaultOptionName(default as Any?),
             options = null,
             declaredKClass = T::class,
             declaredNullable = (null is T),
@@ -792,7 +784,7 @@ class SceneScope internal constructor() {
     /**
      * Declares a scene parameter from explicit [options].
      *
-     * @param options Allowed values with labels.
+     * @param options Allowed values with names.
      * @param name Optional explicit parameter name. If `null`, delegated property name is used.
      */
     @Composable
@@ -805,7 +797,7 @@ class SceneScope internal constructor() {
         return paramImpl(
             name = name,
             default = if (declaredNullable) {
-                ParamOption(value = null as T, label = defaultOptionLabel(null))
+                (null as T) named defaultOptionName(null)
             } else {
                 options.first()
             },
@@ -819,7 +811,7 @@ class SceneScope internal constructor() {
      * Declares a scene parameter with explicit [default] and [options].
      *
      * @param default Initial parameter value.
-     * @param options Allowed values with labels.
+     * @param options Allowed values with names.
      * @param name Optional explicit parameter name. If `null`, delegated property name is used.
      */
     @Composable
@@ -831,10 +823,7 @@ class SceneScope internal constructor() {
     ): ParamProperty<T> {
         return paramImpl(
             name = name,
-            default = ParamOption(
-                value = default,
-                label = defaultOptionLabel(default as Any?),
-            ),
+            default = default named defaultOptionName(default as Any?),
             options = options,
             declaredKClass = T::class,
             declaredNullable = (null is T),
@@ -842,10 +831,10 @@ class SceneScope internal constructor() {
     }
 
     /**
-     * Declares a scene parameter with labeled [default] and explicit [options].
+     * Declares a scene parameter with named [default] and explicit [options].
      *
-     * @param default Initial parameter value together with a selection label.
-     * @param options Allowed values with labels.
+     * @param default Initial parameter value together with a selection name.
+     * @param options Allowed values with names.
      * @param name Optional explicit parameter name. If `null`, delegated property name is used.
      */
     @Composable
@@ -864,5 +853,11 @@ class SceneScope internal constructor() {
         )
     }
 
-    inline infix fun <reified T> T.named(label: String) = ParamOption(value = this, label = label)
+    /**
+     * Creates a named parameter option with infix syntax.
+     */
+    infix fun <T> T.named(name: String): ParamOption<T> = ParamOption(
+        value = this,
+        name = name,
+    )
 }

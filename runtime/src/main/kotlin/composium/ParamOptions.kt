@@ -12,15 +12,6 @@ data class ParamOption<out T>(
 )
 
 @PublishedApi
-internal fun <T> List<ParamOption<T>>.checkFirstValue(): T = this.let { options ->
-    if (options.isEmpty()) {
-        error("Param options list is empty. Provide at least one option.")
-    } else {
-        options.first().value
-    }
-}
-
-@PublishedApi
 internal fun <T> List<ParamOption<T>>.ensureUniqueNames(): List<ParamOption<T>> {
     if (isEmpty()) return this
 
@@ -45,7 +36,7 @@ internal fun <T> List<ParamOption<T>>.ensureUniqueNames(): List<ParamOption<T>> 
         if (resolvedName == option.name) {
             option
         } else {
-            option.value named resolvedName
+            ParamOption(value = option.value, name = resolvedName)
         }
     }
 }
