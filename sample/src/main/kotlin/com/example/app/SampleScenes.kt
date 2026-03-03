@@ -2,7 +2,7 @@ package com.example.app
 
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
-import oleginvoke.com.composium.optionListLabeled
+import oleginvoke.com.composium.optionList
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
@@ -54,19 +54,19 @@ val tonalNestedPlayground by scene(
 @ComposiumSceneCatalog
 internal object ParameterScenes {
 
-    val labelsAndNullable by scene(
+    val namesAndNullable by scene(
         group = "Parameters/Custom options",
-        name = "Labels + nullable",
+        name = "Names + nullable",
     ) {
         val role: UserRole by param(
             default = UserRole.Member,
         )
         val avatarSize: Int? by param(
             default = null,
-            options = optionListLabeled(
-                32 to "32 dp",
-                48 to "48 dp",
-                72 to "72 dp",
+            options = optionList(
+                32 named "32 dp",
+                48 named "48 dp",
+                72 named "72 dp",
             ),
         )
         val subtitle: String? by param(
@@ -74,7 +74,7 @@ internal object ParameterScenes {
             name = "Subtitle",
         )
 
-        NullableLabelsSceneContent(
+        NullableNamesSceneContent(
             role = role,
             avatarSize = avatarSize,
             subtitle = subtitle,
@@ -87,19 +87,19 @@ internal object ParameterScenes {
     ) {
         val tone: BannerTone by param(BannerTone.Success)
         val spacing: Int by param(
-            default = 16,
-            options = optionListLabeled(
-                8 to "Compact",
-                16 to "Comfortable",
-                24 to "Spacious",
+            default = 16 named "Comfortable",
+            options = optionList(
+                8 named "Compact",
+                16 named "Comfortable",
+                24 named "Spacious",
             ),
         )
-        val actionLabel: String by param("Retry")
+        val actionText: String by param("Retry")
 
         EnumAndNumericOptionsSceneContent(
             tone = tone,
             spacing = spacing,
-            actionLabel = actionLabel,
+            actionText = actionText,
         )
     }
 }
