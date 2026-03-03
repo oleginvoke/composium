@@ -4,11 +4,11 @@ package oleginvoke.com.composium
  * Selectable parameter option.
  *
  * @param value Option value.
- * @param label Option label shown in Composium controls.
+ * @param name Option name shown in Composium controls.
  */
 data class ParamOption<out T>(
     val value: T,
-    val label: String,
+    val name: String,
 )
 
 @PublishedApi
@@ -21,34 +21,31 @@ internal fun <T> List<ParamOption<T>>.checkFirstValue(): T = this.let { options 
 }
 
 @PublishedApi
-internal fun <T> List<ParamOption<T>>.ensureUniqueLabels(): List<ParamOption<T>> {
+internal fun <T> List<ParamOption<T>>.ensureUniqueNames(): List<ParamOption<T>> {
     if (isEmpty()) return this
 
-    val originalLabels = map { option -> option.label }.toSet()
-    val usedLabels = hashSetOf<String>()
+    val originalNames = map { option -> option.name }.toSet()
+    val usedNames = hashSetOf<String>()
 
     return map { option ->
-        val baseLabel = option.label
-        val resolvedLabel = if (usedLabels.add(baseLabel)) {
-            baseLabel
+        val baseName = option.name
+        val resolvedName = if (usedNames.add(baseName)) {
+            baseName
         } else {
             var suffix = 1
-            var candidate = baseLabel + suffix
-            while (candidate in usedLabels || candidate in originalLabels) {
+            var candidate = baseName + suffix
+            while (candidate in usedNames || candidate in originalNames) {
                 suffix++
-                candidate = baseLabel + suffix
+                candidate = baseName + suffix
             }
-            usedLabels.add(candidate)
+            usedNames.add(candidate)
             candidate
         }
 
-        if (resolvedLabel == option.label) {
+        if (resolvedName == option.name) {
             option
         } else {
-            ParamOption(
-                value = option.value,
-                label = resolvedLabel,
-            )
+            option.value named resolvedName
         }
     }
 }
