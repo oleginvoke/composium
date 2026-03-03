@@ -46,14 +46,15 @@ fun <T> SceneScope.optionList(values: List<T>, label: (T) -> String): List<Param
 }
 
 /**
- * Builds parameter options from labeled pairs.
+ * Builds parameter options from labeled values.
  *
- * @param valuesWithLabels Value-label pairs.
+ * @param options Value-label options.
  */
-fun <T> SceneScope.optionListLabeled(vararg valuesWithLabels: Pair<T, String>): List<ParamOption<T>> {
-    return valuesWithLabels.map { (value, text) -> ParamOption(value = value, label = text) }
+fun <T> SceneScope.optionList(vararg options: ParamOption<T>): List<ParamOption<T>> {
+    return options.toList()
 }
 
+@PublishedApi
 internal fun defaultOptionLabel(value: Any?): String = when (value) {
     null -> "null"
     is String, is Number, is Boolean, is Char -> value.toString()
