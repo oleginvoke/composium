@@ -291,7 +291,7 @@ class SceneScope internal constructor() {
 
         private fun hasOptionWithName(optionName: String?): Boolean {
             if (optionName == null) return false
-            return options.any { option -> option.name == optionName }
+            return options.isEmpty() || options.any { option -> option.name == optionName }
         }
 
         private fun resolvedSelectedName(currentValue: Any?): String? {
@@ -322,6 +322,8 @@ class SceneScope internal constructor() {
                     }
                     if (matched != null) {
                         ParamOption(value = currentValue, name = matched.name)
+                    } else if (selectedName != null) {
+                        ParamOption(value = currentValue, name = selectedName)
                     } else {
                         ParamOption(value = currentValue, name = nameForValue(currentValue))
                     }
