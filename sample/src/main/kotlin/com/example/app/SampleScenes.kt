@@ -2,7 +2,6 @@ package com.example.app
 
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
-import oleginvoke.com.composium.optionList
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
@@ -11,7 +10,7 @@ internal val gettingStarted by scene(name = "Getting started") {
 }
 
 @ComposiumScene
-val primaryPlayground by scene(
+internal val primaryPlayground by scene(
     group = "Buttons/Primary", // optional group
     name = "Playground", // optional name
 ) {
@@ -34,7 +33,7 @@ val primaryPlayground by scene(
 }
 
 @ComposiumScene
-val tonalNestedPlayground by scene(
+internal val tonalNestedPlayground by scene(
     group = "Buttons/Secondary/Tonal",
     name = "Nested playground",
 ) {
@@ -63,7 +62,7 @@ internal object ParameterScenes {
         )
         val avatarSize: Int? by param(
             default = null,
-            options = optionList(
+            options = listOf(
                 32 named "32 dp",
                 48 named "48 dp",
                 72 named "72 dp",
@@ -87,12 +86,12 @@ internal object ParameterScenes {
     ) {
         val tone: BannerTone by param(BannerTone.Success)
         val spacing: Int by param(
-            default = 16 named "Comfortable",
-            options = optionList(
-                8 named "Compact",
-                16 named "Comfortable",
-                24 named "Spacious",
-            ),
+            default = 16,
+            options = listOf(
+                8,
+                16,
+                24,
+            ).toParamOptions(),
         )
         val actionText: String by param("Retry")
 
