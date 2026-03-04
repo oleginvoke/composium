@@ -303,7 +303,7 @@ internal val buttonPlayground by scene(group = "Buttons") {
 | `String` | Text field | Automatic |
 | `enum` | Option chips | Values inferred automatically |
 | Sealed object hierarchy | Option chips | Values inferred automatically from object instances |
-| Nullable supported parameter | Checkbox + underlying control | Checkbox toggles null-state |
+| Nullable supported parameter | Checkbox + underlying control | Checkbox toggles null-state; do not add `null` to `options` manually |
 | Any other type with explicit options | Option chips | Use `listOf(...).toParamOptions()` or explicit `named` values |
 
 Important detail: you can use any type as a parameter value, but interactive selection for custom and numeric types requires explicit options unless Composium can infer them automatically.
@@ -348,6 +348,8 @@ What happens in the UI:
 For types like `Int`, `Long`, `Float`, `Double`, or custom objects, define the allowed values explicitly.
 
 Inside `scene {}` you can convert raw values to `List<ParamOption<T>>` with `toParamOptions()`. If you want full control over labels, pass explicit `named` values instead.
+
+If the parameter type is nullable, pass only the non-null choices. Composium handles the `null` state through the checkbox automatically.
 
 ```kotlin
 internal val spacingPlayground by scene(group = "Spacing") {
@@ -421,6 +423,14 @@ val alignment by param(
 )
 ```
 
+Using a named default without explicit options:
+
+```kotlin
+val leadingIcon: Painter? by param(
+    painterResource(R.drawable.solid_attention) named "Attention",
+)
+```
+
 For referential values such as `Painter`, names act as the stable identity for explicit option chips. In these cases, name every option and name the default too when it is declared independently from the option list.
 
 If explicit option names collide inside the same parameter, Composium will append numeric suffixes automatically until every name becomes unique.
@@ -440,10 +450,15 @@ internal val cardPlayground by scene(group = "Cards") {
         ),
     )
 
+    val leadingIcon: Painter? by param(
+        painterResource(R.drawable.solid_attention) named "Attention",
+    )
+
     val subtitle: String? by param(null)
 
     ExampleCard(
         maxLines = maxLines,
+        leadingIcon = leadingIcon,
         subtitle = subtitle,
     )
 }
@@ -453,6 +468,8 @@ What happens in the UI:
 - nullable parameters get a checkbox in the control header;
 - unchecked means the parameter is currently `null`;
 - checked restores the value and shows its regular control.
+
+For nullable parameters with explicit options, do not include `null` in the list yourself. Pass only non-null values and let Composium manage the null-state toggle.
 
 ### Reordering auto-inferred options
 
