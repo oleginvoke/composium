@@ -304,7 +304,7 @@ internal val buttonPlayground by scene(group = "Buttons") {
 | `enum` | Option chips | Values inferred automatically |
 | Sealed object hierarchy | Option chips | Values inferred automatically from object instances |
 | Nullable supported parameter | Checkbox + underlying control | Checkbox toggles null-state |
-| Any other type with explicit options | Option chips | Use `optionList(...)` |
+| Any other type with explicit options | Option chips | Use `listOf(...).toParamOptions()` or explicit `named` values |
 
 Important detail: you can use any type as a parameter value, but interactive selection for custom and numeric types requires explicit options unless Composium can infer them automatically.
 
@@ -345,15 +345,15 @@ What happens in the UI:
 
 ### Explicit options for numbers and custom values
 
-For types like `Int`, `Long`, `Float`, `Double`, or custom objects, define the allowed values explicitly:
+For types like `Int`, `Long`, `Float`, `Double`, or custom objects, define the allowed values explicitly.
+
+Inside `scene {}` you can convert raw values to `List<ParamOption<T>>` with `toParamOptions()`. If you want full control over labels, pass explicit `named` values instead.
 
 ```kotlin
-import oleginvoke.com.composium.optionList
-
 internal val spacingPlayground by scene(group = "Spacing") {
     val elevation: Int by param(
         default = 0 named "None",
-        options = optionList(
+        options = listOf(
             0 named "None",
             2 named "2dp",
             8 named "8dp",
@@ -363,7 +363,7 @@ internal val spacingPlayground by scene(group = "Spacing") {
 
     val alpha: Float by param(
         default = 1f,
-        options = optionList(0.25f, 0.5f, 0.75f, 1f),
+        options = listOf(0.25f, 0.5f, 0.75f, 1f).toParamOptions(),
     )
 
     ExampleCard(
@@ -380,11 +380,9 @@ You can override how options are shown in the controls UI.
 `default` can also be passed as a named option with infix syntax:
 
 ```kotlin
-import oleginvoke.com.composium.optionList
-
 val mode by param(
     default = DisplayMode.Grid named "Grid",
-    options = optionList(
+    options = listOf(
         DisplayMode.Grid named "Grid",
         DisplayMode.List named "List",
     ),
@@ -396,9 +394,11 @@ Using a name mapper:
 ```kotlin
 val role by param(
     default = UserRole.Member,
-    options = optionList(
-        values = listOf(UserRole.Admin, UserRole.Member, UserRole.Guest),
-    ) { role ->
+    options = listOf(
+        UserRole.Admin,
+        UserRole.Member,
+        UserRole.Guest,
+    ).toParamOptions { role ->
         when (role) {
             UserRole.Admin -> "Administrator"
             UserRole.Member -> "Member"
@@ -411,11 +411,9 @@ val role by param(
 Using explicit named values:
 
 ```kotlin
-import oleginvoke.com.composium.optionList
-
 val alignment by param(
     default = AlignmentMode.Center,
-    options = optionList(
+    options = listOf(
         AlignmentMode.Start named "Start",
         AlignmentMode.Center named "Center",
         AlignmentMode.End named "End",
@@ -435,7 +433,7 @@ Nullable parameters get an extra checkbox that controls whether the value is cur
 internal val cardPlayground by scene(group = "Cards") {
     val maxLines: Int? by param(
         default = null,
-        options = optionList(
+        options = listOf(
             1 named "1 line",
             2 named "2 lines",
             3 named "3 lines",
