@@ -860,4 +860,13 @@ class SceneScope internal constructor() {
         value = this,
         name = name,
     )
+
+    /**
+     * Converts an iterable of values to a list of parameter options.
+     *
+     * @param name Optional name function for each value. Defaults to `defaultOptionName`.
+     */
+    inline fun <T> Iterable<T>.toParamOptions(
+        name: (T) -> String = ::defaultOptionName
+    ): List<ParamOption<T>> = map { it named name(it) }
 }
