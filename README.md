@@ -9,11 +9,11 @@ Composium lets you describe UI states as regular Compose scenes, browse them ins
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Current release: `0.5.0-alpha01`
+Current release: `1.0.0-alpha01`
 
 Artifacts:
-- `io.github.oleginvoke:composium:0.5.0-alpha01`
-- `io.github.oleginvoke:composium-processor:0.5.0-alpha01`
+- `io.github.oleginvoke:composium:1.0.0-alpha01`
+- `io.github.oleginvoke:composium-processor:1.0.0-alpha01`
 
 It is useful for:
 - design systems and component libraries;
@@ -95,8 +95,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:0.5.0-alpha01")
-    ksp("io.github.oleginvoke:composium-processor:0.5.0-alpha01")
+    implementation("io.github.oleginvoke:composium:1.0.0-alpha01")
+    ksp("io.github.oleginvoke:composium-processor:1.0.0-alpha01")
 }
 ```
 
@@ -106,7 +106,7 @@ Use this mode when you want automatic scene collection.
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:0.5.0-alpha01")
+    implementation("io.github.oleginvoke:composium:1.0.0-alpha01")
 }
 ```
 
@@ -473,9 +473,13 @@ What happens in the UI:
 
 For nullable parameters with explicit options, do not include `null` in the list yourself. Pass only non-null values and let Composium manage the null-state toggle.
 
+If you declare a nullable parameter with `param(options = ...)` and do not provide an explicit `default`, Composium uses the first option from the list as the initial value (including `null` if it is first).
+
 ### Reordering auto-inferred options
 
 For automatically inferred sealed options, you can still override their display order:
+
+By default, auto-inferred sealed options are sorted by their generated names using natural ordering (for example, `r2`, `r10`, `r100`).
 
 ```kotlin
 val size: ButtonSize by param(ButtonSize.Medium) { inferred ->

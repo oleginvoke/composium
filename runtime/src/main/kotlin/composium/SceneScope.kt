@@ -289,6 +289,11 @@ class SceneScope internal constructor() {
             return options.firstOrNull { option -> option.value == value }
         }
 
+        private fun matchedOptionByName(optionName: String?): ParamOption<Any>? {
+            if (optionName == null) return null
+            return options.firstOrNull { option -> option.name == optionName }
+        }
+
         private fun hasOptionWithName(optionName: String?): Boolean {
             if (optionName == null) return false
             return options.isEmpty() || options.any { option -> option.name == optionName }
@@ -356,10 +361,15 @@ class SceneScope internal constructor() {
         override fun onActivationChanged(isActive: Boolean) {
             if (isActive) {
                 if (state.value == null) {
-                    val restoredName = lastNonNullSelectedNameState.value
-                        ?: defaultRestoreName.takeIf { defaultRestoreValue != null }
-                        ?: options.firstOrNull()?.name
-                    val restored = lastNonNullState.value ?: defaultRestoreValue ?: options.firstOrNull()?.value
+                    val restoredOption = matchedOptionByName(lastNonNullSelectedNameState.value)
+                        ?: matchedOptionByName(defaultRestoreName)
+                        ?: matchedOptionByValue(lastNonNullState.value)
+                        ?: matchedOptionByValue(defaultRestoreValue)
+                        ?: options.firstOrNull()
+                    val restoredName = restoredOption?.name
+                        ?: lastNonNullSelectedNameState.value?.takeIf(::hasOptionWithName)
+                        ?: defaultRestoreName?.takeIf(::hasOptionWithName)
+                    val restored = restoredOption?.value ?: lastNonNullState.value ?: defaultRestoreValue
                     if (restored != null) {
                         state.value = restored
                         lastNonNullState.value = restored
@@ -616,15 +626,20 @@ class SceneScope internal constructor() {
 
                     if (merged.isEmpty()) return null
 
+                    val baselineOrdered: List<Any> = merged.sortedWith { left, right ->
+                        compareAutoInferredValues(left, right)
+                    }
+
                     val orderedAny: List<Any> = when {
                         autoOptionsOrder != null -> {
                             @Suppress("UNCHECKED_CAST")
-                            val typed = merged.map { it as T? }
+                            val typed = baselineOrdered.map { it as T? }
                             autoOptionsOrder(typed).mapNotNull { it as Any? }
                         }
 
                         else -> {
-                            globalAutoOptionsOrder[root]?.invoke(merged.map { it as Any? })?.mapNotNull { it } ?: merged
+                            globalAutoOptionsOrder[root]?.invoke(baselineOrdered.map { it as Any? })?.mapNotNull { it }
+                                ?: baselineOrdered
                         }
                     }
 
@@ -835,11 +850,7 @@ class SceneScope internal constructor() {
         val declaredNullable = (null is T)
         return paramImpl(
             name = name,
-            default = if (declaredNullable) {
-                (null as T) named defaultOptionName(null)
-            } else {
-                options.first()
-            },
+            default = options.first(),
             options = options,
             declaredKClass = T::class,
             declaredNullable = declaredNullable,

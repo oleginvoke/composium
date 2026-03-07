@@ -93,6 +93,7 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
+    implementation(libs.androidx.activity)
     implementation(libs.compose.foundation)
     implementation(libs.compose.animation)
     implementation(libs.androidx.lifecycle.runtime.compose)

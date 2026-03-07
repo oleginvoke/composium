@@ -1,5 +1,9 @@
 package oleginvoke.com.composium.host_screen
 
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -15,15 +19,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
@@ -65,6 +74,11 @@ internal fun ComposiumHostScreen(
     fun closeScene() {
         selectedSceneId = null
     }
+
+    SystemBackHandler(
+        enabled = route is HostScreenRoute.Scene,
+        onBack = ::closeScene,
+    )
 
     LaunchedEffect(sceneIds) {
         val currentId = selectedSceneId
@@ -151,4 +165,48 @@ internal fun ComposiumHostScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SystemBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnBack = rememberUpdatedState(onBack)
+    val callback = remember {
+        object : OnBackPressedCallback(enabled) {
+            override fun handleOnBackPressed() {
+                currentOnBack.value.invoke()
+            }
+        }
+    }
+    val dispatcher = remember(context) {
+        context.findOnBackPressedDispatcherOwner()?.onBackPressedDispatcher
+    }
+
+    SideEffect {
+        callback.isEnabled = enabled
+    }
+
+    DisposableEffect(dispatcher, lifecycleOwner, callback) {
+        if (dispatcher == null) {
+            onDispose {}
+        } else {
+            dispatcher.addCallback(lifecycleOwner, callback)
+            onDispose {
+                callback.remove()
+            }
+        }
+    }
+}
+
+private fun Context.findOnBackPressedDispatcherOwner(): OnBackPressedDispatcherOwner? {
+    var current: Context? = this
+    while (current != null) {
+        if (current is OnBackPressedDispatcherOwner) return current
+        current = (current as? ContextWrapper)?.baseContext
+    }
+    return null
 }
