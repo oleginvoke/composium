@@ -23,12 +23,14 @@ It is useful for:
 - keeping a living UI playground inside the app.
 
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/bd3b5619-3620-4535-94e8-0f099ad2213f">
+    <img src="https://github.com/user-attachments/assets/b91587da-5b54-4462-b1f1-6f24607f833c">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/98e4cf27-f3ca-4ceb-914d-402543810ee4">
+    <img src="https://github.com/user-attachments/assets/c7c8295f-a8d8-4bcc-ba7e-188c85e2b9b5">
 </p>
-
+<p align="center">
+    <img src="https://github.com/user-attachments/assets/b3ef5704-3241-4777-afed-24b7575fbe61">
+</p>
 <p align="center">
     <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
 </p>
