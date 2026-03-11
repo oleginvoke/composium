@@ -29,7 +29,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/c7c8295f-a8d8-4bcc-ba7e-188c85e2b9b5">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/b3ef5704-3241-4777-afed-24b7575fbe61">
+    <img src="https://github.com/user-attachments/assets/4c23b4c6-3681-4cdc-bc6d-ba558c202b20">
 </p>
 <p align="center">
     <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
