@@ -4,12 +4,15 @@ package oleginvoke.com.composium
 import androidx.annotation.Size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import kotlinx.coroutines.flow.filterNotNull
 import oleginvoke.com.composium.scene_screen.SceneParamsCallbacks
 import oleginvoke.com.composium.scene_screen.SceneParamsState
 import kotlin.internal.NoInfer
@@ -522,6 +525,17 @@ class SceneScope internal constructor() {
                 property.lastRegisteredName = null
                 property.bindingSignature = null
             }
+        }
+
+        LaunchedEffect(property) {
+            snapshotFlow {
+                val registeredName = property.lastRegisteredName ?: return@snapshotFlow null
+                paramBindings[registeredName]?.snapshot()?.let { registeredName to it }
+            }
+                .filterNotNull()
+                .collect { (registeredName, _) ->
+                    refreshDescriptorIfStateChanged(registeredName)
+                }
         }
 
         SideEffect { property.explicitName = name }
