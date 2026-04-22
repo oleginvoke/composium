@@ -1,20 +1,10 @@
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.gradle/
+.idea/
+build/
+.externalNativeBuild/
+.cxx/
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+captures/
 local.properties
-
-# Project exclude paths
-/processor/build/
-/processor/build/classes/kotlin/main/
-/runtime/build/
+/local.properties
