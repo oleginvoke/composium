@@ -18,6 +18,74 @@ internal data class SceneSearchIndexItem(
     val groupPathPrefixes: List<String>,
 )
 
+internal enum class MainScreenCatalogMode {
+    EmptyCatalog,
+    FullCatalog,
+    FilteredResults,
+    EmptyResults,
+}
+
+internal data class MainScreenCatalogStatus(
+    val mode: MainScreenCatalogMode,
+    val query: String,
+    val visibleCount: Int,
+    val totalCount: Int,
+)
+
+internal data class SearchFieldImeState(
+    val hasSeenVisibleImeForCurrentFocus: Boolean,
+    val clearFocus: Boolean,
+)
+
+internal fun buildCatalogStatus(
+    query: String,
+    visibleCount: Int,
+    totalCount: Int,
+): MainScreenCatalogStatus {
+    val normalizedQuery = query.trim()
+    val mode = when {
+        totalCount == 0 -> MainScreenCatalogMode.EmptyCatalog
+        normalizedQuery.isBlank() -> MainScreenCatalogMode.FullCatalog
+        visibleCount == 0 -> MainScreenCatalogMode.EmptyResults
+        else -> MainScreenCatalogMode.FilteredResults
+    }
+
+    return MainScreenCatalogStatus(
+        mode = mode,
+        query = normalizedQuery,
+        visibleCount = visibleCount,
+        totalCount = totalCount,
+    )
+}
+
+internal fun reduceSearchFieldImeState(
+    isFocused: Boolean,
+    isImeVisible: Boolean,
+    hasSeenVisibleImeForCurrentFocus: Boolean,
+): SearchFieldImeState {
+    return when {
+        !isFocused -> SearchFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = false,
+        )
+
+        isImeVisible -> SearchFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = true,
+            clearFocus = false,
+        )
+
+        hasSeenVisibleImeForCurrentFocus -> SearchFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = true,
+        )
+
+        else -> SearchFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = false,
+        )
+    }
+}
+
 internal fun buildSceneSearchIndex(
     scenes: List<SceneEntry>,
 ): List<SceneSearchIndexItem> {
