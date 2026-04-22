@@ -1,4 +1,3 @@
-import com.android.build.gradle.ProguardFiles.getDefaultProguardFile
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
