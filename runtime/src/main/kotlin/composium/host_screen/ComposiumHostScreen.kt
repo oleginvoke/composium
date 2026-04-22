@@ -156,10 +156,6 @@ internal fun ComposiumHostScreen(
                             fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
                         }
                     }
-
-                    else -> {
-                        fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
-                    }
                 }
             },
             label = "list_detail",
