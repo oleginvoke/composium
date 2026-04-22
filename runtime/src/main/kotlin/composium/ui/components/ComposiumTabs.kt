@@ -3,6 +3,7 @@ package oleginvoke.com.composium.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +27,10 @@ internal fun ComposiumTabRow(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(containerColor),
+            .clip(Tokens.shapes.large)
+            .background(containerColor)
+            .border(1.dp, Tokens.colors.outlineVariant, Tokens.shapes.large)
+            .padding(4.dp),
     ) {
         tabs()
     }
@@ -40,23 +44,22 @@ internal fun ComposiumTab(
     text: String,
 ) {
     val bg by animateColorAsState(
-        targetValue = if (selected) Tokens.colors.primaryContainer else Color.Transparent,
+        targetValue = if (selected) Tokens.colors.inverseSurface else Color.Transparent,
         animationSpec = tween(200),
         label = "tab_bg",
     )
     val fg by animateColorAsState(
-        targetValue = if (selected) Tokens.colors.onPrimaryContainer else Tokens.colors.onSurface,
+        targetValue = if (selected) Tokens.colors.inverseOnSurface else Tokens.colors.onSurfaceVariant,
         animationSpec = tween(200),
         label = "tab_fg",
     )
     Box(
         modifier = modifier
-            .height(40.dp)
-            .padding(horizontal = 4.dp, vertical = 4.dp)
-            .clip(Tokens.shapes.medium)
+            .height(44.dp)
+            .clip(Tokens.shapes.pill)
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         ComposiumText(

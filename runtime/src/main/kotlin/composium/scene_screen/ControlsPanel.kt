@@ -3,7 +3,6 @@ package oleginvoke.com.composium.scene_screen
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.BooleanParamDescriptor
 import oleginvoke.com.composium.ObjectParamDescriptor
@@ -46,12 +47,13 @@ import oleginvoke.com.composium.ui.theme.Tokens
 internal fun ControlsPanel(
     state: SceneParamsState,
     callbacks: SceneParamsCallbacks,
+    contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(state.params, key = { it.name }) { param ->
             ParamCard(
@@ -69,18 +71,32 @@ private fun ParamCard(
     callbacks: SceneParamsCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    val shape = Tokens.shapes.medium
+    val isActive = paramDescriptor.activation?.isActive != false
+    val shape = Tokens.shapes.large
+    val shadowElevation: Dp = if (isActive) 14.dp else 8.dp
+    val containerColor = if (isActive) {
+        Tokens.colors.surface.copy(alpha = 0.94f)
+    } else {
+        Tokens.colors.surface.copy(alpha = 0.78f)
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = shadowElevation,
+                shape = shape,
+                ambientColor = Tokens.colors.scrim.copy(alpha = 0.22f),
+                spotColor = Tokens.colors.scrim.copy(alpha = 0.28f),
+            )
             .clip(shape)
-            .background(Tokens.colors.surfaceVariant)
+            .background(containerColor)
             .border(
                 width = 1.dp,
-                color = Tokens.colors.outlineVariant.copy(alpha = 0.9f),
+                color = if (isActive) Tokens.colors.outlineVariant else Tokens.colors.outlineVariant.copy(alpha = 0.72f),
                 shape = shape,
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Column(
             modifier = Modifier
@@ -89,107 +105,109 @@ private fun ParamCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 ParamHeader(
-                    modifier = Modifier,
                     paramName = paramDescriptor.name,
                     paramType = paramDescriptor.typeName,
                 )
                 paramDescriptor.activation?.let { activation ->
                     ComposiumCheckbox(
-                        modifier = Modifier,
                         checked = activation.isActive,
                         size = 20.dp,
-                        onCheckedChange = { isActive ->
+                        onCheckedChange = { next ->
                             callbacks.onParamActivationChange(
                                 paramName = paramDescriptor.name,
-                                isActive = isActive,
+                                isActive = next,
                             )
                         },
                     )
                 }
             }
-            if (paramDescriptor.activation?.isActive != false) {
-                Spacer(Modifier.height(4.dp))
-                when (paramDescriptor) {
-                    is BooleanParamDescriptor -> {
-                        ComposiumSwitch(
-                            modifier = Modifier,
-                            checked = paramDescriptor.value,
-                            onCheckedChange = { value ->
-                                callbacks.onBooleanParamChange(
-                                    paramName = paramDescriptor.name,
-                                    value = value,
-                                )
-                            },
-                        )
-                    }
 
-                    is ObjectParamDescriptor -> {
-                        val options = paramDescriptor.options
-                        val hasChoices = options.size > 1
-                        var expanded by rememberSaveable { mutableStateOf(false) }
+            if (!isActive) return@Column
 
-                        if (hasChoices) {
-                            FlowRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .animateContentSize(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                maxLines = if (!expanded) 2 else Int.MAX_VALUE,
-                                overflow = FlowRowOverflow.expandIndicator {
-                                    ComposiumChip(
-                                        text = "Show all",
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ComposiumChipDefaults.colors(
-                                            unselectedBackgroundColor = Tokens.colors.tertiaryContainer,
-                                            unselectedBorderColor = Tokens.colors.outline.copy(alpha = 0.5f),
-                                        ),
-                                        modifier = Modifier
-                                            .height(22.dp)
-                                            .clickable { expanded = true },
-                                    )
-                                },
-                            ) {
-                                options.forEach { option ->
-                                    ComposiumChip(
-                                        modifier = Modifier
-                                            .height(22.dp)
-                                            .clickable {
-                                                callbacks.onObjectParamChange(
-                                                    paramName = paramDescriptor.name,
-                                                    option = option,
-                                                )
-                                            },
-                                        text = option.name,
-                                        selected = option.name == paramDescriptor.selectedOption.name,
-                                    )
-                                }
-                            }
-                        } else {
-                            ComposiumText(
-                                text = paramDescriptor.selectedOption.name,
-                                style = Tokens.typography.bodySmall,
-                                color = Tokens.colors.onSurfaceVariant,
+            Spacer(Modifier.height(10.dp))
+
+            when (paramDescriptor) {
+                is BooleanParamDescriptor -> {
+                    ComposiumSwitch(
+                        checked = paramDescriptor.value,
+                        onCheckedChange = { value ->
+                            callbacks.onBooleanParamChange(
+                                paramName = paramDescriptor.name,
+                                value = value,
                             )
-                        }
-                    }
+                        },
+                    )
+                }
 
-                    is StringParamDescriptor -> {
-                        ComposiumTextField(
-                            value = paramDescriptor.value,
-                            onValueChange = { value ->
-                                callbacks.onStringParamChange(
-                                    paramName = paramDescriptor.name,
-                                    value = value,
+                is ObjectParamDescriptor -> {
+                    val options = paramDescriptor.options
+                    val hasChoices = options.size > 1
+                    var expanded by rememberSaveable { mutableStateOf(false) }
+
+                    if (hasChoices) {
+                        FlowRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateContentSize(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            maxLines = if (!expanded) 2 else Int.MAX_VALUE,
+                            overflow = FlowRowOverflow.expandIndicator {
+                                ComposiumChip(
+                                    text = "Show all",
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ComposiumChipDefaults.colors(
+                                        selectedBackgroundColor = Tokens.colors.secondaryContainer,
+                                        selectedBorderColor = Tokens.colors.secondaryContainer,
+                                        selectedContentColor = Tokens.colors.onSecondaryContainer,
+                                        unselectedBackgroundColor = Tokens.colors.secondaryContainer,
+                                        unselectedBorderColor = Tokens.colors.secondaryContainer,
+                                        unselectedContentColor = Tokens.colors.onSecondaryContainer,
+                                    ),
+                                    modifier = Modifier.height(24.dp),
+                                    onClick = { expanded = true },
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            options.forEach { option ->
+                                ComposiumChip(
+                                    modifier = Modifier.height(24.dp),
+                                    text = option.name,
+                                    selected = option.name == paramDescriptor.selectedOption.name,
+                                    onClick = {
+                                        callbacks.onObjectParamChange(
+                                            paramName = paramDescriptor.name,
+                                            option = option,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    } else {
+                        ComposiumText(
+                            text = paramDescriptor.selectedOption.name,
+                            style = Tokens.typography.bodySmall,
+                            color = Tokens.colors.onSurfaceVariant,
                         )
                     }
+                }
+
+                is StringParamDescriptor -> {
+                    ComposiumTextField(
+                        value = paramDescriptor.value,
+                        onValueChange = { value ->
+                            callbacks.onStringParamChange(
+                                paramName = paramDescriptor.name,
+                                value = value,
+                            )
+                        },
+                        placeholder = "Enter text",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -199,19 +217,25 @@ private fun ParamCard(
 @Composable
 private fun ParamTypeChip(text: String) {
     ComposiumChip(
-        modifier = Modifier,
         shape = RoundedCornerShape(12.dp),
         colors = ComposiumChipDefaults.colors(
+            selectedBackgroundColor = Color.Transparent,
+            selectedBorderColor = Tokens.colors.outlineVariant,
+            selectedContentColor = Tokens.colors.onSurfaceVariant,
             unselectedBackgroundColor = Color.Transparent,
-            unselectedBorderColor = Tokens.colors.outline.copy(alpha = 0.12f),
+            unselectedBorderColor = Tokens.colors.outlineVariant,
+            unselectedContentColor = Tokens.colors.onSurfaceVariant,
         ),
         text = text,
     )
 }
 
 @Composable
-private fun ParamHeader(modifier: Modifier = Modifier, paramName: String, paramType: String) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+private fun ParamHeader(
+    paramName: String,
+    paramType: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         ComposiumText(
             text = paramName,
             style = Tokens.typography.titleMedium,

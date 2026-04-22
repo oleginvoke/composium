@@ -101,4 +101,6 @@ dependencies {
     // Previews live in the debug source-set.
     debugImplementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
+
+    testImplementation(kotlin("test"))
 }

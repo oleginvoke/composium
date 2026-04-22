@@ -3,6 +3,7 @@ package oleginvoke.com.composium.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -30,9 +31,18 @@ internal fun ComposiumChip(
     colors: ComposiumChipColors = ComposiumChipDefaults.colors(),
     shape: Shape = RoundedCornerShape(4.dp),
     selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
+            .clip(shape)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .border(
                 shape = shape,
                 border = BorderStroke(
@@ -44,13 +54,11 @@ internal fun ComposiumChip(
                 color = if (selected) colors.selectedBackgroundColor else colors.unselectedBackgroundColor,
                 shape = shape,
             )
-            .clip(shape)
             .height(20.dp)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val onSurfaceVariant = Tokens.colors.onSurfaceVariant
         BasicText(
             modifier = Modifier,
             text = text,
@@ -58,7 +66,9 @@ internal fun ComposiumChip(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             ),
-            color = ColorProducer { onSurfaceVariant },
+            color = ColorProducer {
+                if (selected) colors.selectedContentColor else colors.unselectedContentColor
+            },
         )
     }
 }
@@ -67,24 +77,30 @@ internal fun ComposiumChip(
 internal data class ComposiumChipColors(
     val selectedBackgroundColor: Color,
     val selectedBorderColor: Color,
+    val selectedContentColor: Color,
     val unselectedBackgroundColor: Color,
     val unselectedBorderColor: Color,
+    val unselectedContentColor: Color,
 )
 
 internal object ComposiumChipDefaults {
 
     @Composable
     fun colors(
-        selectedBackgroundColor: Color = Tokens.colors.primaryContainer,
-        selectedBorderColor: Color = Tokens.colors.primaryContainer,
-        unselectedBackgroundColor: Color = Tokens.colors.secondaryContainer.copy(alpha = 0.2f),
+        selectedBackgroundColor: Color = Tokens.colors.primary,
+        selectedBorderColor: Color = Tokens.colors.primary,
+        selectedContentColor: Color = Tokens.colors.onPrimary,
+        unselectedBackgroundColor: Color = Tokens.colors.surface,
         unselectedBorderColor: Color = Tokens.colors.outline,
+        unselectedContentColor: Color = Tokens.colors.onSurfaceVariant,
     ): ComposiumChipColors {
         return ComposiumChipColors(
             selectedBackgroundColor = selectedBackgroundColor,
             selectedBorderColor = selectedBorderColor,
+            selectedContentColor = selectedContentColor,
             unselectedBackgroundColor = unselectedBackgroundColor,
             unselectedBorderColor = unselectedBorderColor,
+            unselectedContentColor = unselectedContentColor,
         )
     }
 }

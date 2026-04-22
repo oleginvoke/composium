@@ -5,11 +5,14 @@ import android.content.ContextWrapper
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -93,8 +96,15 @@ internal fun ComposiumHostScreen(
             .background(Tokens.colors.background)
             .then(
                 if (contentWindowInsets != null) {
+                    val hostInsets = when (route) {
+                        HostScreenRoute.Main ->
+                            contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+
+                        is HostScreenRoute.Scene ->
+                            contentWindowInsets.only(WindowInsetsSides.Horizontal)
+                    }
                     Modifier.windowInsetsPadding(
-                        contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                        hostInsets,
                     )
                 } else {
                     Modifier
@@ -104,12 +114,24 @@ internal fun ComposiumHostScreen(
         AnimatedContent(
             targetState = route,
             transitionSpec = {
+                val scaleSpec = spring<Float>(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow,
+                )
                 when (initialState) {
                     is HostScreenRoute.Main -> {
                         if (targetState is HostScreenRoute.Scene) {
-                            (fadeIn(tween(220)) + slideInHorizontally(initialOffsetX = { width -> width / 4 }, animationSpec = tween(280)))
+                            (
+                                fadeIn(tween(260)) +
+                                    scaleIn(initialScale = 0.97f, animationSpec = scaleSpec) +
+                                    slideInHorizontally(
+                                        initialOffsetX = { width -> width / 8 },
+                                        animationSpec = tween(280),
+                                    )
+                                )
                                 .togetherWith(
-                                    fadeOut(tween(180)) + slideOutHorizontally(targetOffsetX = { width -> -width / 4 }, animationSpec = tween(260)),
+                                    fadeOut(tween(180)) +
+                                        scaleOut(targetScale = 1.02f, animationSpec = tween(260)),
                                 )
                         } else {
                             fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
@@ -118,9 +140,17 @@ internal fun ComposiumHostScreen(
 
                     is HostScreenRoute.Scene -> {
                         if (targetState is HostScreenRoute.Main) {
-                            (fadeIn(tween(220)) + slideInHorizontally(initialOffsetX = { width -> -width / 4 }, animationSpec = tween(280)))
+                            (
+                                fadeIn(tween(260)) +
+                                    scaleIn(initialScale = 1.02f, animationSpec = scaleSpec) +
+                                    slideInHorizontally(
+                                        initialOffsetX = { width -> -width / 10 },
+                                        animationSpec = tween(280),
+                                    )
+                                )
                                 .togetherWith(
-                                    fadeOut(tween(180)) + slideOutHorizontally(targetOffsetX = { width -> width / 4 }, animationSpec = tween(260)),
+                                    fadeOut(tween(180)) +
+                                        scaleOut(targetScale = 0.97f, animationSpec = tween(260)),
                                 )
                         } else {
                             fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
