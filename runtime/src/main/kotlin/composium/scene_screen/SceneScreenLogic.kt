@@ -11,15 +11,41 @@ import kotlin.math.roundToInt
 internal const val DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION = 0.60f
 internal const val MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION = 0.18f
 internal const val MAX_SCENE_INSPECTOR_EXPAND_SNAP_FRACTION = 0.84f
+internal const val TOPBAR_EXPANDED_CROSSFADE_START_FRACTION = 0.72f
 
-private const val MIN_SCENE_INSPECTOR_DRAG_FRACTION = 0.08f
-private const val MAX_SCENE_INSPECTOR_DRAG_FRACTION = 0.92f
+private const val MIN_SCENE_INSPECTOR_DRAG_FRACTION = 0f
+private const val MAX_SCENE_INSPECTOR_DRAG_FRACTION = 1f
+
+internal data class SceneTopBarCrossfadeState(
+    val expandedProgress: Float,
+    val splitInteractive: Boolean,
+    val expandedInteractive: Boolean,
+    val splitZIndex: Float,
+    val expandedZIndex: Float,
+)
 
 internal data class SceneLayoutMetrics(
     val previewVisibleHeightPx: Int,
     val previewComposedHeightPx: Int,
     val inspectorHeightPx: Int,
 )
+
+internal fun calculateSceneTopBarCrossfadeState(
+    inspectorFraction: Float,
+): SceneTopBarCrossfadeState {
+    val expandedProgress = ((inspectorFraction - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION) /
+        (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION))
+        .coerceIn(0f, 1f)
+    val expandedDominant = expandedProgress >= 0.5f
+
+    return SceneTopBarCrossfadeState(
+        expandedProgress = expandedProgress,
+        splitInteractive = !expandedDominant,
+        expandedInteractive = expandedDominant,
+        splitZIndex = if (expandedDominant) 0f else 1f,
+        expandedZIndex = if (expandedDominant) 1f else 0f,
+    )
+}
 
 internal fun calculateSceneLayoutMetrics(
     availableHeightPx: Int,

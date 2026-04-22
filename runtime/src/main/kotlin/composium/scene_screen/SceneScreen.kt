@@ -7,9 +7,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -46,8 +45,11 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -59,14 +61,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
@@ -80,6 +85,7 @@ import oleginvoke.com.composium.ui.components.ComposiumThemeToggle
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
+import kotlin.math.roundToInt
 
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
@@ -160,6 +166,38 @@ internal fun SceneScreen(
         },
     )
 
+    val targetFraction = when (state.controlsSheet.layoutMode) {
+        SceneInspectorLayoutMode.Closed -> 0f
+        SceneInspectorLayoutMode.Split -> state.controlsSheet.splitFraction.coerceIn(0f, 1f)
+        SceneInspectorLayoutMode.Expanded -> 1f
+    }
+    val inspectorFraction = remember { Animatable(targetFraction) }
+    var isInspectorDragging by remember { mutableStateOf(false) }
+    var isInspectorComposed by remember { mutableStateOf(targetFraction > 0f) }
+
+    LaunchedEffect(targetFraction, isInspectorDragging) {
+        if (targetFraction > 0f) isInspectorComposed = true
+        if (isInspectorDragging) {
+            inspectorFraction.snapTo(targetFraction)
+        } else {
+            inspectorFraction.animateTo(targetFraction, Motion.tweenStandard())
+            if (targetFraction == 0f) {
+                isInspectorComposed = false
+            }
+        }
+    }
+
+    val inspectorFractionProvider: () -> Float = remember(inspectorFraction) {
+        { inspectorFraction.value }
+    }
+    val expandedProgressProvider: () -> Float = remember(inspectorFraction) {
+        {
+            val f = inspectorFraction.value
+            ((f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION) /
+                (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION)).coerceIn(0f, 1f)
+        }
+    }
+
     ComposiumPreviewCanvas(
         modifier = modifier
             .fillMaxSize(),
@@ -179,6 +217,13 @@ internal fun SceneScreen(
                     callbacks = callbacks,
                     paramsCallbacks = paramsCallbacks,
                     contentWindowInsets = contentWindowInsets,
+                    inspectorFractionProvider = inspectorFractionProvider,
+                    isInspectorComposed = isInspectorComposed,
+                    onInspectorDragStart = { isInspectorDragging = true },
+                    onInspectorDragStop = {
+                        isInspectorDragging = false
+                        callbacks.onSettleSplitFraction()
+                    },
                     modifier = Modifier
                         .fillMaxSize(),
                 )
@@ -188,6 +233,7 @@ internal fun SceneScreen(
                     controlsSheet = state.controlsSheet,
                     isDarkTheme = themeController.isDarkTheme,
                     callbacks = callbacks,
+                    expandedProgressProvider = expandedProgressProvider,
                     statusBarInsets = contentWindowInsets,
                     modifier = Modifier.align(Alignment.TopStart),
                 )
@@ -202,10 +248,19 @@ private fun SceneScreenTopBar(
     controlsSheet: ControlsSheetUiState,
     isDarkTheme: Boolean,
     callbacks: SceneScreenCallbacks,
+    expandedProgressProvider: () -> Float,
     statusBarInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
     val controlsLayout = controlsSheet.layoutMode
+    val crossfadeState by remember(expandedProgressProvider) {
+        derivedStateOf {
+            calculateSceneTopBarCrossfadeState(
+                inspectorFraction = TOPBAR_EXPANDED_CROSSFADE_START_FRACTION +
+                    (expandedProgressProvider() * (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION)),
+            )
+        }
+    }
 
     Column(
         modifier = modifier
@@ -217,72 +272,112 @@ private fun SceneScreenTopBar(
             .padding(horizontal = 12.dp)
             .padding(top = 10.dp, bottom = 12.dp),
     ) {
-        AnimatedContent(
-            targetState = controlsLayout == SceneInspectorLayoutMode.Expanded,
-            transitionSpec = {
-                fadeIn(Motion.tweenStandard()) togetherWith fadeOut(Motion.tweenFast())
-            },
-            label = "scene_top_bar_mode",
-        ) { isExpandedInspector ->
-            if (isExpandedInspector) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    SceneTopBarActionButton(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to split layout",
-                        onClick = callbacks::onNavigateBackFromExpandedControls,
-                    )
-                    SceneExpandedControlsTitleIsland(
-                        sceneEntry = sceneEntry,
-                        selectedTab = controlsSheet.selectedTab,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SceneTopBarActionButton(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Close settings",
-                        onClick = callbacks::onDismissControls,
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    SceneTopBarActionButton(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = if (controlsSheet.isVisible) "Close settings" else "Back",
-                        onClick = if (controlsSheet.isVisible) callbacks::onDismissControls else callbacks::onBack,
-                    )
-                    SceneSceneTitleIsland(
-                        sceneEntry = sceneEntry,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        SceneTopBarActionButton(
-                            imageVector = Icons.Outlined.Tune,
-                            contentDescription = if (controlsLayout == SceneInspectorLayoutMode.Split) {
-                                "Close properties"
-                            } else {
-                                "Open properties"
-                            },
-                            onClick = callbacks::onToggleControls,
-                            active = controlsLayout == SceneInspectorLayoutMode.Split,
-                        )
-                        ComposiumThemeToggle(
-                            isDark = isDarkTheme,
-                            onToggle = callbacks::onThemeChange,
-                        )
-                    }
-                }
-            }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            SplitTopBarRow(
+                sceneEntry = sceneEntry,
+                controlsLayout = controlsLayout,
+                isVisible = controlsSheet.isVisible,
+                isDarkTheme = isDarkTheme,
+                callbacks = callbacks,
+                interactive = crossfadeState.splitInteractive,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = 1f - crossfadeState.expandedProgress }
+                    .zIndex(crossfadeState.splitZIndex),
+            )
+            ExpandedTopBarRow(
+                sceneEntry = sceneEntry,
+                selectedTab = controlsSheet.selectedTab,
+                callbacks = callbacks,
+                interactive = crossfadeState.expandedInteractive,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = crossfadeState.expandedProgress }
+                    .zIndex(crossfadeState.expandedZIndex),
+            )
         }
+    }
+}
+
+@Composable
+private fun SplitTopBarRow(
+    sceneEntry: SceneEntry,
+    controlsLayout: SceneInspectorLayoutMode,
+    isVisible: Boolean,
+    isDarkTheme: Boolean,
+    callbacks: SceneScreenCallbacks,
+    interactive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SceneTopBarActionButton(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = if (isVisible) "Close settings" else "Back",
+            onClick = if (isVisible) callbacks::onDismissControls else callbacks::onBack,
+            enabled = interactive,
+        )
+        SceneSceneTitleIsland(
+            sceneEntry = sceneEntry,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SceneTopBarActionButton(
+                imageVector = Icons.Outlined.Tune,
+                contentDescription = if (controlsLayout == SceneInspectorLayoutMode.Split) {
+                    "Close properties"
+                } else {
+                    "Open properties"
+                },
+                onClick = callbacks::onToggleControls,
+                active = controlsLayout == SceneInspectorLayoutMode.Split,
+                enabled = interactive,
+            )
+            ComposiumThemeToggle(
+                isDark = isDarkTheme,
+                onToggle = callbacks::onThemeChange,
+                enabled = interactive,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpandedTopBarRow(
+    sceneEntry: SceneEntry,
+    selectedTab: SceneInspectorTab,
+    callbacks: SceneScreenCallbacks,
+    interactive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SceneTopBarActionButton(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back to split layout",
+            onClick = callbacks::onNavigateBackFromExpandedControls,
+            enabled = interactive,
+        )
+        SceneExpandedControlsTitleIsland(
+            sceneEntry = sceneEntry,
+            selectedTab = selectedTab,
+            modifier = Modifier.weight(1f),
+        )
+        SceneTopBarActionButton(
+            imageVector = Icons.Filled.Close,
+            contentDescription = "Close settings",
+            onClick = callbacks::onDismissControls,
+            enabled = interactive,
+        )
     }
 }
 
@@ -376,11 +471,14 @@ private fun SceneScreenContent(
     isDarkTheme: Boolean,
     callbacks: SceneScreenCallbacks,
     paramsCallbacks: SceneParamsCallbacks,
+    inspectorFractionProvider: () -> Float,
+    isInspectorComposed: Boolean,
+    onInspectorDragStart: () -> Unit,
+    onInspectorDragStop: () -> Unit,
     contentWindowInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    var isInspectorDragging by remember(controlsSheet.layoutMode) { mutableStateOf(false) }
     var hasPreviewOverflow by remember(sceneEntry.id) { mutableStateOf(false) }
     val topInset = contentWindowInsets?.getTop(density)?.let { inset ->
         with(density) { inset.toDp() }
@@ -390,6 +488,12 @@ private fun SceneScreenContent(
     } ?: 0.dp
     val contentTopPadding = topInset + 88.dp
 
+    val previewAlpha = animateFloatAsState(
+        targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
+        animationSpec = Motion.tweenStandard(),
+        label = "scene_preview_alpha",
+    )
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -397,27 +501,6 @@ private fun SceneScreenContent(
             .padding(top = contentTopPadding),
     ) {
         val availableHeightPx = constraints.maxHeight
-        val layoutMetrics = calculateSceneLayoutMetrics(
-            availableHeightPx = availableHeightPx,
-            mode = controlsSheet.layoutMode,
-            splitFraction = controlsSheet.splitFraction,
-        )
-        val sizeAnimationSpec = if (isInspectorDragging) snap() else Motion.tweenStandard<Dp>()
-        val previewComposedHeight by animateDpAsState(
-            targetValue = with(density) { layoutMetrics.previewComposedHeightPx.toDp() },
-            animationSpec = sizeAnimationSpec,
-            label = "scene_preview_composed_height",
-        )
-        val inspectorHeight by animateDpAsState(
-            targetValue = with(density) { layoutMetrics.inspectorHeightPx.toDp() },
-            animationSpec = sizeAnimationSpec,
-            label = "scene_inspector_height",
-        )
-        val previewAlpha by animateFloatAsState(
-            targetValue = if (layoutMetrics.previewVisibleHeightPx > 0) 1f else 0f,
-            animationSpec = if (isInspectorDragging) snap() else Motion.tweenStandard(),
-            label = "scene_preview_alpha",
-        )
         val showSplitDivider = shouldShowSceneSplitDivider(
             mode = controlsSheet.layoutMode,
             hasScrollableOverflow = hasPreviewOverflow,
@@ -427,7 +510,8 @@ private fun SceneScreenContent(
             ScenePreviewPane(
                 sceneEntry = sceneEntry,
                 sceneScope = sceneScope,
-                minimumCanvasHeight = previewComposedHeight,
+                availableHeightPx = availableHeightPx,
+                inspectorFractionProvider = inspectorFractionProvider,
                 layoutMode = controlsSheet.layoutMode,
                 onOverflowChanged = { hasOverflow ->
                     hasPreviewOverflow = hasOverflow
@@ -440,11 +524,10 @@ private fun SceneScreenContent(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .height(previewComposedHeight)
-                    .graphicsLayer { alpha = previewAlpha },
+                    .graphicsLayer { alpha = previewAlpha.value },
             )
 
-            if (inspectorHeight > 0.5.dp) {
+            if (isInspectorComposed) {
                 SceneInspectorPane(
                     paramsState = paramsState,
                     scenePreview = sceneScope.preview,
@@ -459,19 +542,16 @@ private fun SceneScreenContent(
                     },
                     availableHeightPx = availableHeightPx,
                     splitFraction = controlsSheet.splitFraction,
+                    inspectorFractionProvider = inspectorFractionProvider,
                     onSplitFractionChanged = callbacks::onUpdateSplitFraction,
-                    onSplitFractionDragStart = { isInspectorDragging = true },
-                    onSplitFractionDragStop = {
-                        isInspectorDragging = false
-                        callbacks.onSettleSplitFraction()
-                    },
+                    onSplitFractionDragStart = onInspectorDragStart,
+                    onSplitFractionDragStop = onInspectorDragStop,
                     onTabSelected = callbacks::onTabSelected,
                     onThemeChange = callbacks::onThemeChange,
                     bottomInset = bottomInset,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(inspectorHeight),
+                        .fillMaxWidth(),
                 )
             }
         }
@@ -485,6 +565,7 @@ private fun SceneTopBarActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     active: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (active) {
@@ -518,7 +599,7 @@ private fun SceneTopBarActionButton(
             .border(1.dp, borderColor, Tokens.shapes.pill),
         contentAlignment = Alignment.Center,
     ) {
-        ComposiumIconButton(onClick = onClick) {
+        ComposiumIconButton(onClick = onClick, enabled = enabled) {
             ComposiumIcon(
                 imageVector = imageVector,
                 contentDescription = contentDescription,
@@ -533,7 +614,8 @@ private fun SceneTopBarActionButton(
 private fun ScenePreviewPane(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
-    minimumCanvasHeight: androidx.compose.ui.unit.Dp,
+    availableHeightPx: Int,
+    inspectorFractionProvider: () -> Float,
     layoutMode: SceneInspectorLayoutMode,
     onOverflowChanged: (Boolean) -> Unit,
     onBackgroundTap: (() -> Unit)?,
@@ -541,18 +623,31 @@ private fun ScenePreviewPane(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scrollState = rememberScrollState()
-    val showOverflowDivider = shouldShowSceneSplitDivider(
-        mode = layoutMode,
-        hasScrollableOverflow = scrollState.maxValue > 0,
-    )
+    val showOverflowDivider by remember(scrollState, layoutMode) {
+        derivedStateOf {
+            shouldShowSceneSplitDivider(
+                mode = layoutMode,
+                hasScrollableOverflow = scrollState.maxValue > 0,
+            )
+        }
+    }
 
-    SideEffect {
+    LaunchedEffect(showOverflowDivider) {
         onOverflowChanged(showOverflowDivider)
     }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
+                val full = if (constraints.hasBoundedHeight) constraints.maxHeight else availableHeightPx
+                val clamped = ((1f - fraction) * full).roundToInt().coerceIn(1, full)
+                val placeable = measurable.measure(
+                    constraints.copy(minHeight = 0, maxHeight = clamped),
+                )
+                layout(placeable.width, clamped) { placeable.place(0, 0) }
+            }
             .then(
                 if (onBackgroundTap != null) {
                     Modifier.clickable(
@@ -565,20 +660,32 @@ private fun ScenePreviewPane(
                 }
             ),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+        ) {
+            ScenePreviewContent(
+                sceneEntry = sceneEntry,
+                sceneScope = sceneScope,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState),
-            ) {
-                ScenePreviewContent(
-                    sceneEntry = sceneEntry,
-                    sceneScope = sceneScope,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minimumCanvasHeight),
-                )
-            }
+                    .fillMaxWidth()
+                    .layout { measurable, constraints ->
+                        val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
+                        val minH = ((1f - fraction) * availableHeightPx)
+                            .roundToInt()
+                            .coerceAtLeast(0)
+                        val placeable = measurable.measure(
+                            Constraints(
+                                minWidth = constraints.minWidth,
+                                maxWidth = constraints.maxWidth,
+                                minHeight = minH,
+                                maxHeight = Constraints.Infinity,
+                            ),
+                        )
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    },
+            )
         }
     }
 }
@@ -594,6 +701,7 @@ private fun SceneInspectorPane(
     onBackgroundTap: (() -> Unit)?,
     availableHeightPx: Int,
     splitFraction: Float,
+    inspectorFractionProvider: () -> Float,
     onSplitFractionChanged: (Float) -> Unit,
     onSplitFractionDragStart: () -> Unit,
     onSplitFractionDragStop: () -> Unit,
@@ -616,6 +724,15 @@ private fun SceneInspectorPane(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
+                val full = if (constraints.hasBoundedHeight) constraints.maxHeight else availableHeightPx
+                val h = (fraction * full).roundToInt().coerceIn(0, full)
+                val placeable = measurable.measure(
+                    constraints.copy(minHeight = h, maxHeight = h),
+                )
+                layout(placeable.width, h) { placeable.place(0, 0) }
+            }
             .then(
                 if (onBackgroundTap != null) {
                     Modifier.clickable(
@@ -816,18 +933,21 @@ private fun SceneInspectorGrabber(
     modifier: Modifier = Modifier,
 ) {
     var isDragging by remember { mutableStateOf(false) }
-    var liveSplitFraction by remember { mutableStateOf(splitFraction) }
+    var liveSplitFraction by remember { mutableFloatStateOf(splitFraction) }
 
-    SideEffect {
+    LaunchedEffect(splitFraction, isDragging) {
         if (!isDragging) {
             liveSplitFraction = splitFraction
         }
     }
 
+    val currentOnSplitFractionChanged by rememberUpdatedState(onSplitFractionChanged)
+    val currentAvailableHeightPx by rememberUpdatedState(availableHeightPx)
     val draggableState = rememberDraggableState { delta ->
-        if (availableHeightPx > 0) {
-            liveSplitFraction -= (delta / availableHeightPx.toFloat())
-            onSplitFractionChanged(liveSplitFraction)
+        val height = currentAvailableHeightPx
+        if (height > 0) {
+            liveSplitFraction -= (delta / height.toFloat())
+            currentOnSplitFractionChanged(liveSplitFraction)
         }
     }
     Box(

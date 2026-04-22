@@ -8,6 +8,30 @@ import kotlin.test.assertTrue
 class SceneScreenLogicTest {
 
     @Test
+    fun `calculate scene top bar crossfade state keeps split row on top for split inspector`() {
+        val result = calculateSceneTopBarCrossfadeState(
+            inspectorFraction = DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION,
+        )
+
+        assertEquals(0f, result.expandedProgress)
+        assertTrue(result.splitInteractive)
+        assertFalse(result.expandedInteractive)
+        assertTrue(result.splitZIndex > result.expandedZIndex)
+    }
+
+    @Test
+    fun `calculate scene top bar crossfade state puts expanded row on top for expanded inspector`() {
+        val result = calculateSceneTopBarCrossfadeState(
+            inspectorFraction = 1f,
+        )
+
+        assertEquals(1f, result.expandedProgress)
+        assertFalse(result.splitInteractive)
+        assertTrue(result.expandedInteractive)
+        assertTrue(result.expandedZIndex > result.splitZIndex)
+    }
+
+    @Test
     fun `calculateSceneLayoutMetrics keeps preview full screen when inspector is closed`() {
         val result = calculateSceneLayoutMetrics(
             availableHeightPx = 1000,

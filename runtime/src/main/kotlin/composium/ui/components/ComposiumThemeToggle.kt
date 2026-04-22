@@ -34,6 +34,7 @@ internal fun ComposiumThemeToggle(
     isDark: Boolean,
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val width = 64.dp
@@ -88,6 +89,7 @@ internal fun ComposiumThemeToggle(
             .background(trackColor)
             .border(width = 1.dp, color = borderColor, shape = Tokens.shapes.pill)
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { onToggle(!isDark) },
