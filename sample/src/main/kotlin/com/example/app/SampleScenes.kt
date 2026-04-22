@@ -5,11 +5,6 @@ import oleginvoke.com.composium.ComposiumSceneCatalog
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
-internal val gettingStarted by scene(name = "Getting started") {
-    GettingStartedSceneContent()
-}
-
-@ComposiumScene
 internal val primaryPlayground by scene(
     group = "Buttons/Primary", // optional group
     name = "Playground", // optional name

@@ -1,15 +1,10 @@
 package oleginvoke.com.composium
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import oleginvoke.com.composium.ui.components.ComposiumSurface
-import oleginvoke.com.composium.ui.theme.Tokens
+import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
 
 fun interface ScenePreviewDecorator {
 
@@ -44,16 +39,8 @@ internal val LocalScenePreviewContainer = staticCompositionLocalOf<ScenePreviewD
 fun DefaultScenePreviewContainer(
     content: @Composable () -> Unit,
 ) {
-    ComposiumSurface(
+    ComposiumPreviewCanvas(
         modifier = Modifier.fillMaxSize(),
-        color = Tokens.colors.background,
-        shape = RoundedCornerShape(0.dp),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            content()
-        }
-    }
+        content = content,
+    )
 }
