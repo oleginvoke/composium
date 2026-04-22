@@ -2,7 +2,6 @@ package oleginvoke.com.composium.scene_screen
 
 import android.content.res.Resources
 import android.util.DisplayMetrics
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -199,9 +198,7 @@ private fun ScaleSettingCard(item: EnvironmentItem.Scale) {
     val shownValue = item.values[selectedIndex]
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

@@ -4,8 +4,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -13,7 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,17 +35,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
 import oleginvoke.com.composium.ui.theme.Tokens
-
-private sealed interface HostScreenRoute {
-    data object Main : HostScreenRoute
-    data class Scene(val sceneId: String) : HostScreenRoute
-}
 
 @Composable
 internal fun ComposiumHostScreen(
@@ -59,139 +57,148 @@ internal fun ComposiumHostScreen(
     val sceneIds by remember {
         derivedStateOf { scenes.map { entry -> entry.id } }
     }
-
-    var selectedSceneId by remember { mutableStateOf<String?>(null) }
-
-    val selectedEntry = selectedSceneId?.let(scenesById::get)
-
-    val route: HostScreenRoute = if (selectedEntry == null) {
-        HostScreenRoute.Main
-    } else {
-        HostScreenRoute.Scene(selectedEntry.id)
+    val mainScreenInsets = remember(contentWindowInsets) {
+        contentWindowInsets?.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
     }
+    val sceneOverlayInsets = remember(contentWindowInsets) {
+        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
+    }
+    val transitionScaleSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow,
+        )
+    }
+    val sceneVisibilityState = remember { MutableTransitionState(false) }
+
+    var state by remember { mutableStateOf(ComposiumHostScreenState()) }
+
+    val renderedSceneId = state.renderedSceneId
+    val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
+    val blocksMainScreenInput = shouldBlockMainScreenInput(state)
 
     fun openScene(sceneId: String) {
-        selectedSceneId = sceneId
+        state = reduceComposiumHostScreen(
+            state = state,
+            intent = ComposiumHostScreenIntent.SceneSelected(sceneId),
+        )
     }
 
     fun closeScene() {
-        selectedSceneId = null
+        state = reduceComposiumHostScreen(
+            state = state,
+            intent = ComposiumHostScreenIntent.SceneClosed,
+        )
     }
 
     SystemBackHandler(
-        enabled = route is HostScreenRoute.Scene,
+        enabled = state.isSceneVisible,
         onBack = ::closeScene,
     )
 
     LaunchedEffect(sceneIds) {
-        val currentId = selectedSceneId
-        if (currentId != null && !scenesById.containsKey(currentId)) {
-            selectedSceneId = null
+        state = reduceComposiumHostScreen(
+            state = state,
+            intent = ComposiumHostScreenIntent.AvailableScenesChanged(sceneIds.toSet()),
+        )
+    }
+
+    SideEffect {
+        sceneVisibilityState.targetState = state.isSceneVisible
+    }
+
+    LaunchedEffect(
+        sceneVisibilityState.currentState,
+        sceneVisibilityState.targetState,
+        state.isSceneVisible,
+        renderedSceneId,
+    ) {
+        if (
+            !sceneVisibilityState.currentState &&
+            !sceneVisibilityState.targetState &&
+            !state.isSceneVisible &&
+            renderedSceneId != null
+        ) {
+            state = reduceComposiumHostScreen(
+                state = state,
+                intent = ComposiumHostScreenIntent.TransitionSettled,
+            )
         }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Tokens.colors.background)
-            .then(
-                if (contentWindowInsets != null) {
-                    val hostInsets = when (route) {
-                        HostScreenRoute.Main ->
-                            contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-
-                        is HostScreenRoute.Scene ->
-                            contentWindowInsets.only(WindowInsetsSides.Horizontal)
-                    }
-                    Modifier.windowInsetsPadding(
-                        hostInsets,
-                    )
-                } else {
-                    Modifier
-                },
-            ),
+            .background(Tokens.colors.background),
     ) {
-        AnimatedContent(
-            targetState = route,
-            transitionSpec = {
-                val scaleSpec = spring<Float>(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow,
-                )
-                when (initialState) {
-                    is HostScreenRoute.Main -> {
-                        if (targetState is HostScreenRoute.Scene) {
-                            (
-                                fadeIn(tween(260)) +
-                                    scaleIn(initialScale = 0.97f, animationSpec = scaleSpec) +
-                                    slideInHorizontally(
-                                        initialOffsetX = { width -> width / 8 },
-                                        animationSpec = tween(280),
-                                    )
-                                )
-                                .togetherWith(
-                                    fadeOut(tween(180)) +
-                                        scaleOut(targetScale = 1.02f, animationSpec = tween(260)),
-                                )
+        saveableStateHolder.SaveableStateProvider("route_main") {
+            MainScreen(
+                scenes = scenes,
+                onSceneSelected = ::openScene,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (mainScreenInsets != null) {
+                            Modifier.windowInsetsPadding(mainScreenInsets)
                         } else {
-                            fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
-                        }
-                    }
+                            Modifier
+                        },
+                    ),
+                contentWindowInsets = contentWindowInsets,
+            )
+        }
 
-                    is HostScreenRoute.Scene -> {
-                        if (targetState is HostScreenRoute.Main) {
-                            (
-                                fadeIn(tween(260)) +
-                                    scaleIn(initialScale = 1.02f, animationSpec = scaleSpec) +
-                                    slideInHorizontally(
-                                        initialOffsetX = { width -> -width / 10 },
-                                        animationSpec = tween(280),
-                                    )
-                                )
-                                .togetherWith(
-                                    fadeOut(tween(180)) +
-                                        scaleOut(targetScale = 0.97f, animationSpec = tween(260)),
-                                )
+        if (blocksMainScreenInput) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeAllPointerInput(),
+            )
+        }
+
+        if (renderedSceneEntry != null) {
+            AnimatedVisibility(
+                visibleState = sceneVisibilityState,
+                enter = fadeIn(tween(260)) +
+                    scaleIn(initialScale = 0.97f, animationSpec = transitionScaleSpec) +
+                    slideInHorizontally(
+                        initialOffsetX = { width -> width / 8 },
+                        animationSpec = tween(280),
+                    ),
+                exit = fadeOut(tween(180)) +
+                    scaleOut(targetScale = 0.97f, animationSpec = tween(260)) +
+                    slideOutHorizontally(
+                        targetOffsetX = { width -> width / 10 },
+                        animationSpec = tween(240),
+                    ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (sceneOverlayInsets != null) {
+                            Modifier.windowInsetsPadding(sceneOverlayInsets)
                         } else {
-                            fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
-                        }
-                    }
-                }
-            },
-            label = "list_detail",
-        ) { routeState ->
-            when (routeState) {
-                HostScreenRoute.Main -> {
-                    saveableStateHolder.SaveableStateProvider("route_main") {
-                        MainScreen(
-                            scenes = scenes,
-                            onSceneSelected = ::openScene,
+                            Modifier
+                        },
+                    ),
+                label = "scene_overlay",
+            ) {
+                saveableStateHolder.SaveableStateProvider("route_scene_$renderedSceneId") {
+                    key(renderedSceneId) {
+                        SceneScreen(
+                            sceneEntry = renderedSceneEntry,
+                            onBack = ::closeScene,
                             modifier = Modifier.fillMaxSize(),
                             contentWindowInsets = contentWindowInsets,
                         )
-                    }
-                }
-
-                is HostScreenRoute.Scene -> {
-                    val sceneEntry = scenesById[routeState.sceneId]
-
-                    if (sceneEntry != null) {
-                        saveableStateHolder.SaveableStateProvider("route_scene_${routeState.sceneId}") {
-                            key(routeState.sceneId) {
-                                SceneScreen(
-                                    sceneEntry = sceneEntry,
-                                    onBack = ::closeScene,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentWindowInsets = contentWindowInsets,
-                                )
-                            }
-                        }
                     }
                 }
             }
         }
     }
 }
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.consumeAllPointerInput(): Modifier = pointerInteropFilter { true }
 
 @Composable
 private fun SystemBackHandler(

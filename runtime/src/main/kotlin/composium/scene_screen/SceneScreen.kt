@@ -57,13 +57,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -102,14 +98,6 @@ internal fun SceneScreen(
     val store = rememberSceneScreenStore(sceneEntry.id)
     val state = store.state
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
-
-    val uiState = SceneScreenUiState(
-        sceneEntry = sceneEntry,
-        sceneScope = sceneScope,
-        paramsState = sceneScope.paramsState,
-        controlsSheet = state.controlsSheet,
-        isDarkTheme = themeController.isDarkTheme,
-    )
 
     val callbacks = remember(store, onBack, themeController.onThemeChange) {
         object : SceneScreenCallbacks {
@@ -165,8 +153,12 @@ internal fun SceneScreen(
     }
 
     SceneScreenBackHandler(
-        enabled = state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded,
-        onBack = callbacks::onNavigateBackFromExpandedControls,
+        enabled = state.controlsSheet.isVisible,
+        onBack = if (state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) {
+            callbacks::onNavigateBackFromExpandedControls
+        } else {
+            callbacks::onDismissControls
+        },
     )
 
     ComposiumPreviewCanvas(
@@ -180,7 +172,11 @@ internal fun SceneScreen(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 SceneScreenContent(
-                    state = uiState,
+                    sceneEntry = sceneEntry,
+                    sceneScope = sceneScope,
+                    paramsState = sceneScope.paramsState,
+                    controlsSheet = state.controlsSheet,
+                    isDarkTheme = themeController.isDarkTheme,
                     callbacks = callbacks,
                     paramsCallbacks = paramsCallbacks,
                     contentWindowInsets = contentWindowInsets,
@@ -189,7 +185,9 @@ internal fun SceneScreen(
                 )
 
                 SceneScreenTopBar(
-                    state = uiState,
+                    sceneEntry = sceneEntry,
+                    controlsSheet = state.controlsSheet,
+                    isDarkTheme = themeController.isDarkTheme,
                     callbacks = callbacks,
                     statusBarInsets = contentWindowInsets,
                     modifier = Modifier.align(Alignment.TopStart),
@@ -201,12 +199,14 @@ internal fun SceneScreen(
 
 @Composable
 private fun SceneScreenTopBar(
-    state: SceneScreenUiState,
+    sceneEntry: SceneEntry,
+    controlsSheet: ControlsSheetUiState,
+    isDarkTheme: Boolean,
     callbacks: SceneScreenCallbacks,
     statusBarInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
-    val controlsLayout = state.controlsSheet.layoutMode
+    val controlsLayout = controlsSheet.layoutMode
 
     Column(
         modifier = modifier
@@ -237,7 +237,8 @@ private fun SceneScreenTopBar(
                         onClick = callbacks::onNavigateBackFromExpandedControls,
                     )
                     SceneExpandedControlsTitleIsland(
-                        state = state,
+                        sceneEntry = sceneEntry,
+                        selectedTab = controlsSheet.selectedTab,
                         modifier = Modifier.weight(1f),
                     )
                     SceneTopBarActionButton(
@@ -254,11 +255,11 @@ private fun SceneScreenTopBar(
                 ) {
                     SceneTopBarActionButton(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        onClick = callbacks::onBack,
+                        contentDescription = if (controlsSheet.isVisible) "Close settings" else "Back",
+                        onClick = if (controlsSheet.isVisible) callbacks::onDismissControls else callbacks::onBack,
                     )
                     SceneSceneTitleIsland(
-                        sceneEntry = state.sceneEntry,
+                        sceneEntry = sceneEntry,
                         modifier = Modifier.weight(1f),
                     )
                     Row(
@@ -276,7 +277,7 @@ private fun SceneScreenTopBar(
                             active = controlsLayout == SceneInspectorLayoutMode.Split,
                         )
                         ComposiumThemeToggle(
-                            isDark = state.isDarkTheme,
+                            isDark = isDarkTheme,
                             onToggle = callbacks::onThemeChange,
                         )
                     }
@@ -323,18 +324,19 @@ private fun SceneSceneTitleIsland(
 
 @Composable
 private fun SceneExpandedControlsTitleIsland(
-    state: SceneScreenUiState,
+    sceneEntry: SceneEntry,
+    selectedTab: SceneInspectorTab,
     modifier: Modifier = Modifier,
 ) {
     val sceneLabel = buildString {
-        val group = state.sceneEntry.scene.group
+        val group = sceneEntry.scene.group
         if (!group.isNullOrBlank()) {
             append(group)
             append("/")
         }
-        append(state.sceneEntry.scene.name)
+        append(sceneEntry.scene.name)
     }
-    val tabLabel = when (state.controlsSheet.selectedTab) {
+    val tabLabel = when (selectedTab) {
         SceneInspectorTab.Properties -> "Properties"
         SceneInspectorTab.Environment -> "Environment"
     }
@@ -368,15 +370,19 @@ private fun SceneExpandedControlsTitleIsland(
 
 @Composable
 private fun SceneScreenContent(
-    state: SceneScreenUiState,
+    sceneEntry: SceneEntry,
+    sceneScope: SceneScope,
+    paramsState: SceneParamsState,
+    controlsSheet: ControlsSheetUiState,
+    isDarkTheme: Boolean,
     callbacks: SceneScreenCallbacks,
     paramsCallbacks: SceneParamsCallbacks,
     contentWindowInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    var isInspectorDragging by remember(state.controlsSheet.layoutMode) { mutableStateOf(false) }
-    var hasPreviewOverflow by remember(state.sceneEntry.id) { mutableStateOf(false) }
+    var isInspectorDragging by remember(controlsSheet.layoutMode) { mutableStateOf(false) }
+    var hasPreviewOverflow by remember(sceneEntry.id) { mutableStateOf(false) }
     val topInset = contentWindowInsets?.getTop(density)?.let { inset ->
         with(density) { inset.toDp() }
     } ?: 0.dp
@@ -394,8 +400,8 @@ private fun SceneScreenContent(
         val availableHeightPx = constraints.maxHeight
         val layoutMetrics = calculateSceneLayoutMetrics(
             availableHeightPx = availableHeightPx,
-            mode = state.controlsSheet.layoutMode,
-            splitFraction = state.controlsSheet.splitFraction,
+            mode = controlsSheet.layoutMode,
+            splitFraction = controlsSheet.splitFraction,
         )
         val sizeAnimationSpec = if (isInspectorDragging) snap() else Motion.tweenStandard<Dp>()
         val previewComposedHeight by animateDpAsState(
@@ -414,20 +420,20 @@ private fun SceneScreenContent(
             label = "scene_preview_alpha",
         )
         val showSplitDivider = shouldShowSceneSplitDivider(
-            mode = state.controlsSheet.layoutMode,
+            mode = controlsSheet.layoutMode,
             hasScrollableOverflow = hasPreviewOverflow,
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
             ScenePreviewPane(
-                sceneEntry = state.sceneEntry,
-                sceneScope = state.sceneScope,
+                sceneEntry = sceneEntry,
+                sceneScope = sceneScope,
                 minimumCanvasHeight = previewComposedHeight,
-                layoutMode = state.controlsSheet.layoutMode,
+                layoutMode = controlsSheet.layoutMode,
                 onOverflowChanged = { hasOverflow ->
                     hasPreviewOverflow = hasOverflow
                 },
-                onBackgroundTap = if (state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
+                onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
                 } else {
                     null
@@ -441,19 +447,19 @@ private fun SceneScreenContent(
 
             if (inspectorHeight > 0.5.dp) {
                 SceneInspectorPane(
-                    paramsState = state.paramsState,
-                    scenePreview = state.sceneScope.preview,
-                    isDarkThemeEnabled = state.isDarkTheme,
+                    paramsState = paramsState,
+                    scenePreview = sceneScope.preview,
+                    isDarkThemeEnabled = isDarkTheme,
                     paramsCallbacks = paramsCallbacks,
-                    selectedTab = state.controlsSheet.selectedTab,
+                    selectedTab = controlsSheet.selectedTab,
                     showSplitDivider = showSplitDivider,
-                    onBackgroundTap = if (state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
+                    onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                         callbacks::onExpandControls
                     } else {
                         null
                     },
                     availableHeightPx = availableHeightPx,
-                    splitFraction = state.controlsSheet.splitFraction,
+                    splitFraction = controlsSheet.splitFraction,
                     onSplitFractionChanged = callbacks::onUpdateSplitFraction,
                     onSplitFractionDragStart = { isInspectorDragging = true },
                     onSplitFractionDragStop = {
@@ -662,24 +668,14 @@ private fun SceneInspectorPane(
                         SceneInspectorTab.Properties -> {
                             if (paramsState.params.isEmpty()) {
                                 SceneInspectorEmptyState(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .inspectorEdgeFade(
-                                            topFade = 18.dp,
-                                            bottomFade = bottomInset + 36.dp,
-                                        ),
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             } else {
                                 ControlsPanel(
                                     state = paramsState,
                                     callbacks = paramsCallbacks,
                                     contentPadding = contentPadding,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .inspectorEdgeFade(
-                                            topFade = 18.dp,
-                                            bottomFade = bottomInset + 36.dp,
-                                        ),
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             }
                         }
@@ -690,12 +686,7 @@ private fun SceneInspectorPane(
                                 isDarkThemeEnabled = isDarkThemeEnabled,
                                 onThemeChange = onThemeChange,
                                 contentPadding = contentPadding,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .inspectorEdgeFade(
-                                        topFade = 18.dp,
-                                        bottomFade = bottomInset + 36.dp,
-                                    ),
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
@@ -1007,36 +998,6 @@ private fun ScenePreviewContent(
             }
         }
     }
-}
-
-private fun Modifier.inspectorEdgeFade(
-    topFade: Dp,
-    bottomFade: Dp,
-): Modifier = composed {
-    val density = LocalDensity.current
-    val topFadePx = with(density) { topFade.toPx() }
-    val bottomFadePx = with(density) { bottomFade.toPx() }
-
-    graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            if (size.height <= 0f) return@drawWithContent
-
-            val topStop = (topFadePx / size.height).coerceIn(0f, 1f)
-            val bottomStop = (1f - (bottomFadePx / size.height)).coerceIn(0f, 1f)
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to if (topFadePx > 0f) Color.Transparent else Color.Black,
-                        topStop to Color.Black,
-                        bottomStop to Color.Black,
-                        1f to if (bottomFadePx > 0f) Color.Transparent else Color.Black,
-                    ),
-                ),
-                blendMode = BlendMode.DstIn,
-            )
-        }
 }
 
 @Composable

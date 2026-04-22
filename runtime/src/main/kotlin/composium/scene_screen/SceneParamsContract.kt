@@ -1,9 +1,11 @@
 package oleginvoke.com.composium.scene_screen
 
+import androidx.compose.runtime.Stable
 import oleginvoke.com.composium.ParamDescriptor
 import oleginvoke.com.composium.ParamOption
 
-internal data class SceneParamsState(
+@Stable
+internal class SceneParamsState(
     val params: List<ParamDescriptor>,
 )
 

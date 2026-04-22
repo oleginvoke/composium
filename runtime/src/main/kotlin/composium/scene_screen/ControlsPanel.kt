@@ -1,6 +1,10 @@
 package oleginvoke.com.composium.scene_screen
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +45,7 @@ import oleginvoke.com.composium.ui.components.ComposiumChipDefaults
 import oleginvoke.com.composium.ui.components.ComposiumSwitch
 import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.ComposiumTextField
+import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 
 @Composable
@@ -99,9 +104,7 @@ private fun ParamCard(
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -126,88 +129,93 @@ private fun ParamCard(
                 }
             }
 
-            if (!isActive) return@Column
+            AnimatedVisibility(
+                visible = isActive,
+                enter = fadeIn(Motion.tweenFast()) + expandVertically(animationSpec = Motion.tweenFast()),
+                exit = fadeOut(Motion.tweenFast()) + shrinkVertically(animationSpec = Motion.tweenFast()),
+                label = "param_card_content",
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.height(10.dp))
 
-            Spacer(Modifier.height(10.dp))
-
-            when (paramDescriptor) {
-                is BooleanParamDescriptor -> {
-                    ComposiumSwitch(
-                        checked = paramDescriptor.value,
-                        onCheckedChange = { value ->
-                            callbacks.onBooleanParamChange(
-                                paramName = paramDescriptor.name,
-                                value = value,
+                    when (paramDescriptor) {
+                        is BooleanParamDescriptor -> {
+                            ComposiumSwitch(
+                                checked = paramDescriptor.value,
+                                onCheckedChange = { value ->
+                                    callbacks.onBooleanParamChange(
+                                        paramName = paramDescriptor.name,
+                                        value = value,
+                                    )
+                                },
                             )
-                        },
-                    )
-                }
+                        }
 
-                is ObjectParamDescriptor -> {
-                    val options = paramDescriptor.options
-                    val hasChoices = options.size > 1
-                    var expanded by rememberSaveable { mutableStateOf(false) }
+                        is ObjectParamDescriptor -> {
+                            val options = paramDescriptor.options
+                            val hasChoices = options.size > 1
+                            var expanded by rememberSaveable { mutableStateOf(false) }
 
-                    if (hasChoices) {
-                        FlowRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateContentSize(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            maxLines = if (!expanded) 2 else Int.MAX_VALUE,
-                            overflow = FlowRowOverflow.expandIndicator {
-                                ComposiumChip(
-                                    text = "Show all",
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ComposiumChipDefaults.colors(
-                                        selectedBackgroundColor = Tokens.colors.secondaryContainer,
-                                        selectedBorderColor = Tokens.colors.secondaryContainer,
-                                        selectedContentColor = Tokens.colors.onSecondaryContainer,
-                                        unselectedBackgroundColor = Tokens.colors.secondaryContainer,
-                                        unselectedBorderColor = Tokens.colors.secondaryContainer,
-                                        unselectedContentColor = Tokens.colors.onSecondaryContainer,
-                                    ),
-                                    modifier = Modifier.height(24.dp),
-                                    onClick = { expanded = true },
-                                )
-                            },
-                        ) {
-                            options.forEach { option ->
-                                ComposiumChip(
-                                    modifier = Modifier.height(24.dp),
-                                    text = option.name,
-                                    selected = option.name == paramDescriptor.selectedOption.name,
-                                    onClick = {
-                                        callbacks.onObjectParamChange(
-                                            paramName = paramDescriptor.name,
-                                            option = option,
+                            if (hasChoices) {
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    maxLines = if (!expanded) 2 else Int.MAX_VALUE,
+                                    overflow = FlowRowOverflow.expandIndicator {
+                                        ComposiumChip(
+                                            text = "Show all",
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ComposiumChipDefaults.colors(
+                                                selectedBackgroundColor = Tokens.colors.secondaryContainer,
+                                                selectedBorderColor = Tokens.colors.secondaryContainer,
+                                                selectedContentColor = Tokens.colors.onSecondaryContainer,
+                                                unselectedBackgroundColor = Tokens.colors.secondaryContainer,
+                                                unselectedBorderColor = Tokens.colors.secondaryContainer,
+                                                unselectedContentColor = Tokens.colors.onSecondaryContainer,
+                                            ),
+                                            modifier = Modifier.height(24.dp),
+                                            onClick = { expanded = true },
                                         )
                                     },
+                                ) {
+                                    options.forEach { option ->
+                                        ComposiumChip(
+                                            modifier = Modifier.height(24.dp),
+                                            text = option.name,
+                                            selected = option.name == paramDescriptor.selectedOption.name,
+                                            onClick = {
+                                                callbacks.onObjectParamChange(
+                                                    paramName = paramDescriptor.name,
+                                                    option = option,
+                                                )
+                                            },
+                                        )
+                                    }
+                                }
+                            } else {
+                                ComposiumText(
+                                    text = paramDescriptor.selectedOption.name,
+                                    style = Tokens.typography.bodySmall,
+                                    color = Tokens.colors.onSurfaceVariant,
                                 )
                             }
                         }
-                    } else {
-                        ComposiumText(
-                            text = paramDescriptor.selectedOption.name,
-                            style = Tokens.typography.bodySmall,
-                            color = Tokens.colors.onSurfaceVariant,
-                        )
-                    }
-                }
 
-                is StringParamDescriptor -> {
-                    ComposiumTextField(
-                        value = paramDescriptor.value,
-                        onValueChange = { value ->
-                            callbacks.onStringParamChange(
-                                paramName = paramDescriptor.name,
-                                value = value,
+                        is StringParamDescriptor -> {
+                            ComposiumTextField(
+                                value = paramDescriptor.value,
+                                onValueChange = { value ->
+                                    callbacks.onStringParamChange(
+                                        paramName = paramDescriptor.name,
+                                        value = value,
+                                    )
+                                },
+                                placeholder = "Enter text",
+                                modifier = Modifier.fillMaxWidth(),
                             )
-                        },
-                        placeholder = "Enter text",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                        }
+                    }
                 }
             }
         }

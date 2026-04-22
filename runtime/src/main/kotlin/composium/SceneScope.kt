@@ -33,8 +33,7 @@ class SceneScope internal constructor() {
     private val paramDescriptorIndexes: MutableMap<String, Int> = hashMapOf()
     private val paramStateSnapshots: MutableMap<String, ParamStateSnapshot> = hashMapOf()
 
-    internal val paramsState: SceneParamsState
-        get() = SceneParamsState(params = params)
+    internal val paramsState: SceneParamsState = SceneParamsState(params = params)
 
     internal val paramsCallbacks: SceneParamsCallbacks = object : SceneParamsCallbacks {
         override fun onParamActivationChange(paramName: String, isActive: Boolean) {

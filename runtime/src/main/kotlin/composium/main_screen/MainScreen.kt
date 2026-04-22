@@ -69,7 +69,6 @@ import oleginvoke.com.composium.ui.components.ComposiumThemeToggle
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
-import oleginvoke.com.composium.ui.theme.staggeredAppear
 
 @Composable
 internal fun MainScreen(
@@ -108,12 +107,6 @@ internal fun MainScreen(
             totalCount = scenes.size,
         )
     }
-    val uiState = MainScreenUiState(
-        query = state.query,
-        scenes = filteredScenes,
-        expandedGroups = state.expandedGroups,
-        isDarkTheme = themeController.isDarkTheme,
-    )
 
     val callbacks = remember(store, sceneSearchIndex, onSceneSelected, themeController.onThemeChange) {
         object : MainScreenCallbacks {
@@ -156,13 +149,15 @@ internal fun MainScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             MainScreenTopBar(
-                state = uiState,
+                query = state.query,
+                isDarkTheme = themeController.isDarkTheme,
                 catalogStatus = catalogStatus,
                 callbacks = callbacks,
                 statusBarInsets = contentWindowInsets,
             )
             MainScreenContent(
-                state = uiState,
+                scenes = filteredScenes,
+                expandedGroups = state.expandedGroups,
                 catalogStatus = catalogStatus,
                 callbacks = callbacks,
                 modifier = Modifier
@@ -175,7 +170,8 @@ internal fun MainScreen(
 
 @Composable
 private fun MainScreenTopBar(
-    state: MainScreenUiState,
+    query: String,
+    isDarkTheme: Boolean,
     catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
     statusBarInsets: WindowInsets? = null,
@@ -207,7 +203,7 @@ private fun MainScreenTopBar(
                 )
             }
             ComposiumThemeToggle(
-                isDark = state.isDarkTheme,
+                isDark = isDarkTheme,
                 onToggle = callbacks::onThemeChange,
             )
         }
@@ -215,7 +211,7 @@ private fun MainScreenTopBar(
         Spacer(Modifier.height(12.dp))
 
         SearchStoriesField(
-            value = state.query,
+            value = query,
             onValueChange = callbacks::onQueryChange,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -224,20 +220,21 @@ private fun MainScreenTopBar(
 
 @Composable
 private fun MainScreenContent(
-    state: MainScreenUiState,
+    scenes: List<SceneEntry>,
+    expandedGroups: Set<String>,
     catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    val sceneGroupTree = remember(state.scenes) {
-        buildSceneGroupTree(state.scenes)
+    val sceneGroupTree = remember(scenes) {
+        buildSceneGroupTree(scenes)
     }
-    val listItems = remember(sceneGroupTree, state.expandedGroups) {
+    val listItems = remember(sceneGroupTree, expandedGroups) {
         val (ungroupedScenes, rootGroups) = sceneGroupTree
         buildMainScreenListItems(
             ungroupedScenes = ungroupedScenes,
             rootGroups = rootGroups,
-            expandedGroups = state.expandedGroups,
+            expandedGroups = expandedGroups,
         )
     }
 
@@ -271,14 +268,19 @@ private fun MainScreenContent(
         itemsIndexed(
             items = listItems,
             key = { _, item -> item.key },
+            contentType = { _, item ->
+                when (item) {
+                    is MainScreenListItem.GroupHeader -> "group_header"
+                    is MainScreenListItem.SceneItem -> "scene_item"
+                }
+            },
         ) { index, item ->
             when (item) {
                 is MainScreenListItem.SceneItem -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = (item.depth * 12).dp)
-                            .staggeredAppear(index = index),
+                            .padding(start = (item.depth * 12).dp),
                     ) {
                         if (item.depth == 0) {
                             ComposiumSceneCard(
@@ -300,9 +302,9 @@ private fun MainScreenContent(
                         name = item.name,
                         depth = item.depth,
                         scenesCount = item.scenesCount,
-                        expanded = state.expandedGroups.contains(item.path),
+                        expanded = expandedGroups.contains(item.path),
                         onToggled = { callbacks.onGroupToggled(item.path) },
-                        modifier = Modifier.staggeredAppear(index = index),
+                        modifier = Modifier,
                     )
                 }
             }
@@ -596,11 +598,6 @@ private fun SearchStoriesField(
         }
     }
 
-    val iconTint by animateColorAsState(
-        targetValue = Tokens.colors.onSurfaceVariant,
-        animationSpec = Motion.tweenStandard(),
-        label = "search_icon_tint",
-    )
     val fillAlpha by animateFloatAsState(
         targetValue = if (isFocused) 0.96f else 0.88f,
         animationSpec = Motion.tweenStandard(),
@@ -621,7 +618,7 @@ private fun SearchStoriesField(
             ComposiumIcon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = null,
-                tint = iconTint,
+                tint = Tokens.colors.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(10.dp))
