@@ -54,9 +54,10 @@ internal fun ComposiumSwitch(
         label = "pressScale"
     )
 
+    val checkedTrackColor = Tokens.colors.primary.copy(alpha = 0.62f)
     val trackColor by animateColorAsState(
         targetValue = when {
-            !enabled -> (if (checked) Tokens.colors.primary else Tokens.colors.outlineVariant)
+            !enabled -> (if (checked) checkedTrackColor else Tokens.colors.outlineVariant)
                 .copy(alpha = 0.45f)
             checked -> Tokens.colors.primary
             else -> Tokens.colors.outlineVariant

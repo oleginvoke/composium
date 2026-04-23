@@ -189,7 +189,7 @@ internal class ComposiumLightColors : ComposiumColors {
 internal class ComposiumDarkColors : ComposiumColors {
     override val primary: Color = Color(0xFF7AACC3)
     override val onPrimary: Color = Color(0xFF062B3E)
-    override val primaryContainer: Color = Color(0xFF125577)
+    override val primaryContainer: Color = Color(0xFF314550)
     override val onPrimaryContainer: Color = Color(0xFFD4E3EE)
 
     override val secondary: Color = Color(0xFF8EA8B8)

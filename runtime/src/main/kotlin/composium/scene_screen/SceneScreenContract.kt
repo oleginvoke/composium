@@ -14,6 +14,12 @@ internal enum class SceneInspectorTab {
     Environment,
 }
 
+internal fun SceneInspectorTab.transitionDirectionTo(target: SceneInspectorTab): Int = when {
+    target.ordinal > ordinal -> 1
+    target.ordinal < ordinal -> -1
+    else -> 0
+}
+
 internal data class ControlsSheetUiState(
     val layoutMode: SceneInspectorLayoutMode = SceneInspectorLayoutMode.Closed,
     val selectedTab: SceneInspectorTab = SceneInspectorTab.Properties,

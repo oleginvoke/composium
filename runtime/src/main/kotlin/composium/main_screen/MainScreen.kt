@@ -343,13 +343,7 @@ private fun MainScreenEmptyState(
     ) {
         Column {
             ComposiumIcon(
-                painter = painterResource(
-                    if (status.mode == MainScreenCatalogMode.EmptyCatalog) {
-                        R.drawable.ic_composium_brand
-                    } else {
-                        R.drawable.ic_composium_scene
-                    }
-                ),
+                painter = painterResource(R.drawable.ic_composium_scene),
                 contentDescription = null,
                 tint = Tokens.colors.primary,
                 modifier = Modifier.size(24.dp),
@@ -604,13 +598,14 @@ private fun SearchStoriesField(
 
     Box(
         modifier = modifier
-            .clip(Tokens.shapes.pill)
+            .clip(Tokens.shapes.extraLarge)
             .background(Tokens.colors.surface.copy(alpha = fillAlpha))
+            .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 15.dp, vertical = 8.dp),
+                .padding(horizontal = 15.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ComposiumIcon(
@@ -641,18 +636,20 @@ private fun SearchStoriesField(
                 ),
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
-                    if (value.isEmpty()) {
-                        ComposiumText(
-                            text = "Search scenes, groups, or states",
-                            style = Tokens.typography.bodyMedium,
-                            color = Tokens.colors.onSurfaceVariant,
-                        )
-                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Box(modifier = Modifier.weight(1f)) { inner() }
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (value.isEmpty()) {
+                                ComposiumText(
+                                    text = "Search scenes, groups, or states",
+                                    style = Tokens.typography.bodyMedium,
+                                    color = Tokens.colors.onSurfaceVariant,
+                                )
+                            }
+                            inner()
+                        }
                         if (value.isNotEmpty()) {
                             ComposiumIconButton(
                                 modifier = Modifier.size(20.dp),

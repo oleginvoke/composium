@@ -1,10 +1,7 @@
 package oleginvoke.com.composium
 
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
-import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
 
 fun interface ScenePreviewDecorator {
 
@@ -12,35 +9,24 @@ fun interface ScenePreviewDecorator {
      * To allow you to control the placement of the inner scene screen relative to your decorations,
      * the scene implementation will pass in a framework-controlled composable parameter
      * [scenePreview] to this method. You must not call [scenePreview] more than once.
+     *
+     * The preview canvas is owned by the runtime. Custom decorators should usually add layout,
+     * padding, or extra chrome around [scenePreview] and then invoke it directly.
      */
     @Composable
     fun Decoration(scenePreview: @Composable () -> Unit)
 }
 
 @PublishedApi
-internal val DefaultScenePreviewContainerSlot: ScenePreviewDecorator =
+internal val NoOpScenePreviewDecorator: ScenePreviewDecorator =
     ScenePreviewDecorator { scenePreview ->
-        DefaultScenePreviewContainer(
-            content = scenePreview,
-        )
+        scenePreview()
     }
 
 @PublishedApi
-internal val LocalScenePreviewContainer = staticCompositionLocalOf<ScenePreviewDecorator> {
-    DefaultScenePreviewContainerSlot
-}
+internal fun defaultScenePreviewDecorator(): ScenePreviewDecorator = NoOpScenePreviewDecorator
 
-/**
- * Default Composium scene preview container.
- *
- * @param content Scene content.
- */
-@Composable
-fun DefaultScenePreviewContainer(
-    content: @Composable () -> Unit,
-) {
-    ComposiumPreviewCanvas(
-        modifier = Modifier.fillMaxSize(),
-        content = content,
-    )
+@PublishedApi
+internal val LocalScenePreviewContainer = staticCompositionLocalOf<ScenePreviewDecorator> {
+    defaultScenePreviewDecorator()
 }

@@ -12,6 +12,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -75,7 +77,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
-import oleginvoke.com.composium.ScenePreviewDecorator
 import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
@@ -202,42 +203,36 @@ internal fun SceneScreen(
         modifier = modifier
             .fillMaxSize(),
     ) {
-        CompositionLocalProvider(
-            LocalScenePreviewContainer provides ScenePreviewDecorator { scenePreview ->
-                scenePreview()
-            },
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                SceneScreenContent(
-                    sceneEntry = sceneEntry,
-                    sceneScope = sceneScope,
-                    paramsState = sceneScope.paramsState,
-                    controlsSheet = state.controlsSheet,
-                    isDarkTheme = themeController.isDarkTheme,
-                    callbacks = callbacks,
-                    paramsCallbacks = paramsCallbacks,
-                    contentWindowInsets = contentWindowInsets,
-                    inspectorFractionProvider = inspectorFractionProvider,
-                    isInspectorComposed = isInspectorComposed,
-                    onInspectorDragStart = { isInspectorDragging = true },
-                    onInspectorDragStop = {
-                        isInspectorDragging = false
-                        callbacks.onSettleSplitFraction()
-                    },
-                    modifier = Modifier
-                        .fillMaxSize(),
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneScreenContent(
+                sceneEntry = sceneEntry,
+                sceneScope = sceneScope,
+                paramsState = sceneScope.paramsState,
+                controlsSheet = state.controlsSheet,
+                isDarkTheme = themeController.isDarkTheme,
+                callbacks = callbacks,
+                paramsCallbacks = paramsCallbacks,
+                contentWindowInsets = contentWindowInsets,
+                inspectorFractionProvider = inspectorFractionProvider,
+                isInspectorComposed = isInspectorComposed,
+                onInspectorDragStart = { isInspectorDragging = true },
+                onInspectorDragStop = {
+                    isInspectorDragging = false
+                    callbacks.onSettleSplitFraction()
+                },
+                modifier = Modifier
+                    .fillMaxSize(),
+            )
 
-                SceneScreenTopBar(
-                    sceneEntry = sceneEntry,
-                    controlsSheet = state.controlsSheet,
-                    isDarkTheme = themeController.isDarkTheme,
-                    callbacks = callbacks,
-                    expandedProgressProvider = expandedProgressProvider,
-                    statusBarInsets = contentWindowInsets,
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
-            }
+            SceneScreenTopBar(
+                sceneEntry = sceneEntry,
+                controlsSheet = state.controlsSheet,
+                isDarkTheme = themeController.isDarkTheme,
+                callbacks = callbacks,
+                expandedProgressProvider = expandedProgressProvider,
+                statusBarInsets = contentWindowInsets,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
         }
     }
 }
@@ -569,7 +564,7 @@ private fun SceneTopBarActionButton(
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (active) {
-            Tokens.colors.primaryContainer.copy(alpha = 0.92f)
+            Tokens.colors.primaryContainer.copy(alpha = 0.6f)
         } else {
             Tokens.colors.surface.copy(alpha = 0.9f)
         },
@@ -578,7 +573,7 @@ private fun SceneTopBarActionButton(
     )
     val borderColor by animateColorAsState(
         targetValue = if (active) {
-            Tokens.colors.primary.copy(alpha = 0.45f)
+            Color.Transparent
         } else {
             Tokens.colors.outlineVariant.copy(alpha = 0.8f)
         },
@@ -776,7 +771,18 @@ private fun SceneInspectorPane(
                 AnimatedContent(
                     targetState = selectedTab,
                     transitionSpec = {
-                        fadeIn(Motion.tweenStandard()) togetherWith fadeOut(Motion.tweenFast())
+                        val direction = initialState.transitionDirectionTo(targetState)
+                        (
+                            slideInHorizontally(
+                                animationSpec = Motion.tweenStandard(),
+                                initialOffsetX = { width -> width * direction },
+                            ) + fadeIn(Motion.tweenStandard())
+                        ) togetherWith (
+                            slideOutHorizontally(
+                                animationSpec = Motion.tweenStandard(),
+                                targetOffsetX = { width -> -width * direction },
+                            ) + fadeOut(Motion.tweenFast())
+                        )
                     },
                     label = "scene_inspector_tab_content",
                 ) { tab ->
@@ -869,12 +875,7 @@ private fun SceneInspectorTabs(
                     .height(28.dp)
                     .align(Alignment.CenterStart)
                     .clip(Tokens.shapes.pill)
-                    .background(Tokens.colors.primaryContainer.copy(alpha = 0.82f))
-                    .border(
-                        width = 1.dp,
-                        color = Tokens.colors.primary.copy(alpha = 0.32f),
-                        shape = Tokens.shapes.pill,
-                    ),
+                    .background(Tokens.colors.primaryContainer.copy(alpha = 0.6f)),
             )
 
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -907,11 +908,16 @@ private fun SceneInspectorTabButton(
         animationSpec = Motion.tweenStandard(),
         label = "scene_inspector_tab_text",
     )
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .height(SceneInspectorTabsHeight)
             .clip(Tokens.shapes.pill)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         ComposiumText(
@@ -955,7 +961,7 @@ private fun SceneInspectorGrabber(
             .width(68.dp)
             .height(22.dp)
             .clip(Tokens.shapes.pill)
-            .background(Tokens.colors.surface.copy(alpha = 0.72f))
+            .background(Tokens.colors.surface)
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.66f), Tokens.shapes.pill)
             .draggable(
                 orientation = Orientation.Vertical,

@@ -62,7 +62,7 @@ internal fun EnvironmentPanel(
     LazyColumn(
         modifier = modifier,
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(items, key = { it.key }) { item ->
             when (item) {

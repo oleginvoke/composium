@@ -23,7 +23,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
  * If KSP is not used, scenes can be registered manually through [Composium.registerAll]
  * before rendering this screen.
  *
- * Uses [DefaultScenePreviewContainer] for scene preview rendering.
+ * Uses the runtime-owned preview canvas with a pass-through scene preview decorator by default.
  *
  * @param modifier Modifier for the screen.
  * @param isDarkTheme Optional dark theme override. If not provided, the internal state is used.
@@ -43,7 +43,7 @@ fun ComposiumScreen(
         isDarkTheme = isDarkTheme,
         contentWindowInsets = contentWindowInsets,
         onThemeChange = onThemeChange,
-        scenePreviewDecorator = DefaultScenePreviewContainerSlot,
+        scenePreviewDecorator = defaultScenePreviewDecorator(),
     )
 }
 
@@ -58,7 +58,7 @@ fun ComposiumScreen(
  * @param contentWindowInsets Optional window insets for the content area. Use `WindowInsets.systemBars` for edge-to-edge
  * or apply padding manually if you are not using edge-to-edge.
  * @param onThemeChange Callback for theme change.
- * @param scenePreviewDecorator Slot container used for scene content rendering across all scenes.
+ * @param scenePreviewDecorator Decorator applied around scene content inside the runtime-owned preview canvas.
  */
 @Composable
 fun ComposiumScreen(

@@ -29,7 +29,7 @@ internal fun ComposiumChip(
     text: String,
     modifier: Modifier = Modifier,
     colors: ComposiumChipColors = ComposiumChipDefaults.colors(),
-    shape: Shape = RoundedCornerShape(4.dp),
+    shape: Shape = RoundedCornerShape(6.dp),
     selected: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
@@ -87,11 +87,11 @@ internal object ComposiumChipDefaults {
 
     @Composable
     fun colors(
-        selectedBackgroundColor: Color = Tokens.colors.primary,
-        selectedBorderColor: Color = Tokens.colors.primary,
-        selectedContentColor: Color = Tokens.colors.onPrimary,
+        selectedBackgroundColor: Color = Tokens.colors.primaryContainer,
+        selectedBorderColor: Color = Tokens.colors.primaryContainer,
+        selectedContentColor: Color = Tokens.colors.onPrimaryContainer,
         unselectedBackgroundColor: Color = Tokens.colors.surface,
-        unselectedBorderColor: Color = Tokens.colors.outline,
+        unselectedBorderColor: Color = Tokens.colors.outlineVariant,
         unselectedContentColor: Color = Tokens.colors.onSurfaceVariant,
     ): ComposiumChipColors {
         return ComposiumChipColors(
