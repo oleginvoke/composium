@@ -148,78 +148,78 @@ internal interface ComposiumColors {
 }
 
 internal class ComposiumLightColors : ComposiumColors {
-    override val primary: Color = Color(0xFF0D9488)
+    override val primary: Color = Color(0xFF5C8EAA)
     override val onPrimary: Color = Color(0xFFFFFFFF)
-    override val primaryContainer: Color = Color(0xFFD7F6F1)
-    override val onPrimaryContainer: Color = Color(0xFF0F4B45)
+    override val primaryContainer: Color = Color(0xD3B5D9E8)
+    override val onPrimaryContainer: Color = Color(0xFF0F3247)
 
-    override val secondary: Color = Color(0xFF0EA5E9)
+    override val secondary: Color = Color(0xFF3A6B86)
     override val onSecondary: Color = Color(0xFFFFFFFF)
-    override val secondaryContainer: Color = Color(0xFFDDF3FF)
-    override val onSecondaryContainer: Color = Color(0xFF11415B)
+    override val secondaryContainer: Color = Color(0xFFE0E8EE)
+    override val onSecondaryContainer: Color = Color(0xFF1D3947)
 
-    override val tertiary: Color = Color(0xFF66788E)
+    override val tertiary: Color = Color(0xFF5A6B7A)
     override val onTertiary: Color = Color(0xFFFFFFFF)
-    override val tertiaryContainer: Color = Color(0xFFE5EBF2)
-    override val onTertiaryContainer: Color = Color(0xFF243240)
+    override val tertiaryContainer: Color = Color(0xFFE4E8EC)
+    override val onTertiaryContainer: Color = Color(0xFF263140)
 
-    override val error: Color = Color(0xFFDC2626)
+    override val error: Color = Color(0xFFB91C1C)
     override val onError: Color = Color(0xFFFFFFFF)
     override val errorContainer: Color = Color(0xFFFEE2E2)
     override val onErrorContainer: Color = Color(0xFF450A0A)
 
-    override val background: Color = Color(0xFFF5F7F8)
-    override val onBackground: Color = Color(0xFF101820)
+    override val background: Color = Color(0xFFF3F5F7)
+    override val onBackground: Color = Color(0xFF0E1820)
     override val surface: Color = Color(0xFFFFFFFF)
-    override val onSurface: Color = Color(0xFF101820)
-    override val surfaceVariant: Color = Color(0xFFEDF1F3)
-    override val onSurfaceVariant: Color = Color(0xFF5A6774)
+    override val onSurface: Color = Color(0xFF0E1820)
+    override val surfaceVariant: Color = Color(0xFFEAEEF1)
+    override val onSurfaceVariant: Color = Color(0xFF5A6874)
 
-    override val outline: Color = Color(0xFF9AA7B4)
-    override val outlineVariant: Color = Color(0xFFD8E0E5)
+    override val outline: Color = Color(0xFF94A2AF)
+    override val outlineVariant: Color = Color(0xFFD4DCE2)
 
-    override val inverseSurface: Color = Color(0xFF111A22)
-    override val inverseOnSurface: Color = Color(0xFFF5F8FA)
-    override val inversePrimary: Color = Color(0xFF5BE4D6)
+    override val inverseSurface: Color = Color(0xFF0E1820)
+    override val inverseOnSurface: Color = Color(0xFFF3F5F7)
+    override val inversePrimary: Color = Color(0xFF6FAACB)
 
     override val scrim: Color = Color(0xFF0B1218)
     override val surfaceTint: Color = primary
 }
 
 internal class ComposiumDarkColors : ComposiumColors {
-    override val primary: Color = Color(0xFF58E6D7)
-    override val onPrimary: Color = Color(0xFF062F2C)
-    override val primaryContainer: Color = Color(0xFF0A5F58)
-    override val onPrimaryContainer: Color = Color(0xFFC7FFF7)
+    override val primary: Color = Color(0xFF7AACC3)
+    override val onPrimary: Color = Color(0xFF062B3E)
+    override val primaryContainer: Color = Color(0xFF125577)
+    override val onPrimaryContainer: Color = Color(0xFFD4E3EE)
 
-    override val secondary: Color = Color(0xFF61CBFF)
-    override val onSecondary: Color = Color(0xFF0E3044)
-    override val secondaryContainer: Color = Color(0xFF113B56)
-    override val onSecondaryContainer: Color = Color(0xFFD9F3FF)
+    override val secondary: Color = Color(0xFF8EA8B8)
+    override val onSecondary: Color = Color(0xFF14273A)
+    override val secondaryContainer: Color = Color(0xFF2A3D4A)
+    override val onSecondaryContainer: Color = Color(0xFFD7E2EA)
 
-    override val tertiary: Color = Color(0xFF9FB0C5)
+    override val tertiary: Color = Color(0xFF93A2B1)
     override val onTertiary: Color = Color(0xFF1A2733)
-    override val tertiaryContainer: Color = Color(0xFF30414F)
-    override val onTertiaryContainer: Color = Color(0xFFEBF0F5)
+    override val tertiaryContainer: Color = Color(0xFF2C3945)
+    override val onTertiaryContainer: Color = Color(0xFFE4EBF0)
 
-    override val error: Color = Color(0xFFFCA5A5)
+    override val error: Color = Color(0xFFF5A3A3)
     override val onError: Color = Color(0xFF450A0A)
     override val errorContainer: Color = Color(0xFF7F1D1D)
     override val onErrorContainer: Color = Color(0xFFFEE2E2)
 
     override val background: Color = Color(0xFF0B1116)
-    override val onBackground: Color = Color(0xFFF4F8FA)
+    override val onBackground: Color = Color(0xFFE9EEF2)
     override val surface: Color = Color(0xFF111920)
-    override val onSurface: Color = Color(0xFFF4F8FA)
-    override val surfaceVariant: Color = Color(0xFF18232C)
-    override val onSurfaceVariant: Color = Color(0xFF9BA8B6)
+    override val onSurface: Color = Color(0xFFE9EEF2)
+    override val surfaceVariant: Color = Color(0xFF18222B)
+    override val onSurfaceVariant: Color = Color(0xFF96A4B0)
 
-    override val outline: Color = Color(0xFF5F6D7B)
-    override val outlineVariant: Color = Color(0xFF24313A)
+    override val outline: Color = Color(0xFF5A6874)
+    override val outlineVariant: Color = Color(0xFF22303A)
 
-    override val inverseSurface: Color = Color(0xFFF3F7F9)
+    override val inverseSurface: Color = Color(0xFFF1F5F7)
     override val inverseOnSurface: Color = Color(0xFF101820)
-    override val inversePrimary: Color = Color(0xFF0D9488)
+    override val inversePrimary: Color = Color(0xFF015382)
 
     override val scrim: Color = Color(0xFF000000)
     override val surfaceTint: Color = primary
