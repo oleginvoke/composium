@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -82,7 +83,10 @@ internal fun ComposiumCheckbox(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clip(Tokens.shapes.extraSmall)
+            // Clip must match the drawn cornerRadius — otherwise the (more rounded) clip
+            // shape trims the (less rounded) border at each corner, making the outline look
+            // soft / cut off where the two radii diverge.
+            .clip(RoundedCornerShape(cornerRadius))
             .toggleable(
                 value = checked,
                 enabled = enabled,

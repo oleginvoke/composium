@@ -10,8 +10,9 @@ import kotlin.math.roundToInt
 
 internal const val DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION = 0.60f
 internal const val MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION = 0.18f
-internal const val MAX_SCENE_INSPECTOR_EXPAND_SNAP_FRACTION = 0.84f
-internal const val TOPBAR_EXPANDED_CROSSFADE_START_FRACTION = 0.72f
+internal const val SCENE_INSPECTOR_ARMED_START_FRACTION = 0.85f
+internal const val SCENE_INSPECTOR_ARMED_FULL_FRACTION = 0.92f
+internal const val MAX_SCENE_INSPECTOR_DRAG_CAP_FRACTION = 0.94f
 
 private const val MIN_SCENE_INSPECTOR_DRAG_FRACTION = 0f
 private const val MAX_SCENE_INSPECTOR_DRAG_FRACTION = 1f
@@ -31,15 +32,13 @@ internal data class SceneLayoutMetrics(
 )
 
 internal fun calculateSceneTopBarCrossfadeState(
-    inspectorFraction: Float,
+    expandedProgress: Float,
 ): SceneTopBarCrossfadeState {
-    val expandedProgress = ((inspectorFraction - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION) /
-        (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION))
-        .coerceIn(0f, 1f)
-    val expandedDominant = expandedProgress >= 0.5f
+    val safeProgress = expandedProgress.coerceIn(0f, 1f)
+    val expandedDominant = safeProgress >= 0.5f
 
     return SceneTopBarCrossfadeState(
-        expandedProgress = expandedProgress,
+        expandedProgress = safeProgress,
         splitInteractive = !expandedDominant,
         expandedInteractive = expandedDominant,
         splitZIndex = if (expandedDominant) 0f else 1f,
@@ -184,8 +183,9 @@ internal fun reduceSceneScreen(
             if (state.controlsSheet.layoutMode != SceneInspectorLayoutMode.Split) {
                 state
             } else {
+                val fraction = state.controlsSheet.splitFraction
                 when {
-                    state.controlsSheet.splitFraction <= MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION -> {
+                    fraction <= MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION -> {
                         state.copy(
                             controlsSheet = state.controlsSheet.copy(
                                 layoutMode = SceneInspectorLayoutMode.Closed,
@@ -193,10 +193,18 @@ internal fun reduceSceneScreen(
                         )
                     }
 
-                    state.controlsSheet.splitFraction >= MAX_SCENE_INSPECTOR_EXPAND_SNAP_FRACTION -> {
+                    fraction >= SCENE_INSPECTOR_ARMED_FULL_FRACTION -> {
                         state.copy(
                             controlsSheet = state.controlsSheet.copy(
                                 layoutMode = SceneInspectorLayoutMode.Expanded,
+                            ),
+                        )
+                    }
+
+                    fraction >= SCENE_INSPECTOR_ARMED_START_FRACTION -> {
+                        state.copy(
+                            controlsSheet = state.controlsSheet.copy(
+                                splitFraction = SCENE_INSPECTOR_ARMED_START_FRACTION,
                             ),
                         )
                     }
@@ -264,9 +272,9 @@ private fun Float.clampDraggedSplitFraction(): Float {
 }
 
 private fun Float.restoreVisibleSplitFraction(): Float {
-    return if (this in MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION..MAX_SCENE_INSPECTOR_EXPAND_SNAP_FRACTION) {
-        this
-    } else {
-        DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION
+    return when {
+        this < MIN_SCENE_INSPECTOR_CLOSE_SNAP_FRACTION -> DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION
+        this > SCENE_INSPECTOR_ARMED_START_FRACTION -> SCENE_INSPECTOR_ARMED_START_FRACTION
+        else -> this
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,8 +55,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,6 +78,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
@@ -90,7 +94,9 @@ import kotlin.math.roundToInt
 
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
-private val SceneInspectorGrabberOverlayOffset = (-24).dp
+
+private fun Float.sanitizedInspectorFraction(): Float =
+    if (isNaN()) 0f else coerceIn(0f, 1f)
 
 @Composable
 internal fun SceneScreen(
@@ -169,33 +175,51 @@ internal fun SceneScreen(
 
     val targetFraction = when (state.controlsSheet.layoutMode) {
         SceneInspectorLayoutMode.Closed -> 0f
-        SceneInspectorLayoutMode.Split -> state.controlsSheet.splitFraction.coerceIn(0f, 1f)
+        SceneInspectorLayoutMode.Split -> state.controlsSheet.splitFraction.sanitizedInspectorFraction()
         SceneInspectorLayoutMode.Expanded -> 1f
     }
     val inspectorFraction = remember { Animatable(targetFraction) }
-    var isInspectorDragging by remember { mutableStateOf(false) }
+    val inspectorAnimationScope = rememberCoroutineScope()
     var isInspectorComposed by remember { mutableStateOf(targetFraction > 0f) }
+    var inspectorAnimationTick by remember { mutableStateOf(0) }
+    val liveDragFraction = remember { mutableFloatStateOf(targetFraction) }
 
-    LaunchedEffect(targetFraction, isInspectorDragging) {
+    LaunchedEffect(targetFraction, inspectorAnimationTick) {
         if (targetFraction > 0f) isInspectorComposed = true
-        if (isInspectorDragging) {
-            inspectorFraction.snapTo(targetFraction)
-        } else {
-            inspectorFraction.animateTo(targetFraction, Motion.tweenStandard())
-            if (targetFraction == 0f) {
-                isInspectorComposed = false
-            }
+        inspectorFraction.animateTo(targetFraction, Motion.tweenStandard())
+        if (targetFraction == 0f) {
+            isInspectorComposed = false
+        }
+    }
+
+    // Mirror the visible inspector fraction into the live drag value continuously so that a
+    // touch on the grabber after any non-drag transition (open/close/expand/restore/settle)
+    // starts dragging from the actually-visible position rather than from a stale value.
+    // During drag, the synchronous write inside onInspectorDragUpdate keeps liveDragFraction
+    // ahead of this mirror; the mirror just re-confirms the same value.
+    LaunchedEffect(inspectorFraction, liveDragFraction) {
+        snapshotFlow { inspectorFraction.value }.collect { value ->
+            liveDragFraction.floatValue = value
         }
     }
 
     val inspectorFractionProvider: () -> Float = remember(inspectorFraction) {
         { inspectorFraction.value }
     }
-    val expandedProgressProvider: () -> Float = remember(inspectorFraction) {
-        {
-            val f = inspectorFraction.value
-            ((f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION) /
-                (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION)).coerceIn(0f, 1f)
+    val liveDragFractionProvider: () -> Float = remember(liveDragFraction) {
+        { liveDragFraction.floatValue }
+    }
+    val onInspectorDragUpdate: (Float) -> Unit = remember(
+        inspectorFraction,
+        inspectorAnimationScope,
+        liveDragFraction,
+    ) {
+        { fraction ->
+            val sanitized = fraction.sanitizedInspectorFraction()
+            liveDragFraction.floatValue = sanitized
+            inspectorAnimationScope.launch {
+                inspectorFraction.snapTo(sanitized)
+            }
         }
     }
 
@@ -215,11 +239,15 @@ internal fun SceneScreen(
                 contentWindowInsets = contentWindowInsets,
                 inspectorFractionProvider = inspectorFractionProvider,
                 isInspectorComposed = isInspectorComposed,
-                onInspectorDragStart = { isInspectorDragging = true },
-                onInspectorDragStop = {
-                    isInspectorDragging = false
+                onInspectorDragUpdate = onInspectorDragUpdate,
+                onInspectorDragStop = { finalFraction ->
+                    callbacks.onUpdateSplitFraction(finalFraction)
                     callbacks.onSettleSplitFraction()
+                    inspectorAnimationTick++
+                    // No manual liveDragFraction reset here — the snapshotFlow mirror above
+                    // keeps it tracking inspectorFraction.value across the settle animation.
                 },
+                liveDragFractionProvider = liveDragFractionProvider,
                 modifier = Modifier
                     .fillMaxSize(),
             )
@@ -229,7 +257,6 @@ internal fun SceneScreen(
                 controlsSheet = state.controlsSheet,
                 isDarkTheme = themeController.isDarkTheme,
                 callbacks = callbacks,
-                expandedProgressProvider = expandedProgressProvider,
                 statusBarInsets = contentWindowInsets,
                 modifier = Modifier.align(Alignment.TopStart),
             )
@@ -243,17 +270,18 @@ private fun SceneScreenTopBar(
     controlsSheet: ControlsSheetUiState,
     isDarkTheme: Boolean,
     callbacks: SceneScreenCallbacks,
-    expandedProgressProvider: () -> Float,
     statusBarInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
     val controlsLayout = controlsSheet.layoutMode
-    val crossfadeState by remember(expandedProgressProvider) {
+    val expandedProgressState = animateFloatAsState(
+        targetValue = if (controlsLayout == SceneInspectorLayoutMode.Expanded) 1f else 0f,
+        animationSpec = Motion.tweenStandard(),
+        label = "scene_top_bar_expanded_progress",
+    )
+    val crossfadeState by remember(expandedProgressState) {
         derivedStateOf {
-            calculateSceneTopBarCrossfadeState(
-                inspectorFraction = TOPBAR_EXPANDED_CROSSFADE_START_FRACTION +
-                    (expandedProgressProvider() * (1f - TOPBAR_EXPANDED_CROSSFADE_START_FRACTION)),
-            )
+            calculateSceneTopBarCrossfadeState(expandedProgressState.value)
         }
     }
 
@@ -384,22 +412,25 @@ private fun SceneSceneTitleIsland(
     Box(
         modifier = modifier
             .clip(Tokens.shapes.extraLarge)
-            .background(Tokens.colors.surface.copy(alpha = 0.9f))
+            .background(Tokens.colors.surface)
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     ) {
         Column {
+            // Always render the group line, even when there is no group, so the island's
+            // vertical extent stays the same as a scene that has one. Without the placeholder
+            // line the Column collapses by labelSmall's line-height and the central island
+            // visibly shrinks for ungrouped scenes.
             val group = sceneEntry.scene.group
-            if (!group.isNullOrBlank()) {
-                ComposiumText(
-                    text = group,
-                    style = Tokens.typography.labelSmall,
-                    color = Tokens.colors.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(1.dp))
-            }
+            val hasGroup = !group.isNullOrBlank()
+            ComposiumText(
+                text = if (hasGroup) group!! else " ",
+                style = Tokens.typography.labelSmall,
+                color = if (hasGroup) Tokens.colors.primary else Color.Transparent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(1.dp))
             ComposiumText(
                 text = sceneEntry.scene.name,
                 maxLines = 1,
@@ -433,7 +464,7 @@ private fun SceneExpandedControlsTitleIsland(
     Box(
         modifier = modifier
             .clip(Tokens.shapes.extraLarge)
-            .background(Tokens.colors.surface.copy(alpha = 0.9f))
+            .background(Tokens.colors.surface)
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     ) {
@@ -468,8 +499,9 @@ private fun SceneScreenContent(
     paramsCallbacks: SceneParamsCallbacks,
     inspectorFractionProvider: () -> Float,
     isInspectorComposed: Boolean,
-    onInspectorDragStart: () -> Unit,
-    onInspectorDragStop: () -> Unit,
+    onInspectorDragUpdate: (Float) -> Unit,
+    onInspectorDragStop: (Float) -> Unit,
+    liveDragFractionProvider: () -> Float,
     contentWindowInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -481,7 +513,7 @@ private fun SceneScreenContent(
     val bottomInset = contentWindowInsets?.getBottom(density)?.let { inset ->
         with(density) { inset.toDp() }
     } ?: 0.dp
-    val contentTopPadding = topInset + 88.dp
+    val contentTopPadding = topInset + 72.dp
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -489,13 +521,33 @@ private fun SceneScreenContent(
         label = "scene_preview_alpha",
     )
 
+    // The visible boundary between preview and inspector sits at the MIDDLE of the tabs in
+    // Split mode. The preview pane is therefore extended downward by this much so that the
+    // top half of the tabs floats over the (translucent) preview content, and the bottom
+    // half marks where preview content is fully clipped. In Expanded mode the boundary
+    // doesn't exist — animate to zero for the transition.
+    val isSplitLayout = controlsSheet.layoutMode == SceneInspectorLayoutMode.Split
+    val splitBoundaryShift by animateDpAsState(
+        targetValue = if (isSplitLayout) {
+            SceneInspectorTabsHeight / 2 + SceneInspectorTabsTopGap
+        } else {
+            0.dp
+        },
+        animationSpec = Motion.tweenStandard(),
+        label = "scene_split_boundary_shift",
+    )
+
+    // BoxWithConstraints fills the full screen (no top padding) — that lets the preview
+    // pane extend up to screen Y=0 so its scrollable content can pass behind the top bar.
+    // Inspector positioning is preserved by treating `availableHeightPx` as the visible-
+    // content area below the top bar (i.e. constraints.maxHeight − contentTopPaddingPx).
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .imePadding()
-            .padding(top = contentTopPadding),
+            .imePadding(),
     ) {
-        val availableHeightPx = constraints.maxHeight
+        val contentTopPaddingPx = with(density) { contentTopPadding.roundToPx() }
+        val availableHeightPx = (constraints.maxHeight - contentTopPaddingPx).coerceAtLeast(0)
         val showSplitDivider = shouldShowSceneSplitDivider(
             mode = controlsSheet.layoutMode,
             hasScrollableOverflow = hasPreviewOverflow,
@@ -508,6 +560,8 @@ private fun SceneScreenContent(
                 availableHeightPx = availableHeightPx,
                 inspectorFractionProvider = inspectorFractionProvider,
                 layoutMode = controlsSheet.layoutMode,
+                splitBoundaryShift = splitBoundaryShift,
+                contentTopPadding = contentTopPadding,
                 onOverflowChanged = { hasOverflow ->
                     hasPreviewOverflow = hasOverflow
                 },
@@ -538,12 +592,13 @@ private fun SceneScreenContent(
                     availableHeightPx = availableHeightPx,
                     splitFraction = controlsSheet.splitFraction,
                     inspectorFractionProvider = inspectorFractionProvider,
-                    onSplitFractionChanged = callbacks::onUpdateSplitFraction,
-                    onSplitFractionDragStart = onInspectorDragStart,
-                    onSplitFractionDragStop = onInspectorDragStop,
+                    liveDragFractionProvider = liveDragFractionProvider,
+                    onInspectorDragUpdate = onInspectorDragUpdate,
+                    onInspectorDragStop = onInspectorDragStop,
                     onTabSelected = callbacks::onTabSelected,
                     onThemeChange = callbacks::onThemeChange,
                     bottomInset = bottomInset,
+                    splitBoundaryShift = splitBoundaryShift,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth(),
@@ -563,10 +618,13 @@ private fun SceneTopBarActionButton(
     enabled: Boolean = true,
 ) {
     val containerColor by animateColorAsState(
+        // The light-theme primaryContainer token bakes in alpha 0.83 (0xD3B5D9E8). Override
+        // to fully opaque so the active settings button is solid like the other top bar
+        // elements rather than letting preview content bleed through.
         targetValue = if (active) {
-            Tokens.colors.primaryContainer.copy(alpha = 0.6f)
+            Tokens.colors.primaryContainer
         } else {
-            Tokens.colors.surface.copy(alpha = 0.9f)
+            Tokens.colors.surface
         },
         animationSpec = Motion.tweenStandard(),
         label = "scene_top_bar_button_container",
@@ -612,6 +670,8 @@ private fun ScenePreviewPane(
     availableHeightPx: Int,
     inspectorFractionProvider: () -> Float,
     layoutMode: SceneInspectorLayoutMode,
+    splitBoundaryShift: Dp,
+    contentTopPadding: Dp,
     onOverflowChanged: (Boolean) -> Unit,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -635,13 +695,19 @@ private fun ScenePreviewPane(
         modifier = modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
-                val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
-                val full = if (constraints.hasBoundedHeight) constraints.maxHeight else availableHeightPx
-                val clamped = ((1f - fraction) * full).roundToInt().coerceIn(1, full)
+                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+                val shiftPx = splitBoundaryShift.toPx()
+                val topPaddingPx = contentTopPadding.toPx()
+                val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
+                // Visible preview area below the top bar, plus the boundary overlap region.
+                val visibleHeight = (1f - fraction) * availableHeightPx + shiftPx
+                // Outer pane extends up into the top-bar area so scrolled content can render
+                // behind the (translucent) top bar instead of being clipped at its bottom.
+                val outerHeight = (visibleHeight + topPaddingPx).roundToInt().coerceIn(1, ceiling)
                 val placeable = measurable.measure(
-                    constraints.copy(minHeight = 0, maxHeight = clamped),
+                    constraints.copy(minHeight = 0, maxHeight = outerHeight),
                 )
-                layout(placeable.width, clamped) { placeable.place(0, 0) }
+                layout(placeable.width, outerHeight) { placeable.place(0, 0) }
             }
             .then(
                 if (onBackgroundTap != null) {
@@ -658,16 +724,21 @@ private fun ScenePreviewPane(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
         ) {
+            // Top-padding spacer lives INSIDE the scroll viewport so scrolling moves it past
+            // the column's top edge, letting the actual preview content slide up into the
+            // (translucent) top bar's region.
+            Spacer(modifier = Modifier.height(contentTopPadding))
             ScenePreviewContent(
                 sceneEntry = sceneEntry,
                 sceneScope = sceneScope,
                 modifier = Modifier
                     .fillMaxWidth()
                     .layout { measurable, constraints ->
-                        val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
-                        val minH = ((1f - fraction) * availableHeightPx)
+                        val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+                        val shiftPx = splitBoundaryShift.toPx()
+                        val minH = ((1f - fraction) * availableHeightPx + shiftPx)
                             .roundToInt()
                             .coerceAtLeast(0)
                         val placeable = measurable.measure(
@@ -697,32 +768,86 @@ private fun SceneInspectorPane(
     availableHeightPx: Int,
     splitFraction: Float,
     inspectorFractionProvider: () -> Float,
-    onSplitFractionChanged: (Float) -> Unit,
-    onSplitFractionDragStart: () -> Unit,
-    onSplitFractionDragStop: () -> Unit,
+    liveDragFractionProvider: () -> Float,
+    onInspectorDragUpdate: (Float) -> Unit,
+    onInspectorDragStop: (Float) -> Unit,
     onTabSelected: (SceneInspectorTab) -> Unit,
     onThemeChange: (Boolean) -> Unit,
     bottomInset: Dp,
+    splitBoundaryShift: Dp,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val contentPadding = remember(bottomInset) {
-        androidx.compose.foundation.layout.PaddingValues(
-            start = 16.dp,
-            top = 8.dp,
-            end = 16.dp,
-            bottom = bottomInset + 28.dp,
-        )
-    }
     val isSplitMode = onBackgroundTap != null
+
+    // Tracks active finger drag on the grabber. The armed indicator must only react to user
+    // drags — not to click-driven transitions that happen to pass through the armed range
+    // (e.g. tap-to-expand or back-to-split, where the inspector fraction sweeps across
+    // 0.78..0.85 as part of the animation but no arming gesture is in progress).
+    var isDraggingGrabber by remember { mutableStateOf(false) }
+    val armedProgressProvider: () -> Float = remember(inspectorFractionProvider) {
+        {
+            val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+            if (!isDraggingGrabber) {
+                0f
+            } else {
+                ((fraction - SCENE_INSPECTOR_ARMED_START_FRACTION) /
+                    (SCENE_INSPECTOR_ARMED_FULL_FRACTION - SCENE_INSPECTOR_ARMED_START_FRACTION))
+                    .coerceIn(0f, 1f)
+            }
+        }
+    }
+
+    // Header padding differs between Split (2dp grabber gap) and Expanded (8dp breathing room)
+    // — animate it so the 6dp delta blends with the inspector size transition instead of
+    // popping instantly the moment layoutMode changes (which the eye perceives as the panel
+    // briefly jerking in the wrong direction at the start of the expand/restore animation).
+    val tabsHeaderExtraPadding by animateDpAsState(
+        targetValue = if (isSplitMode) SceneInspectorTabsTopGap else 8.dp,
+        animationSpec = Motion.tweenStandard(),
+        label = "scene_inspector_tabs_header_extra_padding",
+    )
+
+    // Distance from the boundary to the bottom of the tabs header. Used to push body content
+    // down so it sits below the tabs at scroll=0 (= same visual default as before), even
+    // though the body's scroll viewport now extends UP to the boundary so items can scroll
+    // behind the (opaque) tabs and clip at their middle, mirroring the preview behavior.
+    val tabsHeaderTotalHeight = SceneInspectorTabsHeight + tabsHeaderExtraPadding
+    val bodyTopOffset = tabsHeaderTotalHeight - splitBoundaryShift
+    val contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        start = 16.dp,
+        top = 8.dp + bodyTopOffset,
+        end = 16.dp,
+        bottom = bottomInset + 28.dp,
+    )
+
+    val currentLiveDragFractionProvider by rememberUpdatedState(liveDragFractionProvider)
+    val currentOnInspectorDragUpdate by rememberUpdatedState(onInspectorDragUpdate)
+    val currentOnInspectorDragStop by rememberUpdatedState(onInspectorDragStop)
+    val currentAvailableHeightPx by rememberUpdatedState(availableHeightPx)
+    val draggableState = rememberDraggableState { delta ->
+        val height = currentAvailableHeightPx
+        if (height > 0 && delta.isFinite()) {
+            val current = currentLiveDragFractionProvider()
+            val next = current - delta / height.toFloat()
+            val resolved = if (next.isFinite()) {
+                next.coerceIn(0f, MAX_SCENE_INSPECTOR_DRAG_CAP_FRACTION)
+            } else {
+                current
+            }
+            currentOnInspectorDragUpdate(resolved)
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
-                val fraction = inspectorFractionProvider().coerceIn(0f, 1f)
-                val full = if (constraints.hasBoundedHeight) constraints.maxHeight else availableHeightPx
-                val h = (fraction * full).roundToInt().coerceIn(0, full)
+                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+                // Use the passed-in availableHeightPx (= screen − top bar) rather than
+                // constraints.maxHeight: the parent BoxWithConstraints now spans the full
+                // screen, so its constraints include the top bar region we don't own.
+                val h = (fraction * availableHeightPx).roundToInt().coerceIn(0, availableHeightPx)
                 val placeable = measurable.measure(
                     constraints.copy(minHeight = h, maxHeight = h),
                 )
@@ -740,98 +865,126 @@ private fun SceneInspectorPane(
                 }
             ),
     ) {
-        if (isSplitMode) {
-            SceneSplitDivider(
-                visible = showSplitDivider,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = SceneInspectorTabsTopGap),
-            )
-        }
-
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(
-                        SceneInspectorTabsHeight +
-                            if (isSplitMode) SceneInspectorTabsTopGap else 8.dp,
-                    ),
-            ) {
-                SceneInspectorTabs(
-                    selectedTab = selectedTab,
-                    onTabSelected = onTabSelected,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(),
-            ) {
-                AnimatedContent(
-                    targetState = selectedTab,
-                    transitionSpec = {
-                        val direction = initialState.transitionDirectionTo(targetState)
-                        (
-                            slideInHorizontally(
-                                animationSpec = Motion.tweenStandard(),
-                                initialOffsetX = { width -> width * direction },
-                            ) + fadeIn(Motion.tweenStandard())
-                        ) togetherWith (
-                            slideOutHorizontally(
-                                animationSpec = Motion.tweenStandard(),
-                                targetOffsetX = { width -> -width * direction },
-                            ) + fadeOut(Motion.tweenFast())
-                        )
-                    },
-                    label = "scene_inspector_tab_content",
-                ) { tab ->
-                    when (tab) {
-                        SceneInspectorTab.Properties -> {
-                            if (paramsState.params.isEmpty()) {
+        // Body content area — extends UP to the boundary (middle of tabs in Split, top of
+        // pane in Expanded). The .padding(top = splitBoundaryShift) clips the scroll viewport
+        // there, so items scrolled past the boundary disappear behind the (opaque) tabs.
+        // The contentPadding inside the panels offsets the first item to sit below the tabs
+        // at scroll=0; that padding scrolls with content, mirroring the preview's behavior on
+        // the other side of the boundary.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = splitBoundaryShift),
+        ) {
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    val direction = initialState.transitionDirectionTo(targetState)
+                    (
+                        slideInHorizontally(
+                            animationSpec = Motion.tweenStandard(),
+                            initialOffsetX = { width -> width * direction },
+                        ) + fadeIn(Motion.tweenStandard())
+                    ) togetherWith (
+                        slideOutHorizontally(
+                            animationSpec = Motion.tweenStandard(),
+                            targetOffsetX = { width -> -width * direction },
+                        ) + fadeOut(Motion.tweenFast())
+                    )
+                },
+                label = "scene_inspector_tab_content",
+            ) { tab ->
+                when (tab) {
+                    SceneInspectorTab.Properties -> {
+                        if (paramsState.params.isEmpty()) {
+                            // Empty state isn't scrollable — push it below the tabs explicitly.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = bodyTopOffset),
+                            ) {
                                 SceneInspectorEmptyState(
                                     modifier = Modifier.fillMaxSize(),
                                 )
-                            } else {
-                                ControlsPanel(
-                                    state = paramsState,
-                                    callbacks = paramsCallbacks,
-                                    contentPadding = contentPadding,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
                             }
-                        }
-
-                        SceneInspectorTab.Environment -> {
-                            EnvironmentPanel(
-                                preview = scenePreview,
-                                isDarkThemeEnabled = isDarkThemeEnabled,
-                                onThemeChange = onThemeChange,
+                        } else {
+                            ControlsPanel(
+                                state = paramsState,
+                                callbacks = paramsCallbacks,
                                 contentPadding = contentPadding,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
+
+                    SceneInspectorTab.Environment -> {
+                        EnvironmentPanel(
+                            preview = scenePreview,
+                            isDarkThemeEnabled = isDarkThemeEnabled,
+                            onThemeChange = onThemeChange,
+                            contentPadding = contentPadding,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
-                SceneInspectorBottomGradient(
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                    bottomInset = bottomInset,
-                )
             }
+            SceneInspectorBottomGradient(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                bottomInset = bottomInset,
+            )
         }
 
         if (isSplitMode) {
-            SceneInspectorGrabber(
-                onClick = onBackgroundTap,
-                availableHeightPx = availableHeightPx,
-                splitFraction = splitFraction,
-                onSplitFractionChanged = onSplitFractionChanged,
-                onDragStart = onSplitFractionDragStart,
-                onDragStop = onSplitFractionDragStop,
+            // Divider sits on the new boundary — at the middle of the tabs (= shift below
+            // the inspector pane top), not at the top of the tabs as before.
+            SceneSplitDivider(
+                visible = showSplitDivider,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = SceneInspectorGrabberOverlayOffset),
+                    .offset(y = splitBoundaryShift),
             )
+        }
+
+        // Tabs header — last in z-order so it draws ON TOP of body content scrolled up
+        // behind it (the opaque tabs visually clip those items at the boundary).
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(tabsHeaderTotalHeight)
+                .align(Alignment.TopCenter)
+                .then(
+                    if (isSplitMode) {
+                        Modifier.draggable(
+                            orientation = Orientation.Vertical,
+                            state = draggableState,
+                            onDragStarted = { isDraggingGrabber = true },
+                            onDragStopped = {
+                                isDraggingGrabber = false
+                                currentOnInspectorDragStop(
+                                    currentLiveDragFractionProvider(),
+                                )
+                            },
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
+        ) {
+            SceneInspectorTabs(
+                selectedTab = selectedTab,
+                onTabSelected = onTabSelected,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+            if (isSplitMode) {
+                SceneInspectorArmedIndicator(
+                    progressProvider = armedProgressProvider,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(SceneInspectorTabsHeight),
+                )
+            }
         }
     }
 }
@@ -865,7 +1018,7 @@ private fun SceneInspectorTabs(
                 .fillMaxWidth()
                 .height(SceneInspectorTabsHeight)
                 .clip(Tokens.shapes.pill)
-                .background(Tokens.colors.surface.copy(alpha = 0.68f))
+                .background(Tokens.colors.surface)
                 .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.72f), Tokens.shapes.pill),
         ) {
             Box(
@@ -929,74 +1082,94 @@ private fun SceneInspectorTabButton(
 }
 
 @Composable
-private fun SceneInspectorGrabber(
-    onClick: () -> Unit,
-    availableHeightPx: Int,
-    splitFraction: Float,
-    onSplitFractionChanged: (Float) -> Unit,
-    onDragStart: () -> Unit,
-    onDragStop: () -> Unit,
+private fun SceneInspectorArmedIndicator(
+    progressProvider: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var liveSplitFraction by remember { mutableFloatStateOf(splitFraction) }
-
-    LaunchedEffect(splitFraction, isDragging) {
-        if (!isDragging) {
-            liveSplitFraction = splitFraction
-        }
+    val isArmed by remember(progressProvider) {
+        derivedStateOf { progressProvider() >= 1f }
     }
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (isArmed) 1f else 0f,
+        animationSpec = Motion.tweenStandard(),
+        label = "scene_inspector_armed_glow",
+    )
+    // Soft cloud-sky blue — lighter and airier than the brand primary.
+    val strokeColor = Color(0xFF8FC4DF)
 
-    val currentOnSplitFractionChanged by rememberUpdatedState(onSplitFractionChanged)
-    val currentAvailableHeightPx by rememberUpdatedState(availableHeightPx)
-    val draggableState = rememberDraggableState { delta ->
-        val height = currentAvailableHeightPx
-        if (height > 0) {
-            liveSplitFraction -= (delta / height.toFloat())
-            currentOnSplitFractionChanged(liveSplitFraction)
+    Canvas(modifier = modifier) {
+        val progress = progressProvider().coerceIn(0f, 1f)
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+        if (progress <= 0f && glowAlpha <= 0f) return@Canvas
+
+        val r = h / 2f
+        val centerX = w / 2f
+        val strokeWidth = 3.dp.toPx()
+
+        // Right half: bottom-center → bottom flat → right semicircle → top flat → top-center.
+        val rightPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(centerX, h)
+            lineTo(w - r, h)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(w - 2 * r, 0f, w, h),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = -180f,
+                forceMoveTo = false,
+            )
+            lineTo(centerX, 0f)
         }
-    }
-    Box(
-        modifier = modifier
-            .width(68.dp)
-            .height(22.dp)
-            .clip(Tokens.shapes.pill)
-            .background(Tokens.colors.surface)
-            .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.66f), Tokens.shapes.pill)
-            .draggable(
-                orientation = Orientation.Vertical,
-                state = draggableState,
-                onDragStarted = {
-                    isDragging = true
-                    liveSplitFraction = splitFraction
-                    onDragStart()
-                },
-                onDragStopped = {
-                    isDragging = false
-                    onDragStop()
-                },
+        // Left half (mirror): bottom-center → left flat → left semicircle → top flat → top-center.
+        val leftPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(centerX, h)
+            lineTo(r, h)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(0f, 0f, 2 * r, h),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false,
             )
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(14.dp)
-                    .height(2.dp)
-                    .clip(Tokens.shapes.pill)
-                    .background(Tokens.colors.onSurfaceVariant.copy(alpha = 0.68f)),
+            lineTo(centerX, 0f)
+        }
+
+        // Glow layers — drawn under the main stroke, only present when armed.
+        // Butt caps (instead of Round) so the two halves meet flush at the top/bottom centers
+        // rather than producing visible cap "dots" where their endpoints overlap.
+        if (glowAlpha > 0f) {
+            for (i in 0..3) {
+                val layerWidth = strokeWidth + (3 + i * 3).dp.toPx()
+                val layerAlpha = (0.24f - i * 0.05f).coerceAtLeast(0f) * glowAlpha
+                if (layerAlpha <= 0f) continue
+                val glowStyle = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = layerWidth,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Butt,
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                )
+                drawPath(rightPath, strokeColor.copy(alpha = layerAlpha), style = glowStyle)
+                drawPath(leftPath, strokeColor.copy(alpha = layerAlpha), style = glowStyle)
+            }
+        }
+
+        if (progress > 0f) {
+            val rightMeasure = androidx.compose.ui.graphics.PathMeasure().apply {
+                setPath(rightPath, false)
+            }
+            val leftMeasure = androidx.compose.ui.graphics.PathMeasure().apply {
+                setPath(leftPath, false)
+            }
+            val rightSegment = androidx.compose.ui.graphics.Path()
+            rightMeasure.getSegment(0f, rightMeasure.length * progress, rightSegment, true)
+            val leftSegment = androidx.compose.ui.graphics.Path()
+            leftMeasure.getSegment(0f, leftMeasure.length * progress, leftSegment, true)
+
+            val mainStyle = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = strokeWidth,
+                cap = androidx.compose.ui.graphics.StrokeCap.Butt,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round,
             )
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(2.dp)
-                    .clip(Tokens.shapes.pill)
-                    .background(Tokens.colors.primary.copy(alpha = 0.78f)),
-            )
+            drawPath(rightSegment, strokeColor, style = mainStyle)
+            drawPath(leftSegment, strokeColor, style = mainStyle)
         }
     }
 }
@@ -1117,6 +1290,14 @@ private fun ScenePreviewContent(
         Box(
             modifier = modifier,
             contentAlignment = Alignment.Center,
+            // Propagate the parent's min-height to the decorator so its `fillMaxSize()`
+            // actually fills the visible preview area. Without this, Box's default behavior
+            // relaxes minHeight to 0 when measuring children — and because the surrounding
+            // verticalScroll passes maxHeight = Infinity, fillMaxSize then can't determine
+            // a height to fill and the decorator collapses to its content size, causing
+            // any contentAlignment inside the decorator (e.g. TopCenter) to have no effect
+            // on where the scene actually appears.
+            propagateMinConstraints = true,
         ) {
             LocalScenePreviewContainer.current.Decoration {
                 sceneEntry.scene.content(sceneScope)

@@ -67,10 +67,10 @@ internal fun ComposiumSceneCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ComposiumIcon(
-                painter = painterResource(R.drawable.ic_composium_scene),
+                painter = painterResource(R.drawable.scene_icon),
                 contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(24.dp),
+                tint = Tokens.colors.secondary,
+                modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -126,10 +126,10 @@ internal fun ComposiumSceneRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ComposiumIcon(
-            painter = painterResource(R.drawable.ic_composium_scene),
+            painter = painterResource(R.drawable.scene_icon),
             contentDescription = null,
-            tint = Tokens.colors.primary.copy(alpha = accentAlpha),
-            modifier = Modifier.size(18.dp),
+            tint = Tokens.colors.secondary,
+            modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(10.dp))
         ComposiumText(

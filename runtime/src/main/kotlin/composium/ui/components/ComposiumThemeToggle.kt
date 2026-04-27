@@ -49,7 +49,7 @@ internal fun ComposiumThemeToggle(
     )
     val trackColor by animateColorAsState(
         targetValue = if (isDark) {
-            Tokens.colors.primaryContainer.copy(alpha = 0.36f)
+            Tokens.colors.surfaceVariant
         } else {
             Tokens.colors.surfaceVariant
         },
