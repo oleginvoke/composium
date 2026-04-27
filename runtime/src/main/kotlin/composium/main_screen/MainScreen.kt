@@ -343,7 +343,7 @@ private fun MainScreenEmptyState(
     ) {
         Column {
             ComposiumIcon(
-                painter = painterResource(R.drawable.ic_composium_scene),
+                painter = painterResource(R.drawable.empty_search_icon),
                 contentDescription = null,
                 tint = Tokens.colors.primary,
                 modifier = Modifier.size(24.dp),
