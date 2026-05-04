@@ -2,16 +2,20 @@
 package oleginvoke.com.composium
 
 import androidx.annotation.Size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.filterNotNull
 import oleginvoke.com.composium.scene_screen.SceneParamsCallbacks
 import oleginvoke.com.composium.scene_screen.SceneParamsState
@@ -28,6 +32,23 @@ class SceneScope internal constructor() {
 
     internal val params: SnapshotStateList<ParamDescriptor> = mutableStateListOf()
     internal val preview: SceneSystemSettings = SceneSystemSettings()
+
+    // Set by the runtime each composition. When the scene declares enableEdgeToEdge=true the
+    // runtime fills this with the top-bar / system-nav-bar insets that the scene is allowed to
+    // render behind; otherwise the runtime applies those insets itself and reports zero here.
+    internal var internalInnerPadding: PaddingValues by mutableStateOf(PaddingValues(0.dp))
+
+    /**
+     * Insets the scene should apply to its own content for a polished edge-to-edge layout.
+     *
+     * - When [Scene.enableEdgeToEdge] is `false` (default), the runtime already keeps scene
+     *   content out of the top bar / system bars, and this returns [PaddingValues] of zero.
+     * - When [Scene.enableEdgeToEdge] is `true`, the scene renders behind the top bar and the
+     *   system navigation bar; the corresponding `top` and `bottom` insets are reported here so
+     *   the scene author can apply them where appropriate (e.g. `Modifier.padding(innerPadding)`
+     *   on a list, or as `LazyColumn(contentPadding = innerPadding)`).
+     */
+    val innerPadding: PaddingValues get() = internalInnerPadding
 
     private val paramBindings: MutableMap<String, ParamBinding> = hashMapOf()
     private val paramDescriptorIndexes: MutableMap<String, Int> = hashMapOf()

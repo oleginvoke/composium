@@ -39,8 +39,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -62,6 +60,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -506,7 +505,6 @@ private fun SceneScreenContent(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    var hasPreviewOverflow by remember(sceneEntry.id) { mutableStateOf(false) }
     val topInset = contentWindowInsets?.getTop(density)?.let { inset ->
         with(density) { inset.toDp() }
     } ?: 0.dp
@@ -514,6 +512,27 @@ private fun SceneScreenContent(
         with(density) { inset.toDp() }
     } ?: 0.dp
     val contentTopPadding = topInset + 72.dp
+
+    // Tell the scene what insets the runtime is NOT applying for it.
+    // - enableEdgeToEdge = true  → runtime applies nothing; scene renders behind top bar /
+    //   nav bar and reads `innerPadding` to add the spacing it wants.
+    // - enableEdgeToEdge = false → runtime applies the same spacing itself, so the scene
+    //   sees PaddingValues(0) and just fills its visible area normally.
+    val sceneInnerPadding = if (sceneEntry.scene.enableEdgeToEdge) {
+        androidx.compose.foundation.layout.PaddingValues(
+            top = contentTopPadding,
+            bottom = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Closed) {
+                bottomInset
+            } else {
+                0.dp
+            },
+        )
+    } else {
+        androidx.compose.foundation.layout.PaddingValues(0.dp)
+    }
+    SideEffect {
+        sceneScope.internalInnerPadding = sceneInnerPadding
+    }
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -537,10 +556,11 @@ private fun SceneScreenContent(
         label = "scene_split_boundary_shift",
     )
 
-    // BoxWithConstraints fills the full screen (no top padding) — that lets the preview
-    // pane extend up to screen Y=0 so its scrollable content can pass behind the top bar.
-    // Inspector positioning is preserved by treating `availableHeightPx` as the visible-
-    // content area below the top bar (i.e. constraints.maxHeight − contentTopPaddingPx).
+    // BoxWithConstraints fills the full screen (no top padding). The preview pane's outer
+    // .layout decides the scene placement based on enableEdgeToEdge — either filling the
+    // pane edge-to-edge, or sitting inside the safe area below the top bar / above the nav
+    // bar. Inspector positioning is preserved by treating `availableHeightPx` as the
+    // safe-area height (= constraints.maxHeight − contentTopPaddingPx).
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -548,9 +568,11 @@ private fun SceneScreenContent(
     ) {
         val contentTopPaddingPx = with(density) { contentTopPadding.roundToPx() }
         val availableHeightPx = (constraints.maxHeight - contentTopPaddingPx).coerceAtLeast(0)
+        // The preview pane no longer manages its own scrolling, so there's no overflow to
+        // signal to the inspector — divider stays hidden in this mode.
         val showSplitDivider = shouldShowSceneSplitDivider(
             mode = controlsSheet.layoutMode,
-            hasScrollableOverflow = hasPreviewOverflow,
+            hasScrollableOverflow = false,
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -562,9 +584,8 @@ private fun SceneScreenContent(
                 layoutMode = controlsSheet.layoutMode,
                 splitBoundaryShift = splitBoundaryShift,
                 contentTopPadding = contentTopPadding,
-                onOverflowChanged = { hasOverflow ->
-                    hasPreviewOverflow = hasOverflow
-                },
+                bottomInset = bottomInset,
+                enableEdgeToEdge = sceneEntry.scene.enableEdgeToEdge,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
                 } else {
@@ -672,25 +693,30 @@ private fun ScenePreviewPane(
     layoutMode: SceneInspectorLayoutMode,
     splitBoundaryShift: Dp,
     contentTopPadding: Dp,
-    onOverflowChanged: (Boolean) -> Unit,
+    bottomInset: Dp,
+    enableEdgeToEdge: Boolean,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val scrollState = rememberScrollState()
-    val showOverflowDivider by remember(scrollState, layoutMode) {
-        derivedStateOf {
-            shouldShowSceneSplitDivider(
-                mode = layoutMode,
-                hasScrollableOverflow = scrollState.maxValue > 0,
-            )
-        }
-    }
 
-    LaunchedEffect(showOverflowDivider) {
-        onOverflowChanged(showOverflowDivider)
-    }
-
+    // The preview pane visually occupies [Y=0, Y=paneHeight] in its parent. The pane height
+    // covers everything from the top of the screen down to either the inspector boundary
+    // (Split / Expanded) or the screen bottom (Closed). What changes between edge-to-edge
+    // and not is only the placement of the SCENE inside this pane:
+    //
+    //   - enableEdgeToEdge = true  → scene fills the entire pane, including behind the top
+    //     bar and (in Closed mode) behind the system nav bar. The scene receives both insets
+    //     via SceneScope.innerPadding so it can apply them where appropriate.
+    //   - enableEdgeToEdge = false → scene is offset down by contentTopPadding (so it sits
+    //     below the top bar) and (in Closed mode) shortened by bottomInset (so it sits above
+    //     the nav bar). SceneScope.innerPadding is reported as zero.
+    //
+    // Constraints passed to the scene are FULLY BOUNDED (minH = maxH = sceneHeight) so any
+    // vertical scrollables inside the scene (LazyColumn / Modifier.verticalScroll) measure
+    // without crashing on `hasBoundedHeight`. There's no outer scroll: if the scene is
+    // taller than the available area in Split mode, it simply gets clipped — scenes that
+    // need their own scrolling are expected to bring it themselves.
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -698,17 +724,38 @@ private fun ScenePreviewPane(
                 val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
                 val shiftPx = splitBoundaryShift.toPx()
                 val topPaddingPx = contentTopPadding.toPx()
+                val applyBottomInset = !enableEdgeToEdge &&
+                    layoutMode == SceneInspectorLayoutMode.Closed
+                val bottomPaddingPx = if (applyBottomInset) bottomInset.toPx() else 0f
                 val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
-                // Visible preview area below the top bar, plus the boundary overlap region.
-                val visibleHeight = (1f - fraction) * availableHeightPx + shiftPx
-                // Outer pane extends up into the top-bar area so scrolled content can render
-                // behind the (translucent) top bar instead of being clipped at its bottom.
-                val outerHeight = (visibleHeight + topPaddingPx).roundToInt().coerceIn(1, ceiling)
+
+                val visibleAreaPx = (1f - fraction) * availableHeightPx + shiftPx
+                val paneHeight = (visibleAreaPx + topPaddingPx)
+                    .roundToInt()
+                    .coerceIn(1, ceiling)
+
+                val sceneTopPx = if (enableEdgeToEdge) 0 else topPaddingPx.roundToInt()
+                val sceneBottomPx = bottomPaddingPx.roundToInt()
+                val sceneHeight = (paneHeight - sceneTopPx - sceneBottomPx).coerceAtLeast(0)
+
                 val placeable = measurable.measure(
-                    constraints.copy(minHeight = 0, maxHeight = outerHeight),
+                    Constraints(
+                        minWidth = constraints.minWidth,
+                        maxWidth = constraints.maxWidth,
+                        minHeight = sceneHeight,
+                        maxHeight = sceneHeight,
+                    ),
                 )
-                layout(placeable.width, outerHeight) { placeable.place(0, 0) }
+                layout(placeable.width, paneHeight) {
+                    placeable.place(0, sceneTopPx)
+                }
             }
+            // Clip the pane to its reported size so a scene whose intrinsic content is taller
+            // than `sceneHeight` doesn't overflow downward and get drawn behind the inspector
+            // (which would visually "cut" the scene at the top edge of the tabs instead of at
+            // the boundary). Compose doesn't clip overflow by default — without this the
+            // scene's tail bleeds into the inspector area.
+            .clipToBounds()
             .then(
                 if (onBackgroundTap != null) {
                     Modifier.clickable(
@@ -721,38 +768,11 @@ private fun ScenePreviewPane(
                 }
             ),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-            // Top-padding spacer lives INSIDE the scroll viewport so scrolling moves it past
-            // the column's top edge, letting the actual preview content slide up into the
-            // (translucent) top bar's region.
-            Spacer(modifier = Modifier.height(contentTopPadding))
-            ScenePreviewContent(
-                sceneEntry = sceneEntry,
-                sceneScope = sceneScope,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .layout { measurable, constraints ->
-                        val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
-                        val shiftPx = splitBoundaryShift.toPx()
-                        val minH = ((1f - fraction) * availableHeightPx + shiftPx)
-                            .roundToInt()
-                            .coerceAtLeast(0)
-                        val placeable = measurable.measure(
-                            Constraints(
-                                minWidth = constraints.minWidth,
-                                maxWidth = constraints.maxWidth,
-                                minHeight = minH,
-                                maxHeight = Constraints.Infinity,
-                            ),
-                        )
-                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                    },
-            )
-        }
+        ScenePreviewContent(
+            sceneEntry = sceneEntry,
+            sceneScope = sceneScope,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
