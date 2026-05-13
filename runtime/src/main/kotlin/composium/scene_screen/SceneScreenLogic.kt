@@ -31,6 +31,21 @@ internal data class SceneLayoutMetrics(
     val inspectorHeightPx: Int,
 )
 
+internal enum class SceneTitleIslandLayout {
+    GroupAndTitle,
+    CenteredTitle,
+}
+
+internal fun calculateSceneTitleIslandLayout(
+    group: String?,
+): SceneTitleIslandLayout {
+    return if (group.isNullOrBlank()) {
+        SceneTitleIslandLayout.CenteredTitle
+    } else {
+        SceneTitleIslandLayout.GroupAndTitle
+    }
+}
+
 internal fun calculateSceneTopBarCrossfadeState(
     expandedProgress: Float,
 ): SceneTopBarCrossfadeState {

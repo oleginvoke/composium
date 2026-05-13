@@ -10,7 +10,7 @@ class SceneScreenLogicTest {
     @Test
     fun `calculate scene top bar crossfade state keeps split row on top for split inspector`() {
         val result = calculateSceneTopBarCrossfadeState(
-            inspectorFraction = DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION,
+            expandedProgress = 0f,
         )
 
         assertEquals(0f, result.expandedProgress)
@@ -22,13 +22,37 @@ class SceneScreenLogicTest {
     @Test
     fun `calculate scene top bar crossfade state puts expanded row on top for expanded inspector`() {
         val result = calculateSceneTopBarCrossfadeState(
-            inspectorFraction = 1f,
+            expandedProgress = 1f,
         )
 
         assertEquals(1f, result.expandedProgress)
         assertFalse(result.splitInteractive)
         assertTrue(result.expandedInteractive)
         assertTrue(result.expandedZIndex > result.splitZIndex)
+    }
+
+    @Test
+    fun `scene title island layout centers title when group is missing`() {
+        assertEquals(
+            SceneTitleIslandLayout.CenteredTitle,
+            calculateSceneTitleIslandLayout(group = null),
+        )
+        assertEquals(
+            SceneTitleIslandLayout.CenteredTitle,
+            calculateSceneTitleIslandLayout(group = ""),
+        )
+        assertEquals(
+            SceneTitleIslandLayout.CenteredTitle,
+            calculateSceneTitleIslandLayout(group = "   "),
+        )
+    }
+
+    @Test
+    fun `scene title island layout keeps two lines when group is present`() {
+        assertEquals(
+            SceneTitleIslandLayout.GroupAndTitle,
+            calculateSceneTitleIslandLayout(group = "Buttons/Primary"),
+        )
     }
 
     @Test
@@ -223,14 +247,14 @@ class SceneScreenLogicTest {
             state = SceneScreenState(
                 controlsSheet = ControlsSheetUiState(
                     layoutMode = SceneInspectorLayoutMode.Split,
-                    splitFraction = 0.9f,
+                    splitFraction = 0.93f,
                 ),
             ),
             intent = SceneScreenIntent.SettleSplitFraction,
         )
 
         assertEquals(SceneInspectorLayoutMode.Expanded, result.controlsSheet.layoutMode)
-        assertEquals(0.9f, result.controlsSheet.splitFraction)
+        assertEquals(0.93f, result.controlsSheet.splitFraction)
     }
 
     @Test
@@ -284,5 +308,29 @@ class SceneScreenLogicTest {
         )
 
         assertEquals(SceneInspectorTab.Environment, result.controlsSheet.selectedTab)
+    }
+
+    @Test
+    fun `tab transition direction is positive when moving to the right`() {
+        assertEquals(
+            1,
+            SceneInspectorTab.Properties.transitionDirectionTo(SceneInspectorTab.Environment),
+        )
+    }
+
+    @Test
+    fun `tab transition direction is negative when moving to the left`() {
+        assertEquals(
+            -1,
+            SceneInspectorTab.Environment.transitionDirectionTo(SceneInspectorTab.Properties),
+        )
+    }
+
+    @Test
+    fun `tab transition direction is zero when tab does not change`() {
+        assertEquals(
+            0,
+            SceneInspectorTab.Properties.transitionDirectionTo(SceneInspectorTab.Properties),
+        )
     }
 }

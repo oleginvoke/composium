@@ -6,9 +6,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,8 +25,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +39,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,6 +50,40 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import oleginvoke.com.composium.ui.theme.Tokens
 
+internal data class TextFieldImeState(
+    val hasSeenVisibleImeForCurrentFocus: Boolean,
+    val clearFocus: Boolean,
+)
+
+internal fun reduceTextFieldImeState(
+    isFocused: Boolean,
+    isImeVisible: Boolean,
+    hasSeenVisibleImeForCurrentFocus: Boolean,
+): TextFieldImeState {
+    return when {
+        !isFocused -> TextFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = false,
+        )
+
+        isImeVisible -> TextFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = true,
+            clearFocus = false,
+        )
+
+        hasSeenVisibleImeForCurrentFocus -> TextFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = true,
+        )
+
+        else -> TextFieldImeState(
+            hasSeenVisibleImeForCurrentFocus = false,
+            clearFocus = false,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ComposiumTextField(
     value: String,
@@ -67,6 +108,21 @@ internal fun ComposiumTextField(
     borderWidth: Dp = 1.dp,
 ) {
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusManager = LocalFocusManager.current
+    val imeVisible = WindowInsets.isImeVisible
+    var hasSeenVisibleImeForCurrentFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isFocused, imeVisible) {
+        val nextState = reduceTextFieldImeState(
+            isFocused = isFocused,
+            isImeVisible = imeVisible,
+            hasSeenVisibleImeForCurrentFocus = hasSeenVisibleImeForCurrentFocus,
+        )
+        hasSeenVisibleImeForCurrentFocus = nextState.hasSeenVisibleImeForCurrentFocus
+        if (nextState.clearFocus) {
+            focusManager.clearFocus()
+        }
+    }
 
     val borderColor = when {
         !enabled -> colors.disabledBorderColor

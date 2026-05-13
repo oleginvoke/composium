@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
+    implementation(libs.compose.animation)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.material3)
@@ -66,4 +67,5 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     debugImplementation(libs.androidx.ui.tooling)
     ksp(project(":processor"))
+    testImplementation(kotlin("test"))
 }

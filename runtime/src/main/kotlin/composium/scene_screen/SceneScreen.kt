@@ -69,6 +69,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -408,6 +409,9 @@ private fun SceneSceneTitleIsland(
     sceneEntry: SceneEntry,
     modifier: Modifier = Modifier,
 ) {
+    val group = sceneEntry.scene.group
+    val layout = calculateSceneTitleIslandLayout(group)
+
     Box(
         modifier = modifier
             .clip(Tokens.shapes.extraLarge)
@@ -415,29 +419,61 @@ private fun SceneSceneTitleIsland(
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     ) {
-        Column {
-            // Always render the group line, even when there is no group, so the island's
-            // vertical extent stays the same as a scene that has one. Without the placeholder
-            // line the Column collapses by labelSmall's line-height and the central island
-            // visibly shrinks for ungrouped scenes.
-            val group = sceneEntry.scene.group
-            val hasGroup = !group.isNullOrBlank()
-            ComposiumText(
-                text = if (hasGroup) group!! else " ",
-                style = Tokens.typography.labelSmall,
-                color = if (hasGroup) Tokens.colors.primary else Color.Transparent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(1.dp))
-            ComposiumText(
-                text = sceneEntry.scene.name,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = Tokens.typography.titleLarge,
-                color = Tokens.colors.onSurface,
-            )
+        when (layout) {
+            SceneTitleIslandLayout.GroupAndTitle -> {
+                SceneTitleIslandTextColumn(
+                    group = group!!,
+                    title = sceneEntry.scene.name,
+                )
+            }
+
+            SceneTitleIslandLayout.CenteredTitle -> {
+                SceneTitleIslandTextColumn(
+                    group = " ",
+                    title = sceneEntry.scene.name,
+                    groupColor = Color.Transparent,
+                    titleColor = Color.Transparent,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
+                ComposiumText(
+                    text = sceneEntry.scene.name,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = Tokens.typography.titleLarge,
+                    color = Tokens.colors.onSurface,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun SceneTitleIslandTextColumn(
+    group: String,
+    title: String,
+    modifier: Modifier = Modifier,
+    groupColor: Color = Tokens.colors.primary,
+    titleColor: Color = Tokens.colors.onSurface,
+) {
+    Column(modifier = modifier) {
+        ComposiumText(
+            text = group,
+            style = Tokens.typography.labelSmall,
+            color = groupColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(1.dp))
+        ComposiumText(
+            text = title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = Tokens.typography.titleLarge,
+            color = titleColor,
+        )
     }
 }
 
