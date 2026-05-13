@@ -1,13 +1,15 @@
 package com.example.app.macrobenchmark
 
 import androidx.benchmark.macro.FrameTimingMetric
-import androidx.benchmark.macro.MacrobenchmarkRule
+import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import kotlin.math.roundToInt
 import org.junit.Rule
@@ -83,7 +85,7 @@ class ComposiumMacrobenchmark {
     ) {
         focusSearchField()
         device.executeShellCommand("input text Benchmark")
-        device.wait(Until.hasObject(By.textContains("Benchmark 1")), WAIT_TIMEOUT_MS)
+        waitForObject(By.text(BENCHMARK_SCENE_NAME), "benchmark scene result")
     }
 
     @Test
@@ -98,8 +100,9 @@ class ComposiumMacrobenchmark {
             waitForMainScreen()
         },
     ) {
-        device.wait(Until.findObject(By.text("Playground")), WAIT_TIMEOUT_MS)?.click()
-        device.wait(Until.hasObject(By.desc("Open properties")), WAIT_TIMEOUT_MS)
+        showBenchmarkSceneInCatalog()
+        clickObject(By.text(BENCHMARK_SCENE_NAME), "benchmark scene")
+        waitForObject(By.desc("Open properties"), "open properties button")
         device.pressBack()
         waitForMainScreen()
     }
@@ -114,13 +117,13 @@ class ComposiumMacrobenchmark {
             pressHome()
             startActivityAndWait()
             waitForMainScreen()
-            device.wait(Until.findObject(By.text("Playground")), WAIT_TIMEOUT_MS)?.click()
-            device.wait(Until.findObject(By.desc("Open properties")), WAIT_TIMEOUT_MS)?.click()
-            device.wait(Until.hasObject(By.text("Environment")), WAIT_TIMEOUT_MS)
+            openBenchmarkScene()
+            clickObject(By.desc("Open properties"), "open properties button")
+            waitForObject(By.text("Environment"), "environment tab")
         },
     ) {
-        device.wait(Until.findObject(By.text("Environment")), WAIT_TIMEOUT_MS)?.click()
-        device.wait(Until.findObject(By.text("Properties")), WAIT_TIMEOUT_MS)?.click()
+        clickObject(By.text("Environment"), "environment tab")
+        clickObject(By.text("Properties"), "properties tab")
     }
 
     @Test
@@ -133,9 +136,9 @@ class ComposiumMacrobenchmark {
             pressHome()
             startActivityAndWait()
             waitForMainScreen()
-            device.wait(Until.findObject(By.text("Playground")), WAIT_TIMEOUT_MS)?.click()
-            device.wait(Until.findObject(By.desc("Open properties")), WAIT_TIMEOUT_MS)?.click()
-            device.wait(Until.hasObject(By.text("Properties")), WAIT_TIMEOUT_MS)
+            openBenchmarkScene()
+            clickObject(By.desc("Open properties"), "open properties button")
+            waitForObject(By.text("Properties"), "properties tab")
         },
     ) {
         val centerX = device.displayWidth / 2
@@ -149,17 +152,59 @@ class ComposiumMacrobenchmark {
     }
 
     private fun waitForMainScreen() {
-        device.wait(Until.hasObject(By.text("Composium")), WAIT_TIMEOUT_MS)
-        device.wait(Until.hasObject(By.textContains("Search scenes")), WAIT_TIMEOUT_MS)
+        waitForObject(By.text("Composium"), "main screen title")
+        waitForObject(By.textContains("Search scenes"), "search field")
+    }
+
+    private fun openBenchmarkScene() {
+        showBenchmarkSceneInCatalog()
+        clickObject(By.text(BENCHMARK_SCENE_NAME), "benchmark scene")
+        waitForObject(By.desc("Open properties"), "open properties button")
+    }
+
+    private fun showBenchmarkSceneInCatalog() {
+        focusSearchField()
+        val clearSearchButton = device.findObject(By.desc("Clear search"))
+        if (clearSearchButton != null) {
+            clearSearchButton.click()
+        }
+        device.executeShellCommand("input text Benchmark")
+        waitForObject(By.text(BENCHMARK_SCENE_NAME), "benchmark scene result")
     }
 
     private fun focusSearchField() {
-        device.wait(Until.findObject(By.textContains("Search scenes")), WAIT_TIMEOUT_MS)?.click()
-            ?: device.findObject(By.clazz("android.widget.EditText"))?.click()
+        val field = device.wait(
+            Until.findObject(By.textContains("Search scenes")),
+            WAIT_TIMEOUT_MS,
+        ) ?: device.wait(
+            Until.findObject(By.clazz("android.widget.EditText")),
+            WAIT_TIMEOUT_MS,
+        )
+
+        checkNotNull(field) {
+            "Timed out waiting for search field"
+        }.click()
+    }
+
+    private fun clickObject(
+        selector: BySelector,
+        description: String,
+    ) {
+        waitForObject(selector, description).click()
+    }
+
+    private fun waitForObject(
+        selector: BySelector,
+        description: String,
+    ): UiObject2 {
+        return checkNotNull(device.wait(Until.findObject(selector), WAIT_TIMEOUT_MS)) {
+            "Timed out waiting for $description"
+        }
     }
 
     companion object {
         private const val TARGET_PACKAGE = "com.example.ComposiumSample"
+        private const val BENCHMARK_SCENE_NAME = "Benchmark 1"
         private const val WAIT_TIMEOUT_MS = 5_000L
     }
 }

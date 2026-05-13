@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import oleginvoke.com.composium.R
 import oleginvoke.com.composium.SceneEntry
+import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
 import oleginvoke.com.composium.ui.components.ComposiumBadge
 import oleginvoke.com.composium.ui.components.ComposiumButton
 import oleginvoke.com.composium.ui.components.ComposiumIcon
@@ -191,7 +192,12 @@ private fun MainScreenTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (statusBarInsets != null) Modifier.windowInsetsPadding(statusBarInsets) else Modifier)
+            .then(
+                statusBarInsets
+                    .onlyTopAndHorizontalOrNull()
+                    ?.let(Modifier::windowInsetsPadding)
+                    ?: Modifier,
+            )
             .padding(horizontal = 16.dp)
             .padding(top = 16.dp, bottom = 8.dp),
     ) {

@@ -85,6 +85,7 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
 import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
@@ -288,8 +289,10 @@ private fun SceneScreenTopBar(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (statusBarInsets != null) Modifier.windowInsetsPadding(statusBarInsets)
-                else Modifier,
+                statusBarInsets
+                    .onlyTopAndHorizontalOrNull()
+                    ?.let(Modifier::windowInsetsPadding)
+                    ?: Modifier,
             )
             .padding(horizontal = 12.dp)
             .padding(top = 10.dp, bottom = 12.dp),

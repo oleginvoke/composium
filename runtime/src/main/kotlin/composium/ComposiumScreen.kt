@@ -23,7 +23,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
  * If KSP is not used, scenes can be registered manually through [Composium.registerAll]
  * before rendering this screen.
  *
- * Uses the runtime-owned preview canvas with a pass-through scene preview decorator by default.
+ * Uses the runtime-owned preview canvas by default.
  *
  * @param modifier Modifier for the screen.
  * @param isDarkTheme Optional dark theme override. If not provided, the internal state is used.
@@ -31,6 +31,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
  * or apply padding manually if you are not using edge-to-edge.
  * @param onThemeChange Callback for theme change.
  */
+@Suppress("DEPRECATION")
 @Composable
 fun ComposiumScreen(
     modifier: Modifier = Modifier,
@@ -58,8 +59,12 @@ fun ComposiumScreen(
  * @param contentWindowInsets Optional window insets for the content area. Use `WindowInsets.systemBars` for edge-to-edge
  * or apply padding manually if you are not using edge-to-edge.
  * @param onThemeChange Callback for theme change.
- * @param scenePreviewDecorator Decorator applied around scene content inside the runtime-owned preview canvas.
+ * @param scenePreviewDecorator Deprecated. Custom preview decoration is no longer supported through
+ * [ComposiumScreen]. Use wrapper helpers based on [scene] instead.
  */
+@Deprecated(
+    message = "scenePreviewDecorator is no longer supported. Use wrappers based on the scene function instead.",
+)
 @Composable
 fun ComposiumScreen(
     modifier: Modifier = Modifier,

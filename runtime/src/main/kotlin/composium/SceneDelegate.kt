@@ -8,7 +8,9 @@ import kotlin.reflect.KProperty
  *
  * @param explicitGroup Explicit scene group override.
  * @param explicitName Explicit scene name override.
- * @param enableEdgeToEdge See [Scene.enableEdgeToEdge].
+ * @param enableEdgeToEdge Controls scene inset ownership. When `false` (default), Composium
+ * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
+ * preview area and receives the top/bottom insets through [SceneScope.innerPadding].
  * @param content Scene content.
  */
 class SceneDelegate(
@@ -43,7 +45,10 @@ class SceneDelegate(
  *
  * @param group Optional group path.
  * @param name Optional explicit scene name. If `null`, property name is used.
- * @param enableEdgeToEdge See [Scene.enableEdgeToEdge].
+ * @param enableEdgeToEdge Controls scene inset ownership. When `false` (default), Composium
+ * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
+ * preview area and receives the top/bottom insets through [SceneScope.innerPadding], so the
+ * scene can decide where to apply them.
  * @param content Scene content lambda.
  */
 fun scene(
