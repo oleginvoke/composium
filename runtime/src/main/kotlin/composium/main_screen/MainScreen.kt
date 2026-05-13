@@ -1,18 +1,15 @@
 package oleginvoke.com.composium.main_screen
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,41 +18,55 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.NightsStay
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.ViewInAr
-import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import oleginvoke.com.composium.R
 import oleginvoke.com.composium.SceneEntry
+import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
 import oleginvoke.com.composium.ui.components.ComposiumBadge
+import oleginvoke.com.composium.ui.components.ComposiumButton
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
-import oleginvoke.com.composium.ui.components.ComposiumScaffold
-import oleginvoke.com.composium.ui.components.ComposiumSurface
+import oleginvoke.com.composium.ui.components.ComposiumOutlinedButton
+import oleginvoke.com.composium.ui.components.ComposiumSceneCard
+import oleginvoke.com.composium.ui.components.ComposiumSceneRow
 import oleginvoke.com.composium.ui.components.ComposiumText
+import oleginvoke.com.composium.ui.components.ComposiumThemeToggle
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
+import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 
 @Composable
@@ -66,6 +77,9 @@ internal fun MainScreen(
     contentWindowInsets: WindowInsets? = null,
 ) {
     val themeController = LocalComposiumThemeController.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val backgroundInteractionSource = remember { MutableInteractionSource() }
     val store = rememberMainScreenStore()
     val state = store.state
     val scenesContentKey by remember(scenes) {
@@ -85,14 +99,22 @@ internal fun MainScreen(
             query = state.query,
         )
     }
-    val uiState = MainScreenUiState(
-        query = state.query,
-        scenes = filteredScenes,
-        expandedGroups = state.expandedGroups,
-        isDarkTheme = themeController.isDarkTheme,
-    )
+    val catalogStatus = remember(state.query, filteredScenes.size, scenes.size) {
+        buildCatalogStatus(
+            query = state.query,
+            visibleCount = filteredScenes.size,
+            totalCount = scenes.size,
+        )
+    }
 
-    val callbacks = remember(store, sceneSearchIndex, onSceneSelected, themeController.onThemeChange) {
+    val callbacks = remember(
+        store,
+        sceneSearchIndex,
+        onSceneSelected,
+        themeController.onThemeChange,
+        focusManager,
+        keyboardController,
+    ) {
         object : MainScreenCallbacks {
             override fun onQueryChange(query: String) {
                 store.dispatch(
@@ -102,6 +124,13 @@ internal fun MainScreen(
             }
 
             override fun onSceneSelected(sceneId: String) {
+                val inputDismissal = calculateSceneSelectionInputDismissal()
+                if (inputDismissal.clearFocus) {
+                    focusManager.clearFocus()
+                }
+                if (inputDismissal.hideKeyboard) {
+                    keyboardController?.hide()
+                }
                 onSceneSelected.invoke(sceneId)
             }
 
@@ -118,231 +147,322 @@ internal fun MainScreen(
         }
     }
 
-    ComposiumScaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Tokens.colors.background)
+            .clickable(
+                interactionSource = backgroundInteractionSource,
+                indication = null,
+                onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                },
+            ),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             MainScreenTopBar(
-                state = uiState,
+                query = state.query,
+                isDarkTheme = themeController.isDarkTheme,
+                catalogStatus = catalogStatus,
                 callbacks = callbacks,
                 statusBarInsets = contentWindowInsets,
             )
-        },
-    ) { padding ->
-        MainScreenContent(
-            state = uiState,
-            callbacks = callbacks,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        )
+            MainScreenContent(
+                scenes = filteredScenes,
+                expandedGroups = state.expandedGroups,
+                catalogStatus = catalogStatus,
+                callbacks = callbacks,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(PaddingValues()),
+            )
+        }
     }
 }
 
 @Composable
 private fun MainScreenTopBar(
-    state: MainScreenUiState,
+    query: String,
+    isDarkTheme: Boolean,
+    catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
     statusBarInsets: WindowInsets? = null,
 ) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Tokens.colors.background),
+            .then(
+                statusBarInsets
+                    .onlyTopAndHorizontalOrNull()
+                    ?.let(Modifier::windowInsetsPadding)
+                    ?: Modifier,
+            )
+            .padding(horizontal = 16.dp)
+            .padding(top = 16.dp, bottom = 8.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (statusBarInsets != null) Modifier.windowInsetsPadding(statusBarInsets) else Modifier)
-                .padding(horizontal = 16.dp)
-                .padding(top = 12.dp, bottom = 8.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ComposiumIcon(
-                    imageVector = Icons.Outlined.ViewInAr,
-                    contentDescription = null,
-                    tint = Tokens.colors.primary,
-                    modifier = Modifier.size(40.dp),
-                )
-                Spacer(Modifier.width(12.dp))
                 ComposiumText(
-                    modifier = Modifier.weight(1f),
                     text = "Composium",
-                    style = Tokens.typography.headlineMedium,
+                    style = TextStyle(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 26.sp,
+                    ),
                     color = Tokens.colors.onSurface,
                 )
-                AnimatedContent(targetState = state.isDarkTheme) { isDark ->
-                    if (isDark) {
-                        ComposiumIconButton(
-                            onClick = { callbacks.onThemeChange(false) },
-                        ) {
-                            ComposiumIcon(
-                                imageVector = Icons.Outlined.WbSunny,
-                                contentDescription = "Change theme",
-                                tint = Color.Yellow,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        }
-                    } else {
-                        ComposiumIconButton(
-                            onClick = { callbacks.onThemeChange(true) },
-                        ) {
-                            ComposiumIcon(
-                                imageVector = Icons.Outlined.NightsStay,
-                                contentDescription = "Change theme",
-                                tint = Color.Blue,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        }
-                    }
-                }
             }
-
-            Spacer(Modifier.height(12.dp))
-
-            SearchStoriesField(
-                value = state.query,
-                onValueChange = callbacks::onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
+            ComposiumThemeToggle(
+                isDark = isDarkTheme,
+                onToggle = callbacks::onThemeChange,
             )
-
-            Spacer(Modifier.height(18.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                ComposiumText(
-                    text = "Scenes",
-                    style = Tokens.typography.headlineSmall,
-                    color = Tokens.colors.onSurface,
-                )
-                ComposiumBadge(
-                    text = state.scenes.size.toString(),
-                    containerColor = Tokens.colors.primaryContainer,
-                    contentColor = Tokens.colors.onPrimaryContainer,
-                )
-            }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        SearchStoriesField(
+            value = query,
+            onValueChange = callbacks::onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
 private fun MainScreenContent(
-    state: MainScreenUiState,
+    scenes: List<SceneEntry>,
+    expandedGroups: Set<String>,
+    catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    val sceneGroupTree = remember(state.scenes) {
-        buildSceneGroupTree(state.scenes)
+    val sceneGroupTree = remember(scenes) {
+        buildSceneGroupTree(scenes)
     }
-    val listItems = remember(sceneGroupTree, state.expandedGroups) {
+    val listItems = remember(sceneGroupTree, expandedGroups) {
         val (ungroupedScenes, rootGroups) = sceneGroupTree
         buildMainScreenListItems(
             ungroupedScenes = ungroupedScenes,
             rootGroups = rootGroups,
-            expandedGroups = state.expandedGroups,
+            expandedGroups = expandedGroups,
         )
-    }
-
-    @Composable
-    fun SceneRow(entry: SceneEntry, depth: Int) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = (depth * 14).dp)
-                .clip(Tokens.shapes.medium)
-                .clickable { callbacks.onSceneSelected(entry.id) }
-                .padding(vertical = 10.dp, horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ComposiumIcon(
-                imageVector = Icons.Outlined.ViewInAr,
-                contentDescription = null,
-                tint = Tokens.colors.primary,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            ComposiumText(
-                text = entry.scene.name,
-                style = Tokens.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = Tokens.colors.onSurface,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-            )
-        }
     }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .imePadding(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(
+        if (catalogStatus.totalCount > 0) {
+            item("catalog_meta") {
+                CatalogMetaRow(
+                    totalCount = catalogStatus.totalCount,
+                    visibleCount = catalogStatus.visibleCount,
+                    isFiltered = catalogStatus.query.isNotBlank(),
+                )
+            }
+        }
+
+        if (listItems.isEmpty()) {
+            item("empty_state") {
+                MainScreenEmptyState(
+                    status = catalogStatus,
+                    onClearSearch = { callbacks.onQueryChange("") },
+                )
+            }
+            return@LazyColumn
+        }
+
+        itemsIndexed(
             items = listItems,
-            key = { item -> item.key },
-        ) { item ->
+            key = { _, item -> item.key },
+            contentType = { _, item ->
+                when (item) {
+                    is MainScreenListItem.GroupHeader -> "group_header"
+                    is MainScreenListItem.SceneItem -> "scene_item"
+                }
+            },
+        ) { index, item ->
             when (item) {
                 is MainScreenListItem.SceneItem -> {
-                    SceneRow(entry = item.entry, depth = item.depth)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = (item.depth * 12).dp),
+                    ) {
+                        if (item.depth == 0) {
+                            ComposiumSceneCard(
+                                name = item.entry.scene.name,
+                                group = item.entry.scene.group,
+                                onClick = { callbacks.onSceneSelected(item.entry.id) },
+                            )
+                        } else {
+                            ComposiumSceneRow(
+                                name = item.entry.scene.name,
+                                onClick = { callbacks.onSceneSelected(item.entry.id) },
+                            )
+                        }
+                    }
                 }
 
                 is MainScreenListItem.GroupHeader -> {
-                    val expanded = state.expandedGroups.contains(item.path)
-                    val rotation by animateFloatAsState(
-                        targetValue = if (expanded) 0f else -90f,
-                        animationSpec = tween(220),
-                        label = "chevron",
+                    GroupHeaderRow(
+                        name = item.name,
+                        depth = item.depth,
+                        scenesCount = item.scenesCount,
+                        expanded = expandedGroups.contains(item.path),
+                        onToggled = { callbacks.onGroupToggled(item.path) },
+                        modifier = Modifier,
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = (item.depth * 14).dp)
-                            .clip(Tokens.shapes.medium)
-                            .clickable { callbacks.onGroupToggled(item.path) }
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            ComposiumIcon(
-                                imageVector = Icons.Outlined.ExpandMore,
-                                contentDescription = if (expanded) "Collapse group" else "Expand group",
-                                tint = Tokens.colors.primary,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .graphicsLayer { rotationZ = rotation },
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            ComposiumText(
-                                text = item.name,
-                                style = Tokens.typography.titleMedium,
-                                color = Tokens.colors.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        ComposiumBadge(
-                            text = item.scenesCount.toString(),
-                            containerColor = Tokens.colors.primaryContainer,
-                            contentColor = Tokens.colors.onPrimaryContainer,
-                            compact = true,
-                        )
-                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CatalogMetaRow(
+    totalCount: Int,
+    visibleCount: Int,
+    isFiltered: Boolean,
+) {
+    ComposiumText(
+        text = if (isFiltered) {
+            "$totalCount scenes total · $visibleCount visible"
+        } else {
+            "$totalCount scenes"
+        },
+        style = Tokens.typography.labelSmall,
+        color = Tokens.colors.onSurfaceVariant,
+        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun MainScreenEmptyState(
+    status: MainScreenCatalogStatus,
+    onClearSearch: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(Tokens.shapes.large)
+            .background(Tokens.colors.surface)
+            .border(1.dp, Tokens.colors.outlineVariant, Tokens.shapes.large)
+            .padding(18.dp),
+    ) {
+        Column {
+            ComposiumIcon(
+                painter = painterResource(R.drawable.empty_search_icon),
+                contentDescription = null,
+                tint = Tokens.colors.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            ComposiumText(
+                text = emptyStateTitle(status),
+                style = Tokens.typography.titleLarge,
+                color = Tokens.colors.onSurface,
+            )
+            Spacer(Modifier.height(6.dp))
+            ComposiumText(
+                text = emptyStateBody(status),
+                style = Tokens.typography.bodyMedium,
+                color = Tokens.colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            if (status.mode == MainScreenCatalogMode.EmptyResults) {
+                ComposiumOutlinedButton(onClick = onClearSearch) {
+                    ComposiumText(
+                        text = "Clear filter",
+                        style = Tokens.typography.titleMedium,
+                        color = Tokens.colors.onSurface,
+                    )
+                }
+            } else {
+                ComposiumButton(
+                    onClick = {},
+                    enabled = false,
+                    containerColor = Tokens.colors.surfaceVariant,
+                ) {
+                    ComposiumText(
+                        text = "Awaiting scene registration",
+                        style = Tokens.typography.titleMedium,
+                        color = Tokens.colors.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupHeaderRow(
+    name: String,
+    depth: Int,
+    scenesCount: Int,
+    expanded: Boolean,
+    onToggled: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        animationSpec = Motion.springSnappy(),
+        label = "group_chevron",
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 12).dp)
+            .clip(Tokens.shapes.medium)
+            .background(Tokens.colors.background.copy(alpha = if (expanded) 0.06f else 0f))
+            .clickable(onClick = onToggled)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer { rotationZ = rotation },
+            ) {
+                ComposiumIcon(
+                    imageVector = Icons.Outlined.ExpandMore,
+                    contentDescription = if (expanded) "Collapse group" else "Expand group",
+                    tint = Tokens.colors.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            ComposiumText(
+                text = name,
+                style = Tokens.typography.titleMedium,
+                color = Tokens.colors.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        ComposiumBadge(
+            text = scenesCount.toString(),
+            containerColor = Tokens.colors.surfaceVariant,
+            contentColor = Tokens.colors.onSurfaceVariant,
+            compact = true,
+        )
     }
 }
 
@@ -464,6 +584,7 @@ private fun buildMainScreenListItems(
     return items
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SearchStoriesField(
     value: String,
@@ -472,40 +593,60 @@ private fun SearchStoriesField(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val borderWidth by animateDpAsState(
-        targetValue = if (isFocused) 2.5.dp else 1.5.dp,
-        animationSpec = tween(180),
-        label = "search_border",
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.isImeVisible
+    var hasSeenVisibleImeForCurrentFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isFocused, imeVisible) {
+        val nextState = reduceSearchFieldImeState(
+            isFocused = isFocused,
+            isImeVisible = imeVisible,
+            hasSeenVisibleImeForCurrentFocus = hasSeenVisibleImeForCurrentFocus,
+        )
+        hasSeenVisibleImeForCurrentFocus = nextState.hasSeenVisibleImeForCurrentFocus
+        if (nextState.clearFocus) {
+            focusManager.clearFocus()
+        }
+    }
+
+    val fillAlpha by animateFloatAsState(
+        targetValue = if (isFocused) 0.96f else 0.88f,
+        animationSpec = Motion.tweenStandard(),
+        label = "search_fill_alpha",
     )
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Tokens.colors.primary else Tokens.colors.outlineVariant,
-        animationSpec = tween(180),
-        label = "search_border_color",
-    )
-    ComposiumSurface(
-        modifier = modifier,
-        shape = Tokens.shapes.pill,
-        color = Tokens.colors.surfaceVariant.copy(alpha = 0.6f),
-        border = BorderStroke(borderWidth, borderColor),
+
+    Box(
+        modifier = modifier
+            .clip(Tokens.shapes.extraLarge)
+            .background(Tokens.colors.surface.copy(alpha = fillAlpha))
+            .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 15.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ComposiumIcon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = null,
-                tint = if (isFocused) Tokens.colors.primary else Tokens.colors.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                tint = Tokens.colors.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 singleLine = true,
                 interactionSource = interactionSource,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    },
+                ),
                 cursorBrush = SolidColor(Tokens.colors.primary),
                 textStyle = TextStyle(
                     color = Tokens.colors.onSurface,
@@ -515,18 +656,20 @@ private fun SearchStoriesField(
                 ),
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
-                    if (value.isEmpty()) {
-                        ComposiumText(
-                            text = "Search Scenes...",
-                            style = Tokens.typography.titleMedium,
-                            color = Tokens.colors.onSurfaceVariant,
-                        )
-                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Box(modifier = Modifier.weight(1f)) { inner() }
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (value.isEmpty()) {
+                                ComposiumText(
+                                    text = "Search scenes, groups, or states",
+                                    style = Tokens.typography.bodyMedium,
+                                    color = Tokens.colors.onSurfaceVariant,
+                                )
+                            }
+                            inner()
+                        }
                         if (value.isNotEmpty()) {
                             ComposiumIconButton(
                                 modifier = Modifier.size(20.dp),
@@ -546,3 +689,25 @@ private fun SearchStoriesField(
         }
     }
 }
+
+private fun emptyStateTitle(status: MainScreenCatalogStatus): String =
+    when (status.mode) {
+        MainScreenCatalogMode.EmptyCatalog -> "No scenes registered yet"
+        MainScreenCatalogMode.EmptyResults -> "No matching scenes"
+        MainScreenCatalogMode.FullCatalog,
+        MainScreenCatalogMode.FilteredResults,
+        -> ""
+    }
+
+private fun emptyStateBody(status: MainScreenCatalogStatus): String =
+    when (status.mode) {
+        MainScreenCatalogMode.EmptyCatalog ->
+            "Composium is ready, but the catalog is still empty. Add scenes and this workspace will become your QA-ready inspection surface."
+
+        MainScreenCatalogMode.EmptyResults ->
+            "Nothing in the current catalog matches \"${status.query}\". Clearing the filter will bring back the full scene list."
+
+        MainScreenCatalogMode.FullCatalog,
+        MainScreenCatalogMode.FilteredResults,
+        -> ""
+    }

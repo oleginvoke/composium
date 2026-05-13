@@ -45,7 +45,7 @@ Composium is intentionally flexible:
 - scenes can be flat or deeply grouped;
 - grouping depth is unlimited;
 - you can use the built-in theme toggle or fully own theme state yourself;
-- you can wrap every scene preview with your own decorator;
+- you can create project-local scene helpers for shared preview chrome;
 - you can describe parameters with automatic inference where possible and explicit options where needed.
 
 The library is meant to help you explore UI, not constrain how you structure it.
@@ -62,7 +62,6 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Nullable parameter support with explicit null-state toggle
 - Custom names for selectable options
 - Custom ordering for auto-inferred sealed options
-- Scene preview decorator for wrapping content
 - Built-in dark theme toggle
 - External theme ownership when you need full control
 - Preview system controls for dark theme, display size, font size, and RTL
@@ -281,6 +280,31 @@ That means you can:
 - group them with `group = "..."`;
 - or combine that with `@ComposiumSceneCatalog` objects for code organization.
 
+### Edge-to-edge scenes
+
+By default, Composium keeps scene content below its own top bar and above the system navigation bar:
+
+```kotlin
+internal val regularScene by scene(group = "Layout") {
+    Content()
+}
+```
+
+Use `enableEdgeToEdge = true` when a scene should own this spacing itself, for example for full-screen layouts, lists, maps, or custom surfaces that need to render behind Composium chrome.
+
+```kotlin
+internal val edgeToEdgeFeed by scene(
+    group = "Layout",
+    enableEdgeToEdge = true,
+) {
+    Feed(
+        contentPadding = innerPadding,
+    )
+}
+```
+
+When `enableEdgeToEdge` is `true`, Composium lets the scene fill the preview area and exposes the top and bottom insets through `innerPadding`. Apply that padding where it matches the component layout. When it is `false`, Composium applies the spacing for you and `innerPadding` is zero.
+
 ## Parameters And Controls
 
 Scene parameters are declared inside the scene body with delegated properties:
@@ -288,14 +312,19 @@ Scene parameters are declared inside the scene body with delegated properties:
 ```kotlin
 internal val buttonPlayground by scene(group = "Buttons") {
     val enabled: Boolean by param(true)
-    val title: String by param("Continue")
+    var title: String by param("Continue")
 
     AppButton(
         text = title,
         enabled = enabled,
+        onClick = {
+            title = if (title == "Continue") "Saved" else "Continue"
+        },
     )
 }
 ```
+
+`param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
 
 ### How Composium renders parameter controls
 
@@ -487,45 +516,51 @@ val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
 }
 ```
 
-## Decorating The Scene Preview
+## Custom Scene Wrappers
 
-Every scene can be rendered inside your own wrapper through `scenePreviewDecorator`.
-
-Use this when you want:
-- a custom background;
-- padding around the component;
-- a centered preview surface;
-- device-frame-like wrappers;
-- app-specific chrome around every scene.
+If several scenes need the same preview chrome, create a small project-local helper around `scene(...)`.
 
 ```kotlin
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import oleginvoke.com.composium.ComposiumScreen
+import oleginvoke.com.composium.SceneDelegate
+import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.scene
 
-@Composable
-fun DebugCatalog() {
-    ComposiumScreen(
-        scenePreviewDecorator = { scenePreview ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                scenePreview()
-            }
-        },
-    )
+fun sceneWithFrame(
+    group: String? = null,
+    name: String? = null,
+    content: @Composable SceneScope.() -> Unit,
+): SceneDelegate = scene(
+    group = group,
+    name = name,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF7F7F7))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
 }
 ```
 
-The decorator receives the scene content as a composable lambda. Call it exactly once.
+Use that helper for scenes that should share the same frame:
+
+```kotlin
+val PrimaryButtonScene by sceneWithFrame(group = "Buttons") {
+    PrimaryButton(text = "Save", onClick = {})
+}
+```
 
 ## Theme Control
 
@@ -623,5 +658,5 @@ Composium is a runtime scene browser for Compose that aims to stay out of your w
 - keep scenes flat or organize them into deep nested groups;
 - use automatic controls where possible and explicit options where needed;
 - let Composium own theme state or plug it into your own;
-- wrap scene rendering with your own decorator;
+- create scene helper wrappers for shared preview chrome;
 - inspect components under different preview system settings.
