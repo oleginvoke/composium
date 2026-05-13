@@ -42,6 +42,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.CropFree
+import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -118,11 +121,7 @@ internal fun SceneScreen(
             }
 
             override fun onToggleControls() {
-                val intent = when (store.state.controlsSheet.layoutMode) {
-                    SceneInspectorLayoutMode.Closed -> SceneScreenIntent.ShowControls
-                    SceneInspectorLayoutMode.Split -> SceneScreenIntent.HideControls
-                    SceneInspectorLayoutMode.Expanded -> null
-                }
+                val intent = calculateSceneSettingsButtonClickIntent(store.state.controlsSheet.layoutMode)
                 intent?.let(store::dispatch)
             }
 
@@ -332,6 +331,8 @@ private fun SplitTopBarRow(
     interactive: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val settingsButtonState = calculateSceneSettingsButtonState(controlsLayout)
+
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
@@ -352,14 +353,10 @@ private fun SplitTopBarRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SceneTopBarActionButton(
-                imageVector = Icons.Outlined.Tune,
-                contentDescription = if (controlsLayout == SceneInspectorLayoutMode.Split) {
-                    "Close properties"
-                } else {
-                    "Open properties"
-                },
+                imageVector = settingsButtonState.icon.imageVector(),
+                contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
-                active = controlsLayout == SceneInspectorLayoutMode.Split,
+                active = settingsButtonState.active,
                 enabled = interactive,
             )
             ComposiumThemeToggle(
@@ -641,7 +638,8 @@ private fun SceneScreenContent(
                     paramsCallbacks = paramsCallbacks,
                     selectedTab = controlsSheet.selectedTab,
                     showSplitDivider = showSplitDivider,
-                    onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
+                    layoutMode = controlsSheet.layoutMode,
+                    onBackgroundTap = if (shouldHandleSceneInspectorBackgroundTap(controlsSheet.layoutMode)) {
                         callbacks::onExpandControls
                     } else {
                         null
@@ -710,13 +708,29 @@ private fun SceneTopBarActionButton(
         contentAlignment = Alignment.Center,
     ) {
         ComposiumIconButton(onClick = onClick, enabled = enabled) {
-            ComposiumIcon(
-                imageVector = imageVector,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(20.dp),
-            )
+            AnimatedContent(
+                targetState = imageVector,
+                transitionSpec = {
+                    fadeIn(animationSpec = Motion.tweenStandard()) togetherWith
+                        fadeOut(animationSpec = Motion.tweenStandard())
+                },
+                label = "scene_top_bar_button_icon",
+            ) { targetIcon ->
+                ComposiumIcon(
+                    imageVector = targetIcon,
+                    contentDescription = contentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
+    }
+}
+
+private fun SceneSettingsButtonIcon.imageVector(): ImageVector {
+    return when (this) {
+        SceneSettingsButtonIcon.Settings -> Icons.Outlined.Tune
+        SceneSettingsButtonIcon.Expand -> Icons.Outlined.CropFree
     }
 }
 
@@ -820,6 +834,7 @@ private fun SceneInspectorPane(
     paramsCallbacks: SceneParamsCallbacks,
     selectedTab: SceneInspectorTab,
     showSplitDivider: Boolean,
+    layoutMode: SceneInspectorLayoutMode,
     onBackgroundTap: (() -> Unit)?,
     availableHeightPx: Int,
     splitFraction: Float,
@@ -834,7 +849,7 @@ private fun SceneInspectorPane(
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isSplitMode = onBackgroundTap != null
+    val isSplitMode = layoutMode == SceneInspectorLayoutMode.Split
 
     // Tracks active finger drag on the grabber. The armed indicator must only react to user
     // drags — not to click-driven transitions that happen to pass through the armed range

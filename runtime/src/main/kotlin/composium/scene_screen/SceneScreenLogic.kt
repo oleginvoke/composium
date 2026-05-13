@@ -36,6 +36,17 @@ internal enum class SceneTitleIslandLayout {
     CenteredTitle,
 }
 
+internal enum class SceneSettingsButtonIcon {
+    Settings,
+    Expand,
+}
+
+internal data class SceneSettingsButtonState(
+    val icon: SceneSettingsButtonIcon,
+    val contentDescription: String,
+    val active: Boolean,
+)
+
 internal fun calculateSceneTitleIslandLayout(
     group: String?,
 ): SceneTitleIslandLayout {
@@ -44,6 +55,46 @@ internal fun calculateSceneTitleIslandLayout(
     } else {
         SceneTitleIslandLayout.GroupAndTitle
     }
+}
+
+internal fun calculateSceneSettingsButtonState(
+    layoutMode: SceneInspectorLayoutMode,
+): SceneSettingsButtonState {
+    return when (layoutMode) {
+        SceneInspectorLayoutMode.Closed -> SceneSettingsButtonState(
+            icon = SceneSettingsButtonIcon.Settings,
+            contentDescription = "Open properties",
+            active = false,
+        )
+
+        SceneInspectorLayoutMode.Split -> SceneSettingsButtonState(
+            icon = SceneSettingsButtonIcon.Expand,
+            contentDescription = "Expand settings",
+            active = true,
+        )
+
+        SceneInspectorLayoutMode.Expanded -> SceneSettingsButtonState(
+            icon = SceneSettingsButtonIcon.Expand,
+            contentDescription = "Expand settings",
+            active = true,
+        )
+    }
+}
+
+internal fun calculateSceneSettingsButtonClickIntent(
+    layoutMode: SceneInspectorLayoutMode,
+): SceneScreenIntent? {
+    return when (layoutMode) {
+        SceneInspectorLayoutMode.Closed -> SceneScreenIntent.ShowControls
+        SceneInspectorLayoutMode.Split -> SceneScreenIntent.ExpandControls
+        SceneInspectorLayoutMode.Expanded -> null
+    }
+}
+
+internal fun shouldHandleSceneInspectorBackgroundTap(
+    layoutMode: SceneInspectorLayoutMode,
+): Boolean {
+    return false
 }
 
 internal fun calculateSceneTopBarCrossfadeState(

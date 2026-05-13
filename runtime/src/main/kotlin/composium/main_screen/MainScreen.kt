@@ -106,7 +106,14 @@ internal fun MainScreen(
         )
     }
 
-    val callbacks = remember(store, sceneSearchIndex, onSceneSelected, themeController.onThemeChange) {
+    val callbacks = remember(
+        store,
+        sceneSearchIndex,
+        onSceneSelected,
+        themeController.onThemeChange,
+        focusManager,
+        keyboardController,
+    ) {
         object : MainScreenCallbacks {
             override fun onQueryChange(query: String) {
                 store.dispatch(
@@ -116,6 +123,13 @@ internal fun MainScreen(
             }
 
             override fun onSceneSelected(sceneId: String) {
+                val inputDismissal = calculateSceneSelectionInputDismissal()
+                if (inputDismissal.clearFocus) {
+                    focusManager.clearFocus()
+                }
+                if (inputDismissal.hideKeyboard) {
+                    keyboardController?.hide()
+                }
                 onSceneSelected.invoke(sceneId)
             }
 

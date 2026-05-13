@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -31,14 +34,23 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-internal enum class ButtonVariant {
-    Filled,
+internal enum class ButtonStyle {
+    Default,
     Tonal,
     Outlined,
     Text,
+    ;
+
+    companion object {
+        val default: ButtonStyle = Default
+    }
 }
 
 @Immutable
@@ -117,84 +129,136 @@ internal fun ButtonPreviewCard(
 }
 
 @Composable
-internal fun SampleActionButton(
-    title: String,
-    enabled: Boolean,
-    variant: ButtonVariant,
+internal fun SampleButton(
+    onClick: () -> Unit,
+    text: String,
     size: ButtonSize,
-    showLeadingBadge: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    style: ButtonStyle = ButtonStyle.default,
+    leadingIcon: Painter? = null,
+    trailingIcon: Painter? = null,
 ) {
     val padding = when (size) {
         ButtonSize.Small -> PaddingValues(horizontal = 14.dp, vertical = 8.dp)
         ButtonSize.Medium -> PaddingValues(horizontal = 18.dp, vertical = 10.dp)
         ButtonSize.Large -> PaddingValues(horizontal = 22.dp, vertical = 14.dp)
     }
+    val buttonEnabled = enabled && !loading
 
-    when (variant) {
-        ButtonVariant.Filled -> Button(
-            onClick = {},
-            enabled = enabled,
+    when (style) {
+        ButtonStyle.Default -> Button(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = buttonEnabled,
             contentPadding = padding,
         ) {
-            ButtonTitleRow(
-                title = title,
-                showLeadingBadge = showLeadingBadge,
+            ButtonContentRow(
+                text = text,
+                loading = loading,
+                leadingIcon = leadingIcon,
+                trailingIcon = trailingIcon,
             )
         }
 
-        ButtonVariant.Tonal -> FilledTonalButton(
-            onClick = {},
-            enabled = enabled,
+        ButtonStyle.Tonal -> FilledTonalButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = buttonEnabled,
             contentPadding = padding,
         ) {
-            ButtonTitleRow(
-                title = title,
-                showLeadingBadge = showLeadingBadge,
+            ButtonContentRow(
+                text = text,
+                loading = loading,
+                leadingIcon = leadingIcon,
+                trailingIcon = trailingIcon,
             )
         }
 
-        ButtonVariant.Outlined -> OutlinedButton(
-            onClick = {},
-            enabled = enabled,
+        ButtonStyle.Outlined -> OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = buttonEnabled,
             contentPadding = padding,
         ) {
-            ButtonTitleRow(
-                title = title,
-                showLeadingBadge = showLeadingBadge,
+            ButtonContentRow(
+                text = text,
+                loading = loading,
+                leadingIcon = leadingIcon,
+                trailingIcon = trailingIcon,
             )
         }
 
-        ButtonVariant.Text -> TextButton(
-            onClick = {},
-            enabled = enabled,
+        ButtonStyle.Text -> TextButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = buttonEnabled,
             contentPadding = padding,
         ) {
-            ButtonTitleRow(
-                title = title,
-                showLeadingBadge = showLeadingBadge,
+            ButtonContentRow(
+                text = text,
+                loading = loading,
+                leadingIcon = leadingIcon,
+                trailingIcon = trailingIcon,
             )
         }
     }
 }
 
 @Composable
-private fun ButtonTitleRow(
-    title: String,
-    showLeadingBadge: Boolean,
+private fun ButtonContentRow(
+    text: String,
+    loading: Boolean,
+    leadingIcon: Painter?,
+    trailingIcon: Painter?,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (showLeadingBadge) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+        when {
+            loading -> CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+
+            leadingIcon != null -> Icon(
+                painter = leadingIcon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
             )
         }
-        Text(title)
+        Text(text)
+        if (trailingIcon != null) {
+            Icon(
+                painter = trailingIcon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberSampleBadgePainter(): Painter {
+    val color = MaterialTheme.colorScheme.primary
+    return androidx.compose.runtime.remember(color) {
+        SampleBadgePainter(color)
+    }
+}
+
+private class SampleBadgePainter(
+    private val color: Color,
+) : Painter() {
+    override val intrinsicSize: Size = Size.Unspecified
+
+    override fun DrawScope.onDraw() {
+        drawCircle(
+            color = color,
+            radius = size.minDimension / 2f,
+        )
     }
 }
 
@@ -347,28 +411,6 @@ internal fun GettingStartedSceneContent() {
 }
 
 @Composable
-internal fun PrimaryButtonSceneContent(
-    title: String,
-    enabled: Boolean,
-    variant: ButtonVariant,
-    size: ButtonSize,
-    showBadge: Boolean,
-) {
-    ButtonPreviewCard(
-        title = "Button playground",
-        description = "This scene shows automatic controls for String, Boolean, enum, and sealed object parameters.",
-    ) {
-        SampleActionButton(
-            title = title,
-            enabled = enabled,
-            variant = variant,
-            size = size,
-            showLeadingBadge = showBadge,
-        )
-    }
-}
-
-@Composable
 internal fun NestedButtonSceneContent(
     title: String,
     enabled: Boolean,
@@ -378,12 +420,13 @@ internal fun NestedButtonSceneContent(
         title = "Nested group example",
         description = "This scene lives in a deeper group path and also reverses the auto-inferred order of sealed options.",
     ) {
-        SampleActionButton(
-            title = title,
+        SampleButton(
+            onClick = {},
+            text = title,
             enabled = enabled,
-            variant = ButtonVariant.Tonal,
+            style = ButtonStyle.Tonal,
             size = size,
-            showLeadingBadge = true,
+            leadingIcon = rememberSampleBadgePainter(),
         )
     }
 }

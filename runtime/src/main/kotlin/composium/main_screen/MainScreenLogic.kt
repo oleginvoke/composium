@@ -35,6 +35,18 @@ internal data class SearchFieldImeState(
     val clearFocus: Boolean,
 )
 
+internal data class MainScreenInputDismissal(
+    val clearFocus: Boolean,
+    val hideKeyboard: Boolean,
+)
+
+internal fun calculateSceneSelectionInputDismissal(): MainScreenInputDismissal {
+    return MainScreenInputDismissal(
+        clearFocus = true,
+        hideKeyboard = true,
+    )
+}
+
 internal fun buildCatalogStatus(
     query: String,
     visibleCount: Int,

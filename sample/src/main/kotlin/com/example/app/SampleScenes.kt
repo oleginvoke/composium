@@ -1,30 +1,62 @@
 package com.example.app
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
-internal val primaryPlayground by scene(
-    group = "Buttons/Primary", // optional group
-    name = "Playground", // optional name
+internal val SampleButton by sceneWithDecorator(
+    group = "Buttons", // optional group
 ) {
-    val title: String by param("Continue")
-    val enabled: Boolean by param(true)
-    val variant: ButtonVariant by param(ButtonVariant.Filled)
+    val text: String by param("Continue")
     val size: ButtonSize by param(ButtonSize.Medium)
-    val showBadge: Boolean by param(
-        default = false,
-        name = "Leading badge", // optional name
+    val enabled: Boolean by param(true)
+    val loading: Boolean by param(false)
+    val style: ButtonStyle by param(ButtonStyle.default)
+    val leadingIcon: Painter? by param(
+        options = listOf(
+            painterResource(R.drawable.solid_help_circle) named "solid_help_circle",
+            painterResource(R.drawable.solid_information) named "solid_information",
+        )
+    )
+    val trailingIcon: Painter? by param(
+        options = listOf(
+            painterResource(R.drawable.solid_help_circle) named "solid_help_circle",
+            painterResource(R.drawable.solid_information) named "solid_information",
+        )
     )
 
-    PrimaryButtonSceneContent(
-        title = title,
-        enabled = enabled,
-        variant = variant,
+    SampleButton(
+        onClick = {},
+        text = text,
         size = size,
-        showBadge = showBadge,
+        enabled = enabled,
+        loading = loading,
+        style = style,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
     )
+}
+
+@ComposiumScene
+internal val testList by sceneWithDecorator(
+    enableEdgeToEdge = false,
+    scrollable = false,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = innerPadding,
+    ) {
+        items(10) {
+            Text("$it")
+        }
+    }
 }
 
 @ComposiumScene
