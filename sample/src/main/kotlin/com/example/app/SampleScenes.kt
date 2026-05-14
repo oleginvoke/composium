@@ -14,7 +14,6 @@ import oleginvoke.com.composium.scene
 internal val SampleButton by sceneWithDecorator(
     group = "Buttons", // optional group
 ) {
-    val text: String by param("Continue")
     val size: ButtonSize by param(ButtonSize.Medium)
     val enabled: Boolean by param(true)
     val loading: Boolean by param(false)
@@ -25,6 +24,7 @@ internal val SampleButton by sceneWithDecorator(
             painterResource(R.drawable.solid_information) named "solid_information",
         )
     )
+    val text: String by param("Continue")
     val trailingIcon: Painter? by param(
         options = listOf(
             painterResource(R.drawable.solid_help_circle) named "solid_help_circle",

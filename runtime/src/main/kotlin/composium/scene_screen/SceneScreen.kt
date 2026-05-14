@@ -1,8 +1,10 @@
 package oleginvoke.com.composium.scene_screen
 
+import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.util.DisplayMetrics
+import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
@@ -42,9 +44,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.CropFree
-import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -163,6 +163,8 @@ internal fun SceneScreen(
             }
         }
     }
+
+    SceneScreenSoftInputModeGuard()
 
     SceneScreenBackHandler(
         enabled = state.controlsSheet.isVisible,
@@ -1002,10 +1004,6 @@ private fun SceneInspectorPane(
                     }
                 }
             }
-            SceneInspectorBottomGradient(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                bottomInset = bottomInset,
-            )
         }
 
         if (isSplitMode) {
@@ -1249,27 +1247,6 @@ private fun SceneInspectorArmedIndicator(
 }
 
 @Composable
-private fun SceneInspectorBottomGradient(
-    bottomInset: Dp,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(bottomInset + 84.dp)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Tokens.colors.background.copy(alpha = 0.44f),
-                        Tokens.colors.background.copy(alpha = 0.88f),
-                    ),
-                ),
-            ),
-    )
-}
-
-@Composable
 private fun SceneSplitDivider(
     visible: Boolean,
     modifier: Modifier = Modifier,
@@ -1378,6 +1355,39 @@ private fun ScenePreviewContent(
             }
         }
     }
+}
+
+@Composable
+private fun SceneScreenSoftInputModeGuard() {
+    val context = LocalContext.current
+
+    DisposableEffect(context) {
+        val window = context.findSceneScreenActivity()?.window
+        if (window == null) {
+            onDispose {}
+        } else {
+            val previousSoftInputMode = window.attributes.softInputMode
+            window.setSoftInputMode(previousSoftInputMode.withSoftInputAdjustResize())
+
+            onDispose {
+                window.setSoftInputMode(previousSoftInputMode)
+            }
+        }
+    }
+}
+
+private fun Int.withSoftInputAdjustResize(): Int {
+    val adjustMask = WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST
+    return (this and adjustMask.inv()) or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+}
+
+private fun Context.findSceneScreenActivity(): Activity? {
+    var current: Context? = this
+    while (current != null) {
+        if (current is Activity) return current
+        current = (current as? ContextWrapper)?.baseContext
+    }
+    return null
 }
 
 @Composable
