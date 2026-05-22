@@ -9,11 +9,11 @@ Composium lets you describe UI states as regular Compose scenes, browse them ins
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Current release: `1.1.0`
+Current release: `1.2.0`
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.1.0`
-- `io.github.oleginvoke:composium-processor:1.1.0`
+- `io.github.oleginvoke:composium:1.2.0`
+- `io.github.oleginvoke:composium-processor:1.2.0`
 
 It is useful for:
 - design systems and component libraries;
@@ -48,6 +48,7 @@ Composium is intentionally flexible:
 - scenes can be flat or deeply grouped;
 - grouping depth is unlimited;
 - you can use the built-in theme toggle or fully own theme state yourself;
+- you can sample rendered scene colors with the built-in eyedropper;
 - you can create project-local scene helpers for shared preview chrome;
 - you can describe parameters with automatic inference where possible and explicit options where needed.
 
@@ -68,6 +69,7 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Built-in dark theme toggle
 - External theme ownership when you need full control
 - Preview system controls for dark theme, display size, font size, and RTL
+- Built-in color eyedropper for sampling rendered scene pixels and copying formatted values
 
 ## Requirements
 
@@ -97,8 +99,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.1.0")
-    ksp("io.github.oleginvoke:composium-processor:1.1.0")
+    implementation("io.github.oleginvoke:composium:1.2.0")
+    ksp("io.github.oleginvoke:composium-processor:1.2.0")
 }
 ```
 
@@ -108,7 +110,7 @@ Use this mode when you want automatic scene collection.
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.1.0")
+    implementation("io.github.oleginvoke:composium:1.2.0")
 }
 ```
 
@@ -650,8 +652,7 @@ If you want to fix a bug, improve the API, or extend the library with new functi
 
 ## Roadmap
 
-- [ ] dedicated tokens section for things like typography and colors;
-- [ ] color picker.
+- [ ] dedicated tokens section for things like typography and colors.
 
 ## Summary
 
@@ -661,5 +662,6 @@ Composium is a runtime scene browser for Compose that aims to stay out of your w
 - keep scenes flat or organize them into deep nested groups;
 - use automatic controls where possible and explicit options where needed;
 - let Composium own theme state or plug it into your own;
+- sample rendered scene colors with the built-in eyedropper;
 - create scene helper wrappers for shared preview chrome;
 - inspect components under different preview system settings.
