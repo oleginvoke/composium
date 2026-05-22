@@ -7,10 +7,22 @@ import kotlin.test.assertEquals
 class ColorEyedropperFormatTest {
 
     @Test
-    fun formatsOpaqueSrgbColorInDefaultUiFormats() {
+    fun defaultUiFormatsAreCompactCopyFormats() {
+        assertEquals(
+            listOf(
+                ColorEyedropperFormat.HEX,
+                ColorEyedropperFormat.HEXA,
+                ColorEyedropperFormat.ARGB_INT,
+            ),
+            ColorEyedropperDefaults.formats,
+        )
+    }
+
+    @Test
+    fun formatsOpaqueSrgbColorInSupportedFormats() {
         val color = Color(red = 0x33, green = 0x66, blue = 0x99, alpha = 0xFF)
 
-        val values = ColorEyedropperDefaults.formats.associate { format ->
+        val values = ColorEyedropperFormat.entries.associate { format ->
             format to format.format(color)
         }
 

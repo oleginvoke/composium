@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -101,6 +102,7 @@ import kotlin.math.roundToInt
 
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
+private val SceneEyedropperOverlayTopPadding = 108.dp
 
 private fun Float.sanitizedInspectorFraction(): Float =
     if (isNaN()) 0f else coerceIn(0f, 1f)
@@ -248,6 +250,7 @@ internal fun SceneScreen(
             },
             state = eyedropperState,
             modifier = Modifier.fillMaxSize(),
+            overlaySafePadding = PaddingValues(top = SceneEyedropperOverlayTopPadding),
         ) {
             ComposiumPreviewCanvas(
                 modifier = Modifier.fillMaxSize(),
@@ -603,7 +606,7 @@ private fun SceneScreenContent(
     // - enableEdgeToEdge = false → runtime applies the same spacing itself, so the scene
     //   sees PaddingValues(0) and just fills its visible area normally.
     val sceneInnerPadding = if (sceneEntry.scene.enableEdgeToEdge) {
-        androidx.compose.foundation.layout.PaddingValues(
+        PaddingValues(
             top = contentTopPadding,
             bottom = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Closed) {
                 bottomInset
@@ -696,7 +699,6 @@ private fun SceneScreenContent(
                         null
                     },
                     availableHeightPx = availableHeightPx,
-                    splitFraction = controlsSheet.splitFraction,
                     inspectorFractionProvider = inspectorFractionProvider,
                     liveDragFractionProvider = liveDragFractionProvider,
                     onInspectorDragUpdate = onInspectorDragUpdate,
@@ -887,7 +889,6 @@ private fun SceneInspectorPane(
     layoutMode: SceneInspectorLayoutMode,
     onBackgroundTap: (() -> Unit)?,
     availableHeightPx: Int,
-    splitFraction: Float,
     inspectorFractionProvider: () -> Float,
     liveDragFractionProvider: () -> Float,
     onInspectorDragUpdate: (Float) -> Unit,
@@ -939,7 +940,7 @@ private fun SceneInspectorPane(
         tabsTopPadding = tabsHeaderExtraPadding,
     )
     val bodyTopOffset = tabsHeaderTotalHeight - contentClipOffset
-    val contentPadding = androidx.compose.foundation.layout.PaddingValues(
+    val contentPadding = PaddingValues(
         start = 16.dp,
         top = 8.dp + bodyTopOffset,
         end = 16.dp,

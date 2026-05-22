@@ -2,12 +2,14 @@ package oleginvoke.com.composium.eyedropper
 
 import android.content.ClipData
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,12 +26,15 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
+import androidx.core.graphics.createBitmap
 
 private const val CaptureRetryCount = 4
 
@@ -45,6 +50,8 @@ private const val CaptureRetryCount = 4
  * @param state State object that exposes the current target, sampled color, and copied value.
  * @param formats Color formats shown in the floating island.
  * @param modifier Modifier applied to the host container.
+ * @param overlaySafePadding Extra padding that keeps the eyedropper UI away from app chrome drawn
+ * above this host, such as a floating toolbar.
  * @param content Content that should be available for color sampling.
  */
 @Composable
@@ -54,10 +61,12 @@ fun ColorEyedropperHost(
     state: ColorEyedropperState = rememberColorEyedropperState(),
     formats: List<ColorEyedropperFormat> = ColorEyedropperDefaults.formats,
     modifier: Modifier = Modifier,
+    overlaySafePadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     val ownerView = LocalView.current
     val metrics = ColorEyedropperDefaults.metrics
     val colors = ColorEyedropperDefaults.colors()
@@ -118,7 +127,7 @@ fun ColorEyedropperHost(
         state.updateColor(null)
     }
 
-    LaunchedEffect(visible, state.target, snapshot) {
+    LaunchedEffect(visible, snapshot) {
         if (!visible || !state.target.isSpecifiedForEyedropper) return@LaunchedEffect
         state.updateColor(snapshot?.sample(state.target))
     }
@@ -142,68 +151,142 @@ fun ColorEyedropperHost(
         if (
             visible &&
             activeSnapshot != null &&
-            state.target.isSpecifiedForEyedropper &&
             containerSize.width > 0 &&
             containerSize.height > 0
         ) {
-            val target = state.target
-            val islandOffset = calculateColorEyedropperIslandOffset(
-                target = target,
+            ColorEyedropperOverlay(
+                snapshot = activeSnapshot,
+                state = state,
+                formats = formats,
+                copyValue = { value ->
+                    ColorEyedropperDefaults.copyValueToClipboard(value) { text ->
+                        context.copyColorEyedropperText(text)
+                    }
+                },
+                metrics = metrics,
+                colors = colors,
+                density = density,
+                safeInsets = with(density) {
+                    ColorEyedropperSafeInsets(
+                        left = metrics.safePadding.toPx() +
+                            overlaySafePadding.calculateStartPadding(layoutDirection).toPx(),
+                        top = metrics.safePadding.toPx() +
+                            overlaySafePadding.calculateTopPadding().toPx(),
+                        right = metrics.safePadding.toPx() +
+                            overlaySafePadding.calculateEndPadding(layoutDirection).toPx(),
+                        bottom = metrics.safePadding.toPx() +
+                            overlaySafePadding.calculateBottomPadding().toPx(),
+                    )
+                },
                 containerSize = containerSize,
                 islandSize = islandSize,
-                spacingPx = with(density) { metrics.islandSpacing.toPx() },
-                safePaddingPx = with(density) { metrics.safePadding.toPx() },
+                onIslandSizeChange = { size -> islandSize = size },
+                modifier = Modifier.matchParentSize(),
             )
+        }
+    }
+}
 
-            Box(
+@Composable
+private fun ColorEyedropperOverlay(
+    snapshot: ColorEyedropperSnapshot,
+    state: ColorEyedropperState,
+    formats: List<ColorEyedropperFormat>,
+    copyValue: (ColorEyedropperValue) -> Boolean,
+    metrics: ColorEyedropperMetrics,
+    colors: ColorEyedropperColors,
+    density: androidx.compose.ui.unit.Density,
+    safeInsets: ColorEyedropperSafeInsets,
+    containerSize: IntSize,
+    islandSize: IntSize,
+    onIslandSizeChange: (IntSize) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!state.target.isSpecifiedForEyedropper) return
+
+    val target = state.target
+    val lensSizePx = with(density) { metrics.lensDiameter.roundToPx() }
+    val lensSize = IntSize(width = lensSizePx, height = lensSizePx)
+    val cursorSizePx = with(density) { metrics.cursorDiameter.roundToPx() }
+    val cursorSize = IntSize(width = cursorSizePx, height = cursorSizePx)
+    val lens = remember(snapshot, target, metrics.lensPixelRadius) {
+        snapshot.createColorEyedropperPixelLens(
+            target = target,
+            radius = metrics.lensPixelRadius,
+        )
+    }
+    val cursorOffset = IntOffset(
+        x = (target.x - cursorSizePx / 2f).roundToInt(),
+        y = (target.y - cursorSizePx / 2f).roundToInt(),
+    )
+    val overlayPlacement = calculateColorEyedropperOverlayPlacement(
+        target = target,
+        containerSize = containerSize,
+        lensSize = lensSize,
+        cursorSize = cursorSize,
+        islandSize = islandSize,
+        lensSpacingPx = with(density) { metrics.lensSpacing.toPx() },
+        islandSpacingPx = with(density) { metrics.islandSpacing.toPx() },
+        safeInsets = safeInsets,
+    )
+    fun updateTarget(offset: Offset) {
+        val nextTarget = clampColorEyedropperTarget(
+            target = offset,
+            containerSize = containerSize,
+        )
+        state.updateTarget(nextTarget)
+        state.updateColor(snapshot.sample(nextTarget))
+    }
+    fun nudgeTarget(direction: ColorEyedropperNudgeDirection) {
+        updateTarget(
+            snapshot.nudgeColorEyedropperTarget(
+                target = state.target,
+                direction = direction,
+            ),
+        )
+    }
+
+    Box(
+        modifier = modifier.pointerInput(containerSize, snapshot) {
+            detectDragGestures(
+                onDragStart = { offset ->
+                    updateTarget(offset)
+                },
+                onDrag = { change, _ ->
+                    change.consume()
+                    updateTarget(change.position)
+                },
+            )
+        },
+    ) {
+        lens?.let { pixelLens ->
+            ColorEyedropperLens(
+                lens = pixelLens,
+                onNudge = ::nudgeTarget,
+                metrics = metrics,
+                colors = colors,
+                modifier = Modifier.offset { overlayPlacement.lensPlacement.offset },
+            )
+            ColorEyedropperCursor(
+                metrics = metrics,
+                colors = colors,
+                modifier = Modifier.offset { cursorOffset },
+            )
+        }
+        if (state.color != null) {
+            ColorEyedropperIsland(
+                values = state.values(formats),
+                onValueClick = { value ->
+                    if (copyValue(value)) {
+                        state.markCopied(value)
+                    }
+                },
+                metrics = metrics,
+                colors = colors,
                 modifier = Modifier
-                    .matchParentSize()
-                    .pointerInput(containerSize, snapshot) {
-                        fun updateTarget(offset: Offset) {
-                            val target = clampColorEyedropperTarget(
-                                target = offset,
-                                containerSize = containerSize,
-                            )
-                            state.updateTarget(target)
-                            state.updateColor(activeSnapshot.sample(target))
-                        }
-
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                updateTarget(offset)
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                updateTarget(change.position)
-                            },
-                        )
-                    },
-            ) {
-                ColorEyedropperCrosshair(
-                    target = target,
-                    metrics = metrics,
-                    modifier = Modifier.matchParentSize(),
-                )
-                state.color?.let { color ->
-                    ColorEyedropperIsland(
-                        color = color,
-                        values = state.values(formats),
-                        onValueClick = { value ->
-                            val copied = ColorEyedropperDefaults.copyValueToClipboard(value) { text ->
-                                context.copyColorEyedropperText(text)
-                            }
-                            if (copied) {
-                                state.markCopied(value)
-                            }
-                        },
-                        metrics = metrics,
-                        colors = colors,
-                        modifier = Modifier
-                            .offset { islandOffset }
-                            .onSizeChanged { size -> islandSize = size }
-                    )
-                }
-            }
+                    .offset { overlayPlacement.islandOffset }
+                    .onSizeChanged(onIslandSizeChange),
+            )
         }
     }
 }
@@ -246,7 +329,7 @@ private fun View.captureColorEyedropperSnapshot(
 ): ColorEyedropperSnapshot? {
     if (width <= 0 || height <= 0) return null
 
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(width, height)
     try {
         draw(Canvas(bitmap))
 

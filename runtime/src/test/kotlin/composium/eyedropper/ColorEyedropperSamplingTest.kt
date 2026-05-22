@@ -147,4 +147,137 @@ class ColorEyedropperSamplingTest {
         assertEquals(Color(0xFF00FF00), snapshot?.sample(Offset(0f, 0f)))
         assertEquals(Color(0xFFFFFFFF), snapshot?.sample(Offset(0f, 1f)))
     }
+
+    @Test
+    fun createsPixelLensAroundTargetFromCachedSnapshot() {
+        val snapshot = ColorEyedropperSnapshot(
+            pixels = intArrayOf(
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF333333.toInt(),
+                0xFF444444.toInt(),
+                0xFF555555.toInt(),
+                0xFF666666.toInt(),
+                0xFF777777.toInt(),
+                0xFF888888.toInt(),
+                0xFF999999.toInt(),
+            ),
+            bitmapSize = IntSize(width = 3, height = 3),
+            containerSize = IntSize(width = 30, height = 30),
+        )
+
+        val lens = snapshot.createColorEyedropperPixelLens(
+            target = Offset(15f, 15f),
+            radius = 1,
+        )
+
+        assertEquals(3, lens?.side)
+        assertEquals(4, lens?.centerIndex)
+        assertEquals(Color(0xFF555555), lens?.centerColor)
+        assertEquals(
+            listOf(
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF333333.toInt(),
+                0xFF444444.toInt(),
+                0xFF555555.toInt(),
+                0xFF666666.toInt(),
+                0xFF777777.toInt(),
+                0xFF888888.toInt(),
+                0xFF999999.toInt(),
+            ),
+            lens?.pixels?.toList(),
+        )
+    }
+
+    @Test
+    fun pixelLensClampsSourcePixelsAtBitmapEdges() {
+        val snapshot = ColorEyedropperSnapshot(
+            pixels = intArrayOf(
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF333333.toInt(),
+                0xFF444444.toInt(),
+                0xFF555555.toInt(),
+                0xFF666666.toInt(),
+                0xFF777777.toInt(),
+                0xFF888888.toInt(),
+                0xFF999999.toInt(),
+            ),
+            bitmapSize = IntSize(width = 3, height = 3),
+            containerSize = IntSize(width = 30, height = 30),
+        )
+
+        val lens = snapshot.createColorEyedropperPixelLens(
+            target = Offset.Zero,
+            radius = 1,
+        )
+
+        assertEquals(
+            listOf(
+                0xFF111111.toInt(),
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF111111.toInt(),
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF444444.toInt(),
+                0xFF444444.toInt(),
+                0xFF555555.toInt(),
+            ),
+            lens?.pixels?.toList(),
+        )
+    }
+
+    @Test
+    fun nudgesTargetByOneBitmapPixelAndCentersNewSelectedPixel() {
+        val snapshot = ColorEyedropperSnapshot(
+            pixels = intArrayOf(
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF333333.toInt(),
+                0xFF444444.toInt(),
+                0xFF555555.toInt(),
+                0xFF666666.toInt(),
+                0xFF777777.toInt(),
+                0xFF888888.toInt(),
+                0xFF999999.toInt(),
+            ),
+            bitmapSize = IntSize(width = 3, height = 3),
+            containerSize = IntSize(width = 30, height = 30),
+        )
+
+        val target = snapshot.nudgeColorEyedropperTarget(
+            target = Offset(15f, 15f),
+            direction = ColorEyedropperNudgeDirection.End,
+        )
+
+        assertEquals(25f, target.x)
+        assertEquals(15f, target.y)
+        assertEquals(IntPixelCoordinate(x = 2, y = 1), snapshot.pixelCoordinate(target))
+        assertEquals(Color(0xFF666666), snapshot.sample(target))
+    }
+
+    @Test
+    fun nudgedTargetClampsToBitmapEdges() {
+        val snapshot = ColorEyedropperSnapshot(
+            pixels = intArrayOf(
+                0xFF111111.toInt(),
+                0xFF222222.toInt(),
+                0xFF333333.toInt(),
+                0xFF444444.toInt(),
+            ),
+            bitmapSize = IntSize(width = 2, height = 2),
+            containerSize = IntSize(width = 20, height = 20),
+        )
+
+        val target = snapshot.nudgeColorEyedropperTarget(
+            target = Offset(15f, 15f),
+            direction = ColorEyedropperNudgeDirection.Bottom,
+        )
+
+        assertEquals(15f, target.x)
+        assertEquals(15f, target.y)
+        assertEquals(IntPixelCoordinate(x = 1, y = 1), snapshot.pixelCoordinate(target))
+    }
 }
