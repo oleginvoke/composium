@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,6 +45,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.CropFree
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
@@ -85,6 +87,8 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
+import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
 import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
@@ -98,6 +102,7 @@ import kotlin.math.roundToInt
 
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
+private val SceneEyedropperOverlayTopPadding = 108.dp
 
 private fun Float.sanitizedInspectorFraction(): Float =
     if (isNaN()) 0f else coerceIn(0f, 1f)
@@ -113,6 +118,7 @@ internal fun SceneScreen(
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
     val store = rememberSceneScreenStore(sceneEntry.id)
     val state = store.state
+    val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
     val callbacks = remember(store, onBack, themeController.onThemeChange) {
@@ -154,6 +160,14 @@ internal fun SceneScreen(
                 store.dispatch(SceneScreenIntent.PreviewPaneTapped)
             }
 
+            override fun onToggleEyedropper() {
+                store.dispatch(SceneScreenIntent.ToggleEyedropper)
+            }
+
+            override fun onHideEyedropper() {
+                store.dispatch(SceneScreenIntent.HideEyedropper)
+            }
+
             override fun onTabSelected(tab: SceneInspectorTab) {
                 store.dispatch(SceneScreenIntent.SelectTab(tab))
             }
@@ -167,11 +181,11 @@ internal fun SceneScreen(
     SceneScreenSoftInputModeGuard()
 
     SceneScreenBackHandler(
-        enabled = state.controlsSheet.isVisible,
-        onBack = if (state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) {
-            callbacks::onNavigateBackFromExpandedControls
-        } else {
-            callbacks::onDismissControls
+        enabled = state.isEyedropperVisible || state.controlsSheet.isVisible,
+        onBack = when {
+            state.isEyedropperVisible -> callbacks::onHideEyedropper
+            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded -> callbacks::onNavigateBackFromExpandedControls
+            else -> callbacks::onDismissControls
         },
     )
 
@@ -225,44 +239,57 @@ internal fun SceneScreen(
         }
     }
 
-    ComposiumPreviewCanvas(
+    Box(
         modifier = modifier
             .fillMaxSize(),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            SceneScreenContent(
-                sceneEntry = sceneEntry,
-                sceneScope = sceneScope,
-                paramsState = sceneScope.paramsState,
-                controlsSheet = state.controlsSheet,
-                isDarkTheme = themeController.isDarkTheme,
-                callbacks = callbacks,
-                paramsCallbacks = paramsCallbacks,
-                contentWindowInsets = contentWindowInsets,
-                inspectorFractionProvider = inspectorFractionProvider,
-                isInspectorComposed = isInspectorComposed,
-                onInspectorDragUpdate = onInspectorDragUpdate,
-                onInspectorDragStop = { finalFraction ->
-                    callbacks.onUpdateSplitFraction(finalFraction)
-                    callbacks.onSettleSplitFraction()
-                    inspectorAnimationTick++
-                    // No manual liveDragFraction reset here — the snapshotFlow mirror above
-                    // keeps it tracking inspectorFraction.value across the settle animation.
-                },
-                liveDragFractionProvider = liveDragFractionProvider,
-                modifier = Modifier
-                    .fillMaxSize(),
-            )
-
-            SceneScreenTopBar(
-                sceneEntry = sceneEntry,
-                controlsSheet = state.controlsSheet,
-                isDarkTheme = themeController.isDarkTheme,
-                callbacks = callbacks,
-                statusBarInsets = contentWindowInsets,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
+        ColorEyedropperHost(
+            visible = state.isEyedropperVisible,
+            onVisibleChange = { visible ->
+                if (!visible) callbacks.onHideEyedropper()
+            },
+            state = eyedropperState,
+            modifier = Modifier.fillMaxSize(),
+            overlaySafePadding = PaddingValues(top = SceneEyedropperOverlayTopPadding),
+        ) {
+            ComposiumPreviewCanvas(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                SceneScreenContent(
+                    sceneEntry = sceneEntry,
+                    sceneScope = sceneScope,
+                    paramsState = sceneScope.paramsState,
+                    controlsSheet = state.controlsSheet,
+                    isDarkTheme = themeController.isDarkTheme,
+                    callbacks = callbacks,
+                    paramsCallbacks = paramsCallbacks,
+                    contentWindowInsets = contentWindowInsets,
+                    inspectorFractionProvider = inspectorFractionProvider,
+                    isInspectorComposed = isInspectorComposed,
+                    onInspectorDragUpdate = onInspectorDragUpdate,
+                    onInspectorDragStop = { finalFraction ->
+                        callbacks.onUpdateSplitFraction(finalFraction)
+                        callbacks.onSettleSplitFraction()
+                        inspectorAnimationTick++
+                        // No manual liveDragFraction reset here — the snapshotFlow mirror above
+                        // keeps it tracking inspectorFraction.value across the settle animation.
+                    },
+                    liveDragFractionProvider = liveDragFractionProvider,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                )
+            }
         }
+
+        SceneScreenTopBar(
+            sceneEntry = sceneEntry,
+            controlsSheet = state.controlsSheet,
+            isDarkTheme = themeController.isDarkTheme,
+            isEyedropperVisible = state.isEyedropperVisible,
+            callbacks = callbacks,
+            statusBarInsets = contentWindowInsets,
+            modifier = Modifier.align(Alignment.TopStart),
+        )
     }
 }
 
@@ -271,6 +298,7 @@ private fun SceneScreenTopBar(
     sceneEntry: SceneEntry,
     controlsSheet: ControlsSheetUiState,
     isDarkTheme: Boolean,
+    isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
     statusBarInsets: WindowInsets? = null,
     modifier: Modifier = Modifier,
@@ -305,6 +333,7 @@ private fun SceneScreenTopBar(
                 controlsLayout = controlsLayout,
                 isVisible = controlsSheet.isVisible,
                 isDarkTheme = isDarkTheme,
+                isEyedropperVisible = isEyedropperVisible,
                 callbacks = callbacks,
                 interactive = crossfadeState.splitInteractive,
                 modifier = Modifier
@@ -315,6 +344,7 @@ private fun SceneScreenTopBar(
             ExpandedTopBarRow(
                 sceneEntry = sceneEntry,
                 selectedTab = controlsSheet.selectedTab,
+                isEyedropperVisible = isEyedropperVisible,
                 callbacks = callbacks,
                 interactive = crossfadeState.expandedInteractive,
                 modifier = Modifier
@@ -332,11 +362,13 @@ private fun SplitTopBarRow(
     controlsLayout: SceneInspectorLayoutMode,
     isVisible: Boolean,
     isDarkTheme: Boolean,
+    isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
     interactive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val settingsButtonState = calculateSceneSettingsButtonState(controlsLayout)
+    val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
 
     Row(
         modifier = modifier,
@@ -358,6 +390,13 @@ private fun SplitTopBarRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SceneTopBarActionButton(
+                imageVector = Icons.Outlined.Colorize,
+                contentDescription = eyedropperButtonState.contentDescription,
+                onClick = callbacks::onToggleEyedropper,
+                active = eyedropperButtonState.active,
+                enabled = interactive,
+            )
+            SceneTopBarActionButton(
                 imageVector = settingsButtonState.icon.imageVector(),
                 contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
@@ -377,10 +416,13 @@ private fun SplitTopBarRow(
 private fun ExpandedTopBarRow(
     sceneEntry: SceneEntry,
     selectedTab: SceneInspectorTab,
+    isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
     interactive: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
+
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
@@ -396,6 +438,13 @@ private fun ExpandedTopBarRow(
             sceneEntry = sceneEntry,
             selectedTab = selectedTab,
             modifier = Modifier.weight(1f),
+        )
+        SceneTopBarActionButton(
+            imageVector = Icons.Outlined.Colorize,
+            contentDescription = eyedropperButtonState.contentDescription,
+            onClick = callbacks::onToggleEyedropper,
+            active = eyedropperButtonState.active,
+            enabled = interactive,
         )
         SceneTopBarActionButton(
             imageVector = Icons.Filled.Close,
@@ -557,7 +606,7 @@ private fun SceneScreenContent(
     // - enableEdgeToEdge = false → runtime applies the same spacing itself, so the scene
     //   sees PaddingValues(0) and just fills its visible area normally.
     val sceneInnerPadding = if (sceneEntry.scene.enableEdgeToEdge) {
-        androidx.compose.foundation.layout.PaddingValues(
+        PaddingValues(
             top = contentTopPadding,
             bottom = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Closed) {
                 bottomInset
@@ -650,7 +699,6 @@ private fun SceneScreenContent(
                         null
                     },
                     availableHeightPx = availableHeightPx,
-                    splitFraction = controlsSheet.splitFraction,
                     inspectorFractionProvider = inspectorFractionProvider,
                     liveDragFractionProvider = liveDragFractionProvider,
                     onInspectorDragUpdate = onInspectorDragUpdate,
@@ -658,7 +706,6 @@ private fun SceneScreenContent(
                     onTabSelected = callbacks::onTabSelected,
                     onThemeChange = callbacks::onThemeChange,
                     bottomInset = bottomInset,
-                    splitBoundaryShift = splitBoundaryShift,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth(),
@@ -842,7 +889,6 @@ private fun SceneInspectorPane(
     layoutMode: SceneInspectorLayoutMode,
     onBackgroundTap: (() -> Unit)?,
     availableHeightPx: Int,
-    splitFraction: Float,
     inspectorFractionProvider: () -> Float,
     liveDragFractionProvider: () -> Float,
     onInspectorDragUpdate: (Float) -> Unit,
@@ -850,7 +896,6 @@ private fun SceneInspectorPane(
     onTabSelected: (SceneInspectorTab) -> Unit,
     onThemeChange: (Boolean) -> Unit,
     bottomInset: Dp,
-    splitBoundaryShift: Dp,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -889,8 +934,13 @@ private fun SceneInspectorPane(
     // though the body's scroll viewport now extends UP to the boundary so items can scroll
     // behind the (opaque) tabs and clip at their middle, mirroring the preview behavior.
     val tabsHeaderTotalHeight = SceneInspectorTabsHeight + tabsHeaderExtraPadding
-    val bodyTopOffset = tabsHeaderTotalHeight - splitBoundaryShift
-    val contentPadding = androidx.compose.foundation.layout.PaddingValues(
+    val contentClipOffset = calculateSceneInspectorContentClipOffset(
+        layoutMode = layoutMode,
+        tabsHeight = SceneInspectorTabsHeight,
+        tabsTopPadding = tabsHeaderExtraPadding,
+    )
+    val bodyTopOffset = tabsHeaderTotalHeight - contentClipOffset
+    val contentPadding = PaddingValues(
         start = 16.dp,
         top = 8.dp + bodyTopOffset,
         end = 16.dp,
@@ -941,8 +991,8 @@ private fun SceneInspectorPane(
                 }
             ),
     ) {
-        // Body content area — extends UP to the boundary (middle of tabs in Split, top of
-        // pane in Expanded). The .padding(top = splitBoundaryShift) clips the scroll viewport
+        // Body content area extends up to the tabs' middle in Split and Expanded.
+        // The .padding(top = contentClipOffset) clips the scroll viewport
         // there, so items scrolled past the boundary disappear behind the (opaque) tabs.
         // The contentPadding inside the panels offsets the first item to sit below the tabs
         // at scroll=0; that padding scrolls with content, mirroring the preview's behavior on
@@ -950,7 +1000,7 @@ private fun SceneInspectorPane(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = splitBoundaryShift),
+                .padding(top = contentClipOffset),
         ) {
             AnimatedContent(
                 targetState = selectedTab,
@@ -1013,7 +1063,7 @@ private fun SceneInspectorPane(
                 visible = showSplitDivider,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = splitBoundaryShift),
+                    .offset(y = contentClipOffset),
             )
         }
 
