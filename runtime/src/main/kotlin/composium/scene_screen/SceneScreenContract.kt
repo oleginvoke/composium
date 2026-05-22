@@ -31,6 +31,7 @@ internal data class ControlsSheetUiState(
 
 internal data class SceneScreenState(
     val controlsSheet: ControlsSheetUiState = ControlsSheetUiState(),
+    val isEyedropperVisible: Boolean = false,
 )
 
 internal data class SceneScreenUiState(
@@ -50,6 +51,8 @@ internal sealed interface SceneScreenIntent {
     data class UpdateSplitFraction(val fraction: Float) : SceneScreenIntent
     data object SettleSplitFraction : SceneScreenIntent
     data object PreviewPaneTapped : SceneScreenIntent
+    data object ToggleEyedropper : SceneScreenIntent
+    data object HideEyedropper : SceneScreenIntent
     data class SelectTab(val tab: SceneInspectorTab) : SceneScreenIntent
 }
 
@@ -63,6 +66,8 @@ internal interface SceneScreenCallbacks {
     fun onUpdateSplitFraction(fraction: Float)
     fun onSettleSplitFraction()
     fun onPreviewPaneTapped()
+    fun onToggleEyedropper()
+    fun onHideEyedropper()
     fun onTabSelected(tab: SceneInspectorTab)
     fun onThemeChange(isDarkTheme: Boolean)
 }

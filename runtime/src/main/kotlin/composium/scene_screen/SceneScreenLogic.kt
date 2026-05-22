@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 internal const val DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION = 0.60f
@@ -43,6 +45,11 @@ internal enum class SceneSettingsButtonIcon {
 
 internal data class SceneSettingsButtonState(
     val icon: SceneSettingsButtonIcon,
+    val contentDescription: String,
+    val active: Boolean,
+)
+
+internal data class SceneEyedropperButtonState(
     val contentDescription: String,
     val active: Boolean,
 )
@@ -89,6 +96,15 @@ internal fun calculateSceneSettingsButtonClickIntent(
         SceneInspectorLayoutMode.Split -> SceneScreenIntent.ExpandControls
         SceneInspectorLayoutMode.Expanded -> null
     }
+}
+
+internal fun calculateSceneEyedropperButtonState(
+    isVisible: Boolean,
+): SceneEyedropperButtonState {
+    return SceneEyedropperButtonState(
+        contentDescription = if (isVisible) "Close eyedropper" else "Open eyedropper",
+        active = isVisible,
+    )
 }
 
 internal fun shouldHandleSceneInspectorBackgroundTap(
@@ -158,6 +174,19 @@ internal fun shouldShowSceneSplitDivider(
     hasScrollableOverflow: Boolean,
 ): Boolean {
     return mode == SceneInspectorLayoutMode.Split && hasScrollableOverflow
+}
+
+internal fun calculateSceneInspectorContentClipOffset(
+    layoutMode: SceneInspectorLayoutMode,
+    tabsHeight: Dp,
+    tabsTopPadding: Dp,
+): Dp {
+    return when (layoutMode) {
+        SceneInspectorLayoutMode.Split,
+        SceneInspectorLayoutMode.Expanded -> tabsTopPadding + tabsHeight / 2
+
+        SceneInspectorLayoutMode.Closed -> 0.dp
+    }
 }
 
 internal fun reduceSceneScreen(
@@ -289,6 +318,18 @@ internal fun reduceSceneScreen(
                         layoutMode = SceneInspectorLayoutMode.Closed,
                     ),
                 )
+            }
+        }
+
+        SceneScreenIntent.ToggleEyedropper -> {
+            state.copy(isEyedropperVisible = !state.isEyedropperVisible)
+        }
+
+        SceneScreenIntent.HideEyedropper -> {
+            if (!state.isEyedropperVisible) {
+                state
+            } else {
+                state.copy(isEyedropperVisible = false)
             }
         }
 
