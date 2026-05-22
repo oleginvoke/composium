@@ -32,7 +32,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/d2dee548-aa58-4aa8-9e3f-456eed043465">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/004a531d-d40f-4991-9ae3-460e34472f95">
+    <img src="https://github.com/user-attachments/assets/921d2a38-517c-4557-a5b0-73ff82662875">
 </p>
 <p align="center">
     <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
