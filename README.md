@@ -308,6 +308,73 @@ internal val edgeToEdgeFeed by scene(
 
 When `enableEdgeToEdge` is `true`, Composium lets the scene fill the preview area and exposes the top and bottom insets through `innerPadding`. Apply that padding where it matches the component layout. When it is `false`, Composium applies the spacing for you and `innerPadding` is zero.
 
+### Scene thumbnails
+
+The main catalog screen automatically creates thumbnails for scenes. By default, Composium renders each scene on a hidden capture surface, stores the resulting image in memory, and shows that image in the scene card thumbnail area.
+
+This keeps the catalog visual without requiring extra setup for every scene:
+
+```kotlin
+internal val primaryButton by scene(group = "Buttons") {
+    PrimaryButton(text = "Continue", onClick = {})
+}
+```
+
+If the full scene is too heavy, too large, animated, or not representative enough for a compact card, provide a custom `thumbnail`. The custom thumbnail is used only for catalog thumbnail capture; opening the scene still renders the regular scene content.
+
+```kotlin
+internal val paymentForm by scene(
+    group = "Forms",
+    thumbnail = {
+        PaymentFormPreview()
+    },
+) {
+    PaymentForm()
+}
+```
+
+Use custom thumbnails for cases where the catalog should show a simplified, stable, or intentionally framed version of the component while keeping the real scene interactive and complete.
+
+### Scene card badges
+
+Use `badge` when a scene needs an extra marker inside its catalog card. Composium renders it in the top-end corner of the thumbnail area and only adds a small outer padding; the badge content controls its own size, shape, colors, and behavior.
+
+This is useful for lightweight per-scene metadata that should be visible before opening the scene, for example:
+
+- readiness status: draft, ready for review, reviewed;
+- QA or design-review state;
+- platform or feature availability markers;
+- warnings for incomplete, deprecated, or experimental components;
+- selection or pinning indicators in a custom catalog flow.
+
+The badge is regular Compose content. It can be a small colored dot, text label, icon, progress marker, or an interactive control if your catalog UX needs it.
+
+```kotlin
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+internal val paymentButton by scene(
+    group = "Buttons",
+    badge = {
+        // Reviewed
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF2E7D32)),
+        )
+    },
+) {
+    PaymentButton()
+}
+```
+
 ## Parameters And Controls
 
 Scene parameters are declared inside the scene body with delegated properties:

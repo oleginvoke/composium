@@ -50,8 +50,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -90,9 +92,11 @@ internal fun MainScreen(
     val themeController = LocalComposiumThemeController.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val density = LocalDensity.current
     val backgroundInteractionSource = remember { MutableInteractionSource() }
     val store = rememberMainScreenStore()
     val state = store.state
+    var topBarHeightDp by remember { mutableStateOf(0f) }
     val scenesContentKey by remember(scenes) {
         derivedStateOf {
             scenes.map { entry ->
@@ -116,6 +120,9 @@ internal fun MainScreen(
             visibleCount = filteredScenes.size,
             totalCount = scenes.size,
         )
+    }
+    val listViewportLayout = remember(topBarHeightDp) {
+        mainScreenListViewportLayout(topBarHeightDp = topBarHeightDp)
     }
 
     val callbacks = remember(
@@ -171,27 +178,29 @@ internal fun MainScreen(
                 },
             ),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            MainScreenTopBar(
-                query = state.query,
-                isDarkTheme = themeController.isDarkTheme,
-                callbacks = callbacks,
-                statusBarInsets = contentWindowInsets,
-            )
-            MainScreenContent(
-                scenes = filteredScenes,
-                expandedGroups = state.expandedGroups,
-                catalogStatus = catalogStatus,
-                callbacks = callbacks,
-                contentWindowInsets = contentWindowInsets,
-                thumbnailStates = thumbnailStates,
-                onVisibleSceneIdsChanged = onVisibleSceneIdsChanged,
-                onListScrollInProgressChanged = onListScrollInProgressChanged,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(PaddingValues()),
-            )
-        }
+        MainScreenContent(
+            scenes = filteredScenes,
+            expandedGroups = state.expandedGroups,
+            catalogStatus = catalogStatus,
+            callbacks = callbacks,
+            contentWindowInsets = contentWindowInsets,
+            thumbnailStates = thumbnailStates,
+            onVisibleSceneIdsChanged = onVisibleSceneIdsChanged,
+            onListScrollInProgressChanged = onListScrollInProgressChanged,
+            extraTopPaddingDp = listViewportLayout.extraTopPaddingDp,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = listViewportLayout.topOffsetDp.dp),
+        )
+        MainScreenTopBar(
+            query = state.query,
+            isDarkTheme = themeController.isDarkTheme,
+            callbacks = callbacks,
+            statusBarInsets = contentWindowInsets,
+            modifier = Modifier.onSizeChanged { size ->
+                topBarHeightDp = with(density) { size.height.toDp().value }
+            },
+        )
     }
 }
 
@@ -201,9 +210,10 @@ private fun MainScreenTopBar(
     isDarkTheme: Boolean,
     callbacks: MainScreenCallbacks,
     statusBarInsets: WindowInsets? = null,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(
                 statusBarInsets
@@ -212,7 +222,7 @@ private fun MainScreenTopBar(
                     ?: Modifier,
             )
             .padding(horizontal = 18.dp)
-            .padding(top = 18.dp, bottom = 12.dp),
+            .padding(top = 18.dp, bottom = MainScreenTopBarBottomPaddingDp.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -260,12 +270,14 @@ private fun MainScreenContent(
     onVisibleSceneIdsChanged: (List<String>) -> Unit,
     onListScrollInProgressChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    extraTopPaddingDp: Float = 0f,
 ) {
     val listState = rememberLazyListState()
     val density = LocalDensity.current
     val listContentPadding = mainScreenListContentPadding(
         contentWindowInsets = contentWindowInsets,
         density = density,
+        extraTopPaddingDp = extraTopPaddingDp,
     )
     val sceneGroupTree = remember(scenes) {
         buildSceneGroupTree(scenes)
@@ -341,22 +353,13 @@ private fun MainScreenContent(
                         connectorContinuations = item.connectorContinuations,
                         drawChildStem = false,
                     ) {
-                        if (item.depth == 0) {
-                            ComposiumSceneCard(
-                                name = item.entry.scene.name,
-                                group = item.entry.scene.group,
-                                thumbnailState = thumbnailStates[item.entry.id],
-                                onClick = { callbacks.onSceneSelected(item.entry.id) },
-                            )
-                        } else {
-                            ComposiumSceneCard(
-                                name = item.entry.scene.name,
-                                group = item.entry.scene.group,
-                                thumbnailState = thumbnailStates[item.entry.id],
-                                onClick = { callbacks.onSceneSelected(item.entry.id) },
-                                compact = true,
-                            )
-                        }
+                        ComposiumSceneCard(
+                            name = item.entry.scene.name,
+                            group = item.entry.scene.group,
+                            thumbnailState = thumbnailStates[item.entry.id],
+                            badge = item.entry.scene.badge,
+                            onClick = { callbacks.onSceneSelected(item.entry.id) },
+                        )
                     }
                 }
 
@@ -402,15 +405,20 @@ private fun HierarchyItemFrame(
                 if (shouldDrawConnectors) {
                     Modifier.drawBehind {
                         val strokeWidth = 1.5.dp.toPx()
-                        val itemTargetY = minOf(size.height / 2f, 34.dp.toPx())
+                        val itemBottomGapPx = layout.childStemStartInsetFromBottomDp.dp.toPx()
+                        val itemTargetY = mainScreenHierarchyConnectorTargetYPx(
+                            itemHeightPx = size.height,
+                            bottomGapPx = itemBottomGapPx,
+                        )
 
                         layout.parentConnectorCentersDp.forEachIndexed { index, centerDp ->
                             val x = centerDp.dp.toPx()
                             val shouldContinue = connectorContinuations.getOrElse(index) { false }
                             val isCurrentConnector = index == layout.parentConnectorCentersDp.lastIndex
+                            if (isCurrentConnector) return@forEachIndexed
+
                             val endY = when {
                                 shouldContinue -> size.height
-                                isCurrentConnector -> itemTargetY
                                 else -> 0f
                             }
                             if (endY > 0f) {
@@ -427,26 +435,77 @@ private fun HierarchyItemFrame(
                         layout.currentConnectorCenterDp?.let { centerDp ->
                             val x = centerDp.dp.toPx()
                             val elbowEndX = layout.elbowEndDp.dp.toPx()
-                            drawLine(
-                                color = connectorColor,
-                                start = Offset(x, itemTargetY),
-                                end = Offset(elbowEndX, itemTargetY),
-                                strokeWidth = strokeWidth,
-                                cap = StrokeCap.Round,
+                            val currentConnectorContinues = connectorContinuations
+                                .getOrElse(layout.parentConnectorCentersDp.lastIndex) { false }
+                            val elbow = calculateMainScreenHierarchyConnectorElbow(
+                                connectorX = x,
+                                elbowEndX = elbowEndX,
+                                targetYPx = itemTargetY,
+                                requestedRadiusPx = connectorStyle.cornerRadiusDp.dp.toPx(),
                             )
-                            drawHierarchyConnectorArrow(
-                                color = connectorColor,
-                                tipX = elbowEndX,
-                                centerY = itemTargetY,
-                                arrowLengthPx = connectorStyle.arrowLengthDp.dp.toPx(),
-                                arrowHalfHeightPx = connectorStyle.arrowHalfHeightDp.dp.toPx(),
-                                strokeWidth = strokeWidth,
-                            )
+                            if (elbow.radiusPx > 0f) {
+                                if (currentConnectorContinues) {
+                                    drawLine(
+                                        color = connectorColor,
+                                        start = Offset(x, 0f),
+                                        end = Offset(x, size.height),
+                                        strokeWidth = strokeWidth,
+                                        cap = StrokeCap.Round,
+                                    )
+                                }
+                                val path = Path().apply {
+                                    moveTo(x, 0f)
+                                    if (currentConnectorContinues) {
+                                        moveTo(x, elbow.verticalEndYPx)
+                                    } else {
+                                        lineTo(x, elbow.verticalEndYPx)
+                                    }
+                                    quadraticTo(
+                                        x1 = x,
+                                        y1 = itemTargetY,
+                                        x2 = elbow.horizontalStartXPx,
+                                        y2 = itemTargetY,
+                                    )
+                                    lineTo(elbowEndX, itemTargetY)
+                                }
+                                drawPath(
+                                    path = path,
+                                    color = connectorColor,
+                                    style = Stroke(
+                                        width = strokeWidth,
+                                        cap = StrokeCap.Round,
+                                    ),
+                                )
+                            } else {
+                                drawLine(
+                                    color = connectorColor,
+                                    start = Offset(x, 0f),
+                                    end = Offset(x, itemTargetY),
+                                    strokeWidth = strokeWidth,
+                                    cap = StrokeCap.Round,
+                                )
+                                drawLine(
+                                    color = connectorColor,
+                                    start = Offset(x, itemTargetY),
+                                    end = Offset(elbowEndX, itemTargetY),
+                                    strokeWidth = strokeWidth,
+                                    cap = StrokeCap.Round,
+                                )
+                            }
+                            if (currentConnectorContinues && elbow.radiusPx <= 0f) {
+                                drawLine(
+                                    color = connectorColor,
+                                    start = Offset(x, itemTargetY),
+                                    end = Offset(x, size.height),
+                                    strokeWidth = strokeWidth,
+                                    cap = StrokeCap.Round,
+                                )
+                            }
                         }
 
                         if (drawChildStem) {
                             val childX = layout.childConnectorCenterDp.dp.toPx()
-                            val startY = (size.height - layout.childStemStartInsetFromBottomDp.dp.toPx())
+                            val startY = (size.height - itemBottomGapPx)
                                 .coerceAtLeast(0f)
                             drawLine(
                                 color = connectorColor,
@@ -471,31 +530,6 @@ private fun HierarchyItemFrame(
             content()
         }
     }
-}
-
-private fun DrawScope.drawHierarchyConnectorArrow(
-    color: androidx.compose.ui.graphics.Color,
-    tipX: Float,
-    centerY: Float,
-    arrowLengthPx: Float,
-    arrowHalfHeightPx: Float,
-    strokeWidth: Float,
-) {
-    val tailX = tipX - arrowLengthPx
-    drawLine(
-        color = color,
-        start = Offset(tailX, centerY - arrowHalfHeightPx),
-        end = Offset(tipX, centerY),
-        strokeWidth = strokeWidth,
-        cap = StrokeCap.Round,
-    )
-    drawLine(
-        color = color,
-        start = Offset(tailX, centerY + arrowHalfHeightPx),
-        end = Offset(tipX, centerY),
-        strokeWidth = strokeWidth,
-        cap = StrokeCap.Round,
-    )
 }
 
 @Composable

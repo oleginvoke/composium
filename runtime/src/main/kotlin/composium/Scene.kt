@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
  * for its own layout.
  * @param thumbnail Optional lightweight content used only for catalog thumbnail capture.
  * If `null`, the runtime captures [content].
+ * @param badge Optional content rendered over the catalog card thumbnail area. The runtime
+ * positions it in the top-end corner and does not constrain its size.
  * @param content Scene content rendered inside [SceneScope].
  */
 class Scene(
@@ -27,6 +29,7 @@ class Scene(
     val name: String,
     val enableEdgeToEdge: Boolean = false,
     val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
+    val badge: (@Composable () -> Unit)? = null,
     val content: @Composable SceneScope.() -> Unit,
 ) {
     constructor(
@@ -39,6 +42,7 @@ class Scene(
         name = name,
         enableEdgeToEdge = enableEdgeToEdge,
         thumbnail = null,
+        badge = null,
         content = content,
     )
 }

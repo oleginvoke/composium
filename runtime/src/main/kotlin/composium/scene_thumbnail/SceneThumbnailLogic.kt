@@ -9,11 +9,11 @@ import kotlin.math.roundToInt
 
 internal const val DefaultSceneThumbnailInitialBudgetMillis: Long = 2_000L
 internal val DefaultSceneThumbnailCaptureTimeoutMillis: Long? = null
-internal const val DefaultSceneThumbnailMemoryBudgetBytes: Int = 32 * 1024 * 1024
+internal const val DefaultSceneThumbnailMemoryBudgetBytes: Int = 48 * 1024 * 1024
 internal const val DefaultSceneThumbnailCaptureScale: Float = 3f
 internal const val DefaultSceneThumbnailViewportWidthPx: Int = 1080
 internal const val DefaultSceneThumbnailViewportHeightPx: Int = 1920
-internal const val DefaultSceneThumbnailTargetWidthPx: Int = 540
+internal const val DefaultSceneThumbnailTargetWidthPx: Int = 960
 internal const val DefaultSceneThumbnailTargetHeightPx: Int = 960
 internal const val DefaultSceneThumbnailFailureRetryCount: Int = 1
 
@@ -91,11 +91,9 @@ internal enum class SceneThumbnailPreviewHorizontalAlignment {
 }
 
 internal data class SceneThumbnailCardLayout(
-    val isHeaderHighlighted: Boolean,
     val hasDivider: Boolean,
     val previewHorizontalAlignment: SceneThumbnailPreviewHorizontalAlignment,
-    val previewBodyMinHeightDp: Float,
-    val compactPreviewBodyMinHeightDp: Float,
+    val previewHeightDp: Float,
 )
 
 internal enum class SceneThumbnailFailureDecision {
@@ -304,11 +302,9 @@ internal fun calculateSceneThumbnailReadyPreviewSize(
 
 internal fun sceneThumbnailCardLayout(): SceneThumbnailCardLayout =
     SceneThumbnailCardLayout(
-        isHeaderHighlighted = true,
         hasDivider = true,
         previewHorizontalAlignment = SceneThumbnailPreviewHorizontalAlignment.Center,
-        previewBodyMinHeightDp = 40f,
-        compactPreviewBodyMinHeightDp = 40f,
+        previewHeightDp = 86f,
     )
 
 internal fun sceneThumbnailInitialReadyCount(sceneCount: Int): Int =

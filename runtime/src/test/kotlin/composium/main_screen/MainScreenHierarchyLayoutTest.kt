@@ -71,12 +71,57 @@ class MainScreenHierarchyLayoutTest {
     }
 
     @Test
-    fun hierarchyConnectorStyleUsesArrowsWithoutNodes() {
+    fun hierarchyConnectorStyleUsesStraightLinesWithoutArrows() {
         val style = mainScreenHierarchyConnectorStyle()
 
-        assertEquals(false, style.hasNode)
-        assertEquals(5f, style.arrowLengthDp)
-        assertEquals(2.5f, style.arrowHalfHeightDp)
+        assertEquals(false, style.hasArrow)
+        assertEquals(6f, style.cornerRadiusDp)
+    }
+
+    @Test
+    fun hierarchyConnectorElbowRoundsVerticalToHorizontalTurn() {
+        val elbow = calculateMainScreenHierarchyConnectorElbow(
+            connectorX = 16f,
+            elbowEndX = 32f,
+            targetYPx = 30f,
+            requestedRadiusPx = 6f,
+        )
+
+        assertEquals(6f, elbow.radiusPx)
+        assertEquals(24f, elbow.verticalEndYPx)
+        assertEquals(22f, elbow.horizontalStartXPx)
+    }
+
+    @Test
+    fun hierarchyConnectorElbowClampsRadiusToAvailableSpace() {
+        val elbow = calculateMainScreenHierarchyConnectorElbow(
+            connectorX = 16f,
+            elbowEndX = 20f,
+            targetYPx = 3f,
+            requestedRadiusPx = 6f,
+        )
+
+        assertEquals(3f, elbow.radiusPx)
+        assertEquals(0f, elbow.verticalEndYPx)
+        assertEquals(19f, elbow.horizontalStartXPx)
+    }
+
+    @Test
+    fun hierarchyConnectorTargetUsesItemCenter() {
+        assertEquals(
+            106f,
+            mainScreenHierarchyConnectorTargetYPx(
+                itemHeightPx = 220f,
+                bottomGapPx = 8f,
+            ),
+        )
+        assertEquals(
+            30f,
+            mainScreenHierarchyConnectorTargetYPx(
+                itemHeightPx = 68f,
+                bottomGapPx = 8f,
+            ),
+        )
     }
 
     @Test
@@ -90,6 +135,33 @@ class MainScreenHierarchyLayoutTest {
         assertEquals(18.dp, padding.calculateRightPadding(LayoutDirection.Ltr))
         assertEquals(8.dp, padding.calculateTopPadding())
         assertEquals(50.dp, padding.calculateBottomPadding())
+    }
+
+    @Test
+    fun listViewportStartsAtSearchFieldMidlineAndPreservesInitialContentPosition() {
+        val viewport = mainScreenListViewportLayout(
+            topBarHeightDp = 150f,
+            searchFieldHeightDp = 40f,
+        )
+
+        assertEquals(118f, viewport.topOffsetDp)
+        assertEquals(32f, viewport.extraTopPaddingDp)
+        assertEquals(
+            158f,
+            viewport.topOffsetDp + MainScreenListBaseTopPaddingDp + viewport.extraTopPaddingDp,
+        )
+        assertEquals(158f, 150f + MainScreenListBaseTopPaddingDp)
+    }
+
+    @Test
+    fun listContentPaddingIncludesViewportOverlapPadding() {
+        val padding = mainScreenListContentPadding(
+            contentWindowInsets = null,
+            density = density,
+            extraTopPaddingDp = 32f,
+        )
+
+        assertEquals(40.dp, padding.calculateTopPadding())
     }
 
     @Test

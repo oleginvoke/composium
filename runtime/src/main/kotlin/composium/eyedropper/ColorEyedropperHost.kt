@@ -55,7 +55,7 @@ private const val CaptureRetryCount = 4
  * @param content Content that should be available for color sampling.
  */
 @Composable
-fun ColorEyedropperHost(
+internal fun ColorEyedropperHost(
     visible: Boolean,
     onVisibleChange: (Boolean) -> Unit,
     state: ColorEyedropperState = rememberColorEyedropperState(),

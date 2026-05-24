@@ -33,8 +33,13 @@ class SceneThumbnailLogicTest {
         assertEquals(3f, key.captureScale)
         assertEquals(1080, key.viewportWidthPx)
         assertEquals(1920, key.viewportHeightPx)
-        assertEquals(540, key.targetWidthPx)
+        assertEquals(960, key.targetWidthPx)
         assertEquals(960, key.targetHeightPx)
+    }
+
+    @Test
+    fun defaultMemoryBudgetKeepsInitialLargeThumbnailBatch() {
+        assertEquals(48 * 1024 * 1024, DefaultSceneThumbnailMemoryBudgetBytes)
     }
 
     @Test
@@ -354,20 +359,20 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
-    fun sceneCardLayoutUsesHighlightedHeaderDividerAndCenteredPreview() {
+    fun sceneCardLayoutUsesTopPreviewDividerAndCenteredPreview() {
         val layout = sceneThumbnailCardLayout()
 
-        assertTrue(layout.isHeaderHighlighted)
         assertTrue(layout.hasDivider)
         assertEquals(SceneThumbnailPreviewHorizontalAlignment.Center, layout.previewHorizontalAlignment)
     }
 
     @Test
-    fun sceneCardLayoutKeepsPreviewBodyFromCollapsing() {
+    fun sceneCardLayoutUsesLargeVerticalPreviewHeights() {
         val layout = sceneThumbnailCardLayout()
 
-        assertEquals(40f, layout.previewBodyMinHeightDp)
-        assertEquals(40f, layout.compactPreviewBodyMinHeightDp)
+        assertEquals(120f, layout.previewHeightDp)
+        assertEquals(96f, layout.compactPreviewHeightDp)
+        assertTrue(layout.previewHeightDp > layout.compactPreviewHeightDp)
     }
 
     private fun fakeImageBitmap(): ImageBitmap = object : ImageBitmap {

@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
  * host places the target in the center of its bounds when the eyedropper becomes visible.
  */
 @Composable
-fun rememberColorEyedropperState(
+internal fun rememberColorEyedropperState(
     initialTarget: Offset = Offset.Unspecified,
 ): ColorEyedropperState = remember {
     ColorEyedropperState(initialTarget = initialTarget)
@@ -31,7 +31,7 @@ fun rememberColorEyedropperState(
  * custom controls or feedback.
  */
 @Stable
-class ColorEyedropperState internal constructor(
+internal class ColorEyedropperState internal constructor(
     initialTarget: Offset,
 ) {
     /**

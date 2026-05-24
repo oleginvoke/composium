@@ -9,12 +9,10 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -42,15 +40,15 @@ internal fun ComposiumSceneCard(
     name: String,
     group: String?,
     thumbnailState: SceneThumbnailState?,
+    badge: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val layout = remember { sceneThumbnailCardLayout() }
-    val previewWidth = if (compact) SceneThumbnailPreviewCompactWidth else SceneThumbnailPreviewWidth
-    val previewHeight = if (compact) SceneThumbnailPreviewCompactHeight else SceneThumbnailPreviewHeight
+    val previewHeight = layout.previewHeightDp.dp
+    val previewPadding = SceneThumbnailPreviewPadding
 
     Box(
         modifier = modifier
@@ -75,40 +73,49 @@ internal fun ComposiumSceneCard(
                 onClick = onClick,
             ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = previewHeight),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            SceneThumbnailPreview(
-                state = thumbnailState,
-                compact = compact,
-                horizontalAlignment = layout.previewHorizontalAlignment,
+            Box(
                 modifier = Modifier
-                    .size(width = previewWidth, height = previewHeight)
+                    .fillMaxWidth()
+                    .height(previewHeight)
                     .background(Tokens.colors.surfaceVariant.copy(alpha = 0.42f))
-                    .drawThumbnailRightBorder(
+                    .drawThumbnailBottomBorder(
                         color = Tokens.colors.outlineVariant.copy(alpha = 0.52f),
-                    )
-                    .padding(
-                        6.dp
                     ),
-            )
+            ) {
+                SceneThumbnailPreview(
+                    state = thumbnailState,
+                    horizontalAlignment = layout.previewHorizontalAlignment,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(previewPadding),
+                )
+
+                if (badge != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd),
+                    ) {
+                        badge()
+                    }
+                }
+            }
 
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth()
                     .padding(
-                        start = if (compact) 12.dp else 14.dp,
-                        end = if (compact) 10.dp else 12.dp,
-                        top = if (compact) 10.dp else 12.dp,
-                        bottom = if (compact) 10.dp else 12.dp,
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 10.dp,
+                        bottom = 12.dp,
                     ),
             ) {
                 ComposiumText(
                     text = name,
-                    style = if (compact) Tokens.typography.titleMedium else Tokens.typography.titleLarge,
+                    style = Tokens.typography.titleMedium,
                     color = Tokens.colors.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -141,7 +148,6 @@ internal fun ComposiumSceneCard(
 @Composable
 private fun SceneThumbnailPreview(
     state: SceneThumbnailState?,
-    compact: Boolean,
     horizontalAlignment: SceneThumbnailPreviewHorizontalAlignment,
     modifier: Modifier = Modifier,
 ) {
@@ -151,11 +157,7 @@ private fun SceneThumbnailPreview(
                 modifier = modifier,
                 contentAlignment = horizontalAlignment.toComposeAlignment(),
             ) {
-                val maxPreviewHeight = if (compact) {
-                    SceneThumbnailPreviewCompactMaxHeight
-                } else {
-                    SceneThumbnailPreviewMaxHeight
-                }
+                val maxPreviewHeight = SceneThumbnailPreviewMaxHeight
                 val previewSize = calculateSceneThumbnailReadyPreviewSize(
                     imageWidthPx = state.image.width,
                     imageHeightPx = state.image.height,
@@ -240,21 +242,17 @@ private fun SceneThumbnailPlaceholder(
     }
 }
 
-private val SceneThumbnailPreviewMaxHeight = 180.dp
-private val SceneThumbnailPreviewCompactMaxHeight = 150.dp
-private val SceneThumbnailPreviewWidth = 124.dp
-private val SceneThumbnailPreviewHeight = 88.dp
-private val SceneThumbnailPreviewCompactWidth = 112.dp
-private val SceneThumbnailPreviewCompactHeight = 76.dp
+private val SceneThumbnailPreviewMaxHeight = 124.dp
+private val SceneThumbnailPreviewPadding = 7.dp
 
-private fun Modifier.drawThumbnailRightBorder(color: Color): Modifier =
+private fun Modifier.drawThumbnailBottomBorder(color: Color): Modifier =
     drawBehind {
         val strokeWidth = 1.dp.toPx()
-        val x = size.width - strokeWidth / 2f
+        val y = size.height - strokeWidth / 2f
         drawLine(
             color = color,
-            start = Offset(x, 0f),
-            end = Offset(x, size.height),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
             strokeWidth = strokeWidth,
         )
     }

@@ -25,15 +25,25 @@ internal data class MainScreenGroupHeaderLayout(
 )
 
 internal data class MainScreenHierarchyConnectorStyle(
-    val hasNode: Boolean,
-    val arrowLengthDp: Float,
-    val arrowHalfHeightDp: Float,
+    val hasArrow: Boolean,
+    val cornerRadiusDp: Float,
+)
+
+internal data class MainScreenHierarchyConnectorElbow(
+    val radiusPx: Float,
+    val verticalEndYPx: Float,
+    val horizontalStartXPx: Float,
 )
 
 internal data class MainScreenSearchFieldLayout(
     val heightDp: Float,
     val horizontalPaddingDp: Float,
     val clearButtonSizeDp: Float,
+)
+
+internal data class MainScreenListViewportLayout(
+    val topOffsetDp: Float,
+    val extraTopPaddingDp: Float,
 )
 
 internal fun calculateMainScreenHierarchyLayout(depth: Int): MainScreenHierarchyLayout {
@@ -79,10 +89,42 @@ internal fun mainScreenGroupHeaderLayout(depth: Int): MainScreenGroupHeaderLayou
 
 internal fun mainScreenHierarchyConnectorStyle(): MainScreenHierarchyConnectorStyle =
     MainScreenHierarchyConnectorStyle(
-        hasNode = false,
-        arrowLengthDp = MainScreenHierarchyArrowLengthDp,
-        arrowHalfHeightDp = MainScreenHierarchyArrowHalfHeightDp,
+        hasArrow = false,
+        cornerRadiusDp = MainScreenHierarchyConnectorCornerRadiusDp,
     )
+
+internal fun calculateMainScreenHierarchyConnectorElbow(
+    connectorX: Float,
+    elbowEndX: Float,
+    targetYPx: Float,
+    requestedRadiusPx: Float,
+): MainScreenHierarchyConnectorElbow {
+    require(targetYPx >= 0f) { "targetYPx must be >= 0" }
+    require(requestedRadiusPx >= 0f) { "requestedRadiusPx must be >= 0" }
+
+    val horizontalLengthPx = (elbowEndX - connectorX).coerceAtLeast(0f)
+    val radiusPx = minOf(
+        requestedRadiusPx,
+        targetYPx,
+        horizontalLengthPx,
+    )
+    return MainScreenHierarchyConnectorElbow(
+        radiusPx = radiusPx,
+        verticalEndYPx = targetYPx - radiusPx,
+        horizontalStartXPx = connectorX + radiusPx,
+    )
+}
+
+internal fun mainScreenHierarchyConnectorTargetYPx(
+    itemHeightPx: Float,
+    bottomGapPx: Float,
+): Float {
+    require(itemHeightPx >= 0f) { "itemHeightPx must be >= 0" }
+    require(bottomGapPx >= 0f) { "bottomGapPx must be >= 0" }
+
+    return (itemHeightPx - bottomGapPx)
+        .coerceAtLeast(0f) / 2f
+}
 
 internal fun mainScreenSearchFieldLayout(): MainScreenSearchFieldLayout =
     MainScreenSearchFieldLayout(
@@ -91,10 +133,29 @@ internal fun mainScreenSearchFieldLayout(): MainScreenSearchFieldLayout =
         clearButtonSizeDp = MainScreenSearchFieldClearButtonSizeDp,
     )
 
+internal fun mainScreenListViewportLayout(
+    topBarHeightDp: Float,
+    searchFieldHeightDp: Float = MainScreenSearchFieldHeightDp,
+    topBarBottomPaddingDp: Float = MainScreenTopBarBottomPaddingDp,
+): MainScreenListViewportLayout {
+    require(topBarHeightDp >= 0f) { "topBarHeightDp must be >= 0" }
+    require(searchFieldHeightDp >= 0f) { "searchFieldHeightDp must be >= 0" }
+    require(topBarBottomPaddingDp >= 0f) { "topBarBottomPaddingDp must be >= 0" }
+
+    val overlapDp = searchFieldHeightDp / 2f
+    return MainScreenListViewportLayout(
+        topOffsetDp = (topBarHeightDp - topBarBottomPaddingDp - overlapDp).coerceAtLeast(0f),
+        extraTopPaddingDp = topBarBottomPaddingDp + overlapDp,
+    )
+}
+
 internal fun mainScreenListContentPadding(
     contentWindowInsets: WindowInsets?,
     density: Density,
+    extraTopPaddingDp: Float = 0f,
 ): PaddingValues {
+    require(extraTopPaddingDp >= 0f) { "extraTopPaddingDp must be >= 0" }
+
     val bottomInset = contentWindowInsets
         ?.getBottom(density)
         ?.let { insetPx -> with(density) { insetPx.toDp() } }
@@ -102,24 +163,26 @@ internal fun mainScreenListContentPadding(
 
     return PaddingValues(
         start = MainScreenListHorizontalPaddingDp.dp,
-        top = MainScreenListVerticalPaddingDp.dp,
+        top = (MainScreenListBaseTopPaddingDp + extraTopPaddingDp).dp,
         end = MainScreenListHorizontalPaddingDp.dp,
         bottom = MainScreenListVerticalPaddingDp.dp + bottomInset,
     )
 }
 
+internal const val MainScreenListBaseTopPaddingDp = 8f
+internal const val MainScreenTopBarBottomPaddingDp = 12f
+
 private const val MainScreenListHorizontalPaddingDp = 18f
-private const val MainScreenListVerticalPaddingDp = 8f
+private const val MainScreenListVerticalPaddingDp = MainScreenListBaseTopPaddingDp
 private const val MainScreenHierarchyDepthStepDp = 32f
 private const val MainScreenHierarchyConnectorCenterDp = 16f
 private const val MainScreenHierarchyItemBottomGapDp = 8f
+private const val MainScreenHierarchyConnectorCornerRadiusDp = 6f
 private const val MainScreenGroupCountBadgeSizeDp = 22f
 private const val MainScreenGroupCountBadgeCornerRadiusDp = 6f
 private const val MainScreenGroupHeaderHorizontalPaddingDp = 8f
 private const val MainScreenGroupHeaderRootVerticalPaddingDp = 8f
 private const val MainScreenGroupHeaderNestedVerticalPaddingDp = 6f
-private const val MainScreenHierarchyArrowLengthDp = 5f
-private const val MainScreenHierarchyArrowHalfHeightDp = 2.5f
 private const val MainScreenSearchFieldHeightDp = 40f
 private const val MainScreenSearchFieldHorizontalPaddingDp = 15f
 private const val MainScreenSearchFieldClearButtonSizeDp = 28f

@@ -14,7 +14,7 @@ import kotlin.math.roundToInt
  * Each format can turn the currently sampled sRGB color into the exact string that will be
  * displayed in the floating island and copied to the clipboard.
  */
-enum class ColorEyedropperFormat(
+internal enum class ColorEyedropperFormat(
     /**
      * Short label shown next to the formatted color value.
      */
@@ -92,7 +92,7 @@ enum class ColorEyedropperFormat(
  * @param text Formatted color value.
  */
 @Immutable
-data class ColorEyedropperValue(
+internal data class ColorEyedropperValue(
     val format: ColorEyedropperFormat,
     val label: String,
     val text: String,
