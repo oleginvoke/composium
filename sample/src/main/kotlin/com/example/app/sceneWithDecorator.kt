@@ -98,12 +98,15 @@ internal fun sceneWithDecorator(
     scrollable: Boolean = true,
     backgroundColorLight: Color = Color.White,
     backgroundColorDark: Color = Color(0xFF4A4949),
+    thumbnail: (@Composable SceneScope.() -> Unit)? = null,
     content: @Composable (SceneScope.() -> Unit),
 ): SceneDelegate {
+    val previewContent = thumbnail ?: content
     return scene(
         group = group,
         name = name,
         enableEdgeToEdge = enableEdgeToEdge,
+        thumbnail = previewContent,
         content = {
             var showContentBounds by remember { mutableStateOf(false) }
             var previewTheme by remember { mutableStateOf(previewThemeCache) }

@@ -53,7 +53,7 @@ internal val testList by sceneWithDecorator(
         modifier = Modifier.fillMaxSize(),
         contentPadding = innerPadding,
     ) {
-        items(10) {
+        items(50) {
             Text("$it")
         }
     }

@@ -750,7 +750,7 @@ class SceneScope internal constructor() {
                 optionItems != null && isEnumType -> {
                     val enumOptions: List<ParamOption<Any>> =
                         requireNotNull(optionItems).mapNotNull { option ->
-                            val nonNullValue = option.value as Any? ?: return@mapNotNull null
+                            val nonNullValue = option.value as? Any? ?: return@mapNotNull null
                             nonNullValue named option.name
                         }
 
@@ -773,12 +773,12 @@ class SceneScope internal constructor() {
                 optionValues != null -> {
                     val anyOptions: List<ParamOption<Any>> = if (optionItems != null) {
                         optionItems.mapNotNull { option ->
-                            val nonNullValue = option.value as Any? ?: return@mapNotNull null
+                            val nonNullValue = option.value as? Any? ?: return@mapNotNull null
                             nonNullValue named option.name
                         }
                     } else {
                         optionValues.mapNotNull { optionValue ->
-                            val nonNullValue = optionValue as Any? ?: return@mapNotNull null
+                            val nonNullValue = optionValue as? Any? ?: return@mapNotNull null
                             nonNullValue named nameForValue(nonNullValue)
                         }
                     }

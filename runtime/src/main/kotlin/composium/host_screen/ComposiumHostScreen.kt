@@ -2,6 +2,8 @@ package oleginvoke.com.composium.host_screen
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +31,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -39,9 +42,27 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailCaptureHost
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailCaptureRequest
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailFailureDecision
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailFailureRetryTracker
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailKey
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailLoadingScreen
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailPreloadPolicy
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailPreloadStatus
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailQueue
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailStore
+import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailUnavailableDecision
+import oleginvoke.com.composium.scene_thumbnail.buildSceneThumbnailFailureLogMessage
+import oleginvoke.com.composium.scene_thumbnail.resolveSceneThumbnailUnavailableDecision
+import oleginvoke.com.composium.scene_thumbnail.sceneThumbnailInitialReadyCount
+import oleginvoke.com.composium.scene_thumbnail.shouldShowSceneThumbnailLoading
+import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Tokens
 
 @Composable
@@ -50,6 +71,7 @@ internal fun ComposiumHostScreen(
     contentWindowInsets: WindowInsets? = null,
 ) {
     val scenes = ComposiumRuntime.scenes
+    val themeController = LocalComposiumThemeController.current
     val saveableStateHolder = rememberSaveableStateHolder()
     val scenesById by remember {
         derivedStateOf { scenes.associateBy { entry -> entry.id } }
@@ -58,7 +80,7 @@ internal fun ComposiumHostScreen(
         derivedStateOf { scenes.map { entry -> entry.id } }
     }
     val mainScreenInsets = remember(contentWindowInsets) {
-        contentWindowInsets?.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
     }
     val sceneOverlayInsets = remember(contentWindowInsets) {
         contentWindowInsets?.only(WindowInsetsSides.Horizontal)
@@ -72,10 +94,54 @@ internal fun ComposiumHostScreen(
     val sceneVisibilityState = remember { MutableTransitionState(false) }
 
     var state by remember { mutableStateOf(ComposiumHostScreenState()) }
+    val thumbnailStore = remember { SceneThumbnailStore() }
+    val thumbnailQueue = remember { SceneThumbnailQueue() }
+    val thumbnailRetryTracker = remember { SceneThumbnailFailureRetryTracker() }
+    var visibleSceneIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isMainListScrollInProgress by remember { mutableStateOf(false) }
+    var currentCaptureKey by remember { mutableStateOf<SceneThumbnailKey?>(null) }
+    var preloadElapsedMillis by remember { mutableLongStateOf(0L) }
 
     val renderedSceneId = state.renderedSceneId
     val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
     val blocksMainScreenInput = shouldBlockMainScreenInput(state)
+    val thumbnailKeys = remember(sceneIds, themeController.isDarkTheme) {
+        scenes.map { entry ->
+            SceneThumbnailKey(
+                sceneId = entry.id,
+                isDarkTheme = themeController.isDarkTheme,
+            )
+        }
+    }
+    val thumbnailKeySet = remember(thumbnailKeys) { thumbnailKeys.toSet() }
+    val preloadPolicy = remember(thumbnailKeys.size) {
+        SceneThumbnailPreloadPolicy(
+            initialReadyCount = sceneThumbnailInitialReadyCount(thumbnailKeys.size),
+        )
+    }
+    val preloadStatus = SceneThumbnailPreloadStatus(
+        totalCount = thumbnailKeys.size,
+        readyCount = thumbnailStore.readyCount(thumbnailKeySet),
+        terminalCount = thumbnailStore.terminalCount(thumbnailKeySet),
+        elapsedMillis = preloadElapsedMillis,
+    )
+    val showThumbnailLoading = shouldShowSceneThumbnailLoading(
+        policy = preloadPolicy,
+        status = preloadStatus,
+    )
+    val shouldPauseThumbnailCapture = isMainListScrollInProgress || blocksMainScreenInput
+    val currentCaptureEntry = currentCaptureKey?.sceneId?.let(scenesById::get)
+    val currentCaptureRequest = currentCaptureKey
+        ?.takeUnless { shouldPauseThumbnailCapture }
+        ?.let { key ->
+            currentCaptureEntry?.let { entry ->
+                SceneThumbnailCaptureRequest(
+                    key = key,
+                    sceneEntry = entry,
+                )
+            }
+        }
+    val thumbnailStatesBySceneId = thumbnailStore.statesBySceneId()
 
     fun openScene(sceneId: String) {
         state = reduceComposiumHostScreen(
@@ -101,6 +167,92 @@ internal fun ComposiumHostScreen(
             state = state,
             intent = ComposiumHostScreenIntent.AvailableScenesChanged(sceneIds.toSet()),
         )
+    }
+
+    LaunchedEffect(thumbnailKeys) {
+        preloadElapsedMillis = 0L
+        thumbnailStore.retain(thumbnailKeySet)
+        thumbnailQueue.retain(thumbnailKeySet)
+        thumbnailRetryTracker.retain(thumbnailKeySet)
+        if (currentCaptureKey != null && currentCaptureKey !in thumbnailKeySet) {
+            currentCaptureKey = null
+        }
+        thumbnailKeys.forEach { key ->
+            if (thumbnailStore.needsCapture(key)) {
+                thumbnailStore.putPending(key)
+                thumbnailQueue.sync(listOf(key))
+            }
+        }
+
+        val startedAt = SystemClock.uptimeMillis()
+        while (isActive && preloadElapsedMillis < preloadPolicy.initialBudgetMillis) {
+            preloadElapsedMillis = SystemClock.uptimeMillis() - startedAt
+            delay(50)
+        }
+        preloadElapsedMillis = SystemClock.uptimeMillis() - startedAt
+    }
+
+    LaunchedEffect(visibleSceneIds, thumbnailKeys) {
+        val visibleSet = visibleSceneIds.toSet()
+        val visibleKeys = thumbnailKeys.filter { key ->
+            key.sceneId in visibleSet && thumbnailStore.needsCapture(key)
+        }
+        visibleKeys.forEach(thumbnailStore::putPending)
+        thumbnailQueue.prioritize(visibleKeys)
+    }
+
+    LaunchedEffect(shouldPauseThumbnailCapture, currentCaptureKey) {
+        val captureKey = currentCaptureKey
+        if (shouldPauseThumbnailCapture && captureKey != null) {
+            thumbnailStore.putPending(captureKey)
+            thumbnailQueue.prioritize(listOf(captureKey))
+            currentCaptureKey = null
+        }
+    }
+
+    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture) {
+        while (isActive) {
+            if (shouldPauseThumbnailCapture || currentCaptureKey != null) {
+                delay(50)
+                continue
+            }
+
+            var nextKey = thumbnailQueue.next()
+            while (nextKey != null && !thumbnailStore.needsCapture(nextKey)) {
+                nextKey = thumbnailQueue.next()
+            }
+
+            if (nextKey == null) {
+                delay(120)
+            } else {
+                thumbnailStore.putCapturing(nextKey)
+                currentCaptureKey = nextKey
+            }
+        }
+    }
+
+    LaunchedEffect(currentCaptureKey, currentCaptureEntry, thumbnailKeySet) {
+        val captureKey = currentCaptureKey ?: return@LaunchedEffect
+        if (currentCaptureEntry == null) {
+            when (
+                resolveSceneThumbnailUnavailableDecision(
+                    key = captureKey,
+                    currentKeys = thumbnailKeySet,
+                )
+            ) {
+                SceneThumbnailUnavailableDecision.Retry -> {
+                    thumbnailStore.putPending(captureKey)
+                    thumbnailQueue.sync(listOf(captureKey))
+                }
+
+                SceneThumbnailUnavailableDecision.Drop -> {
+                    thumbnailStore.remove(captureKey)
+                    thumbnailQueue.remove(captureKey)
+                    thumbnailRetryTracker.clear(captureKey)
+                }
+            }
+            currentCaptureKey = null
+        }
     }
 
     SideEffect {
@@ -131,21 +283,81 @@ internal fun ComposiumHostScreen(
             .fillMaxSize()
             .background(Tokens.colors.background),
     ) {
-        saveableStateHolder.SaveableStateProvider("route_main") {
-            MainScreen(
-                scenes = scenes,
-                onSceneSelected = ::openScene,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (mainScreenInsets != null) {
-                            Modifier.windowInsetsPadding(mainScreenInsets)
-                        } else {
-                            Modifier
-                        },
+        SceneThumbnailCaptureHost(
+            request = currentCaptureRequest,
+            onCaptured = { key, result ->
+                thumbnailRetryTracker.clear(key)
+                thumbnailStore.putReady(
+                    key = key,
+                    image = result.image,
+                    byteSizeBytes = result.byteSizeBytes,
+                    captureScale = result.captureScale,
+                )
+                if (currentCaptureKey == key) {
+                    currentCaptureKey = null
+                }
+            },
+            onFailed = { key, failure ->
+                val decision = thumbnailRetryTracker.recordFailure(key)
+                val attemptNumber = thumbnailRetryTracker.failureCountFor(key)
+                val sceneEntry = scenesById[key.sceneId]
+                Log.w(
+                    SceneThumbnailLogTag,
+                    buildSceneThumbnailFailureLogMessage(
+                        key = key,
+                        sceneName = sceneEntry?.scene?.name,
+                        sceneGroup = sceneEntry?.scene?.group,
+                        reason = failure.reason,
+                        attemptNumber = attemptNumber,
+                        maxAttemptCount = thumbnailRetryTracker.maxAttemptCount,
+                        decision = decision,
                     ),
-                contentWindowInsets = contentWindowInsets,
+                    failure.throwable,
+                )
+                when (decision) {
+                    SceneThumbnailFailureDecision.Retry -> {
+                        thumbnailStore.putPending(key)
+                        thumbnailQueue.prioritize(listOf(key))
+                    }
+
+                    SceneThumbnailFailureDecision.Fail -> {
+                        thumbnailStore.putFailed(key, failure.reason)
+                    }
+                }
+                if (currentCaptureKey == key) {
+                    currentCaptureKey = null
+                }
+            },
+        )
+
+        if (showThumbnailLoading) {
+            SceneThumbnailLoadingScreen(
+                readyCount = preloadStatus.readyCount,
+                totalCount = preloadStatus.totalCount,
+                modifier = Modifier.fillMaxSize(),
             )
+        } else {
+            saveableStateHolder.SaveableStateProvider("route_main") {
+                MainScreen(
+                    scenes = scenes,
+                    onSceneSelected = ::openScene,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (mainScreenInsets != null) {
+                                Modifier.windowInsetsPadding(mainScreenInsets)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    contentWindowInsets = contentWindowInsets,
+                    thumbnailStates = thumbnailStatesBySceneId,
+                    onVisibleSceneIdsChanged = { ids -> visibleSceneIds = ids },
+                    onListScrollInProgressChanged = { inProgress ->
+                        isMainListScrollInProgress = inProgress
+                    },
+                )
+            }
         }
 
         if (blocksMainScreenInput) {
@@ -199,6 +411,8 @@ internal fun ComposiumHostScreen(
 
 @OptIn(ExperimentalComposeUiApi::class)
 private fun Modifier.consumeAllPointerInput(): Modifier = pointerInteropFilter { true }
+
+private const val SceneThumbnailLogTag = "ComposiumThumbnail"
 
 @Composable
 private fun SystemBackHandler(

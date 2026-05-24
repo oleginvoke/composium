@@ -1,6 +1,7 @@
 package com.example.app
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -28,22 +29,22 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(
                     statusBarStyle = if (isDarkTheme) {
                         SystemBarStyle.dark(
-                            scrim = android.graphics.Color.TRANSPARENT,
+                            scrim = Color.TRANSPARENT,
                         )
                     } else {
                         SystemBarStyle.light(
-                            scrim = android.graphics.Color.TRANSPARENT,
-                            darkScrim = android.graphics.Color.TRANSPARENT,
+                            scrim = Color.TRANSPARENT,
+                            darkScrim = Color.TRANSPARENT,
                         )
                     },
                     navigationBarStyle = if (isDarkTheme) {
                         SystemBarStyle.dark(
-                            scrim = android.graphics.Color.TRANSPARENT,
+                            scrim = DarkNavigationBarColor,
                         )
                     } else {
                         SystemBarStyle.light(
-                            scrim = android.graphics.Color.TRANSPARENT,
-                            darkScrim = android.graphics.Color.TRANSPARENT,
+                            scrim = LightNavigationBarColor,
+                            darkScrim = LightNavigationBarColor,
                         )
                     },
                 )
@@ -66,3 +67,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private val LightNavigationBarColor = Color.WHITE
+private val DarkNavigationBarColor = Color.rgb(17, 25, 32)
