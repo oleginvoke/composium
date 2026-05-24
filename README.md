@@ -9,11 +9,11 @@ Composium lets you describe UI states as regular Compose scenes, browse them ins
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Current release: `1.1.0`
+Current release: `1.2.1`
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.1.0`
-- `io.github.oleginvoke:composium-processor:1.1.0`
+- `io.github.oleginvoke:composium:1.2.1`
+- `io.github.oleginvoke:composium-processor:1.2.1`
 
 It is useful for:
 - design systems and component libraries;
@@ -60,6 +60,9 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Flat scenes and unlimited nested groups via `group = "A/B/C"`
 - Automatic scene discovery with KSP
 - Optional manual registration without KSP
+- Automatic scene thumbnail generation for the main catalog
+- Custom scene thumbnails via the `thumbnail` parameter
+- Scene card badges via the `badge` parameter
 - Runtime controls for scene parameters
 - Automatic controls for `Boolean`, `String`, `enum`, and sealed object hierarchies
 - Nullable parameter support with explicit null-state toggle
@@ -97,8 +100,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.1.0")
-    ksp("io.github.oleginvoke:composium-processor:1.1.0")
+    implementation("io.github.oleginvoke:composium:1.2.1")
+    ksp("io.github.oleginvoke:composium-processor:1.2.1")
 }
 ```
 
@@ -108,7 +111,7 @@ Use this mode when you want automatic scene collection.
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.1.0")
+    implementation("io.github.oleginvoke:composium:1.2.1")
 }
 ```
 
