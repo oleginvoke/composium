@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 /**
  * Default configuration values for [ColorEyedropperHost].
  */
-object ColorEyedropperDefaults {
+internal object ColorEyedropperDefaults {
 
     /**
      * Formats displayed by the default floating island.
@@ -55,7 +55,7 @@ object ColorEyedropperDefaults {
  * Visual metrics used by the default eyedropper UI.
  */
 @Immutable
-data class ColorEyedropperMetrics(
+internal data class ColorEyedropperMetrics(
     val islandSpacing: Dp = 6.dp,
     val lensSpacing: Dp = 10.dp,
     val safePadding: Dp = 8.dp,
@@ -95,7 +95,7 @@ data class ColorEyedropperMetrics(
  * Color palette used by the default eyedropper UI.
  */
 @Immutable
-data class ColorEyedropperColors(
+internal data class ColorEyedropperColors(
     val islandContainer: Color = Color(0xF7FFFFFF),
     val islandContent: Color = Color(0xFF0E1820),
     val islandSecondaryContent: Color = Color(0xFF5A6874),

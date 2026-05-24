@@ -18,11 +18,34 @@ import androidx.compose.runtime.Composable
  * the top bar and navigation bar. The corresponding top and bottom padding is exposed through
  * [SceneScope.innerPadding], and the scene is responsible for applying it where it makes sense
  * for its own layout.
+ * @param thumbnail Optional lightweight content used only for catalog thumbnail capture.
+ * If `null`, the runtime captures [content].
+ * @param badge Optional content rendered over the catalog card thumbnail area. The runtime
+ * positions it in the top-end corner and does not constrain its size.
  * @param content Scene content rendered inside [SceneScope].
  */
 class Scene(
     val group: String?,
     val name: String,
     val enableEdgeToEdge: Boolean = false,
+    val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
+    val badge: (@Composable () -> Unit)? = null,
     val content: @Composable SceneScope.() -> Unit,
-)
+) {
+    constructor(
+        group: String?,
+        name: String,
+        enableEdgeToEdge: Boolean = false,
+        content: @Composable SceneScope.() -> Unit,
+    ) : this(
+        group = group,
+        name = name,
+        enableEdgeToEdge = enableEdgeToEdge,
+        thumbnail = null,
+        badge = null,
+        content = content,
+    )
+}
+
+internal fun Scene.thumbnailContent(): @Composable SceneScope.() -> Unit =
+    thumbnail ?: content

@@ -51,7 +51,7 @@ internal fun ComposiumThemeToggle(
         targetValue = if (isDark) {
             Tokens.colors.surfaceVariant
         } else {
-            Tokens.colors.surfaceVariant
+            Tokens.colors.surface
         },
         animationSpec = Motion.tweenStandard(),
         label = "theme_track_color",
@@ -60,7 +60,7 @@ internal fun ComposiumThemeToggle(
         targetValue = if (isDark) {
             Tokens.colors.primary.copy(alpha = 0.55f)
         } else {
-            Tokens.colors.outlineVariant
+            Tokens.colors.outlineVariant.copy(alpha = 0.82f)
         },
         animationSpec = Motion.tweenStandard(),
         label = "theme_border_color",

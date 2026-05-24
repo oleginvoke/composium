@@ -12,12 +12,16 @@ import kotlin.reflect.KProperty
  * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
  * preview area and receives the top/bottom insets through [SceneScope.innerPadding].
  * @param content Scene content.
+ * @param thumbnail Optional content used only for catalog thumbnail capture.
+ * @param badge Optional content rendered in the scene card thumbnail area.
  */
 class SceneDelegate(
     private val explicitGroup: String?,
     private val explicitName: String?,
     private val enableEdgeToEdge: Boolean,
     private val content: @Composable SceneScope.() -> Unit,
+    private val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
+    private val badge: (@Composable () -> Unit)? = null,
 ) {
     /**
      * Builds [Scene] from delegated property metadata.
@@ -34,6 +38,8 @@ class SceneDelegate(
             name = name,
             enableEdgeToEdge = enableEdgeToEdge,
             content = content,
+            thumbnail = thumbnail,
+            badge = badge,
         )
     }
 }
@@ -49,16 +55,22 @@ class SceneDelegate(
  * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
  * preview area and receives the top/bottom insets through [SceneScope.innerPadding], so the
  * scene can decide where to apply them.
+ * @param thumbnail Optional lightweight content used only for catalog thumbnail capture. If `null`, [content] is used.
+ * @param badge Optional content rendered in the top-end corner of the scene card thumbnail area.
  * @param content Scene content lambda.
  */
 fun scene(
     group: String? = null,
     name: String? = null,
     enableEdgeToEdge: Boolean = false,
+    thumbnail: (@Composable SceneScope.() -> Unit)? = null,
+    badge: (@Composable () -> Unit)? = null,
     content: @Composable SceneScope.() -> Unit,
 ): SceneDelegate = SceneDelegate(
     explicitGroup = group,
     explicitName = name,
     enableEdgeToEdge = enableEdgeToEdge,
     content = content,
+    thumbnail = thumbnail,
+    badge = badge,
 )
