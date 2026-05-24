@@ -183,4 +183,12 @@ class MainScreenHierarchyLayoutTest {
         assertEquals(15f, layout.horizontalPaddingDp)
         assertEquals(true, layout.clearButtonSizeDp < layout.heightDp)
     }
+
+    @Test
+    fun searchFieldLayoutUsesOpaqueSurfaceAndFullHeightInputTarget() {
+        val layout = mainScreenSearchFieldLayout()
+
+        assertEquals(1f, layout.containerAlpha)
+        assertEquals(layout.heightDp, layout.inputHitTargetHeightDp)
+    }
 }

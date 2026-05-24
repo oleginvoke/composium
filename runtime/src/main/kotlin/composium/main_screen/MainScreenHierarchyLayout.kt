@@ -39,6 +39,8 @@ internal data class MainScreenSearchFieldLayout(
     val heightDp: Float,
     val horizontalPaddingDp: Float,
     val clearButtonSizeDp: Float,
+    val containerAlpha: Float,
+    val inputHitTargetHeightDp: Float,
 )
 
 internal data class MainScreenListViewportLayout(
@@ -131,6 +133,8 @@ internal fun mainScreenSearchFieldLayout(): MainScreenSearchFieldLayout =
         heightDp = MainScreenSearchFieldHeightDp,
         horizontalPaddingDp = MainScreenSearchFieldHorizontalPaddingDp,
         clearButtonSizeDp = MainScreenSearchFieldClearButtonSizeDp,
+        containerAlpha = MainScreenSearchFieldContainerAlpha,
+        inputHitTargetHeightDp = MainScreenSearchFieldHeightDp,
     )
 
 internal fun mainScreenListViewportLayout(
@@ -186,3 +190,4 @@ private const val MainScreenGroupHeaderNestedVerticalPaddingDp = 6f
 private const val MainScreenSearchFieldHeightDp = 40f
 private const val MainScreenSearchFieldHorizontalPaddingDp = 15f
 private const val MainScreenSearchFieldClearButtonSizeDp = 28f
+private const val MainScreenSearchFieldContainerAlpha = 1f

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -47,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -221,8 +222,12 @@ private fun MainScreenTopBar(
                     ?.let(Modifier::windowInsetsPadding)
                     ?: Modifier,
             )
-            .padding(horizontal = 18.dp)
-            .padding(top = 18.dp, bottom = MainScreenTopBarBottomPaddingDp.dp),
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 16.dp,
+                bottom = MainScreenTopBarBottomPaddingDp.dp,
+            ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -236,9 +241,9 @@ private fun MainScreenTopBar(
                 ComposiumText(
                     text = "Composium",
                     style = TextStyle(
-                        fontSize = 29.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
-                        lineHeight = 34.sp,
+                        lineHeight = 26.sp,
                     ),
                     color = Tokens.colors.onSurface,
                 )
@@ -249,7 +254,7 @@ private fun MainScreenTopBar(
             )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         SearchStoriesField(
             value = query,
@@ -314,7 +319,6 @@ private fun MainScreenContent(
             .fillMaxSize()
             .imePadding(),
         contentPadding = listContentPadding,
-        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         if (catalogStatus.totalCount > 0) {
             item("catalog_meta") {
@@ -546,7 +550,7 @@ private fun CatalogMetaRow(
         },
         style = Tokens.typography.labelSmall,
         color = Tokens.colors.onSurfaceVariant,
-        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
+        modifier = Modifier.padding(bottom = 6.dp),
     )
 }
 
@@ -652,8 +656,10 @@ private fun GroupHeaderRow(
             )
             .clickable(onClick = onToggled)
             .padding(
-                horizontal = layout.horizontalPaddingDp.dp,
-                vertical = layout.verticalPaddingDp.dp,
+                start = layout.horizontalPaddingDp.dp,
+                end = 16.dp,
+                top = layout.verticalPaddingDp.dp,
+                bottom = layout.verticalPaddingDp.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -891,6 +897,7 @@ private fun SearchStoriesField(
 ) {
     val layout = remember { mainScreenSearchFieldLayout() }
     val interactionSource = remember { MutableInteractionSource() }
+    val focusRequester = remember { FocusRequester() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -909,18 +916,17 @@ private fun SearchStoriesField(
         }
     }
 
-    val fillAlpha by animateFloatAsState(
-        targetValue = if (isFocused) 0.96f else 0.88f,
-        animationSpec = Motion.tweenStandard(),
-        label = "search_fill_alpha",
-    )
-
     Box(
         modifier = modifier
             .height(layout.heightDp.dp)
             .clip(Tokens.shapes.extraLarge)
-            .background(Tokens.colors.surface.copy(alpha = fillAlpha))
+            .background(Tokens.colors.surface.copy(alpha = layout.containerAlpha))
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { focusRequester.requestFocus() },
+            )
     ) {
         Row(
             modifier = Modifier
@@ -954,9 +960,13 @@ private fun SearchStoriesField(
                     fontWeight = Tokens.typography.titleMedium.fontWeight,
                     fontFamily = Tokens.typography.titleMedium.fontFamily,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(layout.inputHitTargetHeightDp.dp)
+                    .focusRequester(focusRequester),
                 decorationBox = { inner ->
                     Row(
+                        modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
