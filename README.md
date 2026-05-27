@@ -716,11 +716,6 @@ Use scenes as a fast sandbox for composing UI states that would be awkward to wi
 
 If you want to fix a bug, improve the API, or extend the library with new functionality, contributions are welcome.
 
-## Roadmap
-
-- [ ] dedicated tokens section for things like typography and colors;
-- [ ] color picker.
-
 ## Summary
 
 Composium is a runtime scene browser for Compose that aims to stay out of your way:
