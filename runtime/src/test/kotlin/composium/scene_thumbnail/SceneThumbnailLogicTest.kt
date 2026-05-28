@@ -367,12 +367,10 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
-    fun sceneCardLayoutUsesLargeVerticalPreviewHeights() {
+    fun sceneCardLayoutUsesSinglePreviewHeight() {
         val layout = sceneThumbnailCardLayout()
 
-        assertEquals(120f, layout.previewHeightDp)
-        assertEquals(96f, layout.compactPreviewHeightDp)
-        assertTrue(layout.previewHeightDp > layout.compactPreviewHeightDp)
+        assertEquals(86f, layout.previewHeightDp)
     }
 
     private fun fakeImageBitmap(): ImageBitmap = object : ImageBitmap {

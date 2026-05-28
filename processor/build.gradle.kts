@@ -37,7 +37,7 @@ mavenPublishing {
         version = providers.gradleProperty("VERSION_NAME").get(),
     )
 
-    publishToMavenCentral("CENTRAL_PORTAL")
+    publishToMavenCentral()
     if (!isLocalPublishOnly) {
         signAllPublications()
     }

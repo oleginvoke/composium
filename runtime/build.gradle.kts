@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.maven.publish)
 }
@@ -11,11 +10,14 @@ plugins {
 android {
     namespace = "oleginvoke.com.composium"
 
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
         consumerProguardFiles("consumer-rules.pro")
+        aarMetadata {
+            minCompileSdk = 36
+        }
     }
 
     buildFeatures {
@@ -27,12 +29,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlin {
-        compilerOptions {
-            apiVersion.set(KotlinVersion.KOTLIN_2_0)
-            jvmTarget.set(JvmTarget.JVM_11)
-            languageVersion.set(KotlinVersion.KOTLIN_2_0)
-        }
+}
+
+kotlin {
+    compilerOptions {
+        apiVersion.set(KotlinVersion.KOTLIN_2_0)
+        jvmTarget.set(JvmTarget.JVM_11)
+        languageVersion.set(KotlinVersion.KOTLIN_2_0)
     }
 }
 
@@ -50,7 +53,7 @@ mavenPublishing {
         version = providers.gradleProperty("VERSION_NAME").get(),
     )
 
-    publishToMavenCentral("CENTRAL_PORTAL")
+    publishToMavenCentral()
     if (!isLocalPublishOnly) {
         signAllPublications()
     }
@@ -102,5 +105,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
 }
