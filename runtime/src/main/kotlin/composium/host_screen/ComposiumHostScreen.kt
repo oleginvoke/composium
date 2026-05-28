@@ -2,7 +2,6 @@ package oleginvoke.com.composium.host_screen
 
 import android.content.Context
 import android.content.ContextWrapper
-import android.os.SystemClock
 import android.util.Log
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -31,7 +30,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -52,16 +50,11 @@ import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailCaptureRequest
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailFailureDecision
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailFailureRetryTracker
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailKey
-import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailLoadingScreen
-import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailPreloadPolicy
-import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailPreloadStatus
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailQueue
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailStore
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailUnavailableDecision
 import oleginvoke.com.composium.scene_thumbnail.buildSceneThumbnailFailureLogMessage
 import oleginvoke.com.composium.scene_thumbnail.resolveSceneThumbnailUnavailableDecision
-import oleginvoke.com.composium.scene_thumbnail.sceneThumbnailInitialReadyCount
-import oleginvoke.com.composium.scene_thumbnail.shouldShowSceneThumbnailLoading
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Tokens
 
@@ -100,7 +93,6 @@ internal fun ComposiumHostScreen(
     var visibleSceneIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var isMainListScrollInProgress by remember { mutableStateOf(false) }
     var currentCaptureKey by remember { mutableStateOf<SceneThumbnailKey?>(null) }
-    var preloadElapsedMillis by remember { mutableLongStateOf(0L) }
 
     val renderedSceneId = state.renderedSceneId
     val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
@@ -114,21 +106,6 @@ internal fun ComposiumHostScreen(
         }
     }
     val thumbnailKeySet = remember(thumbnailKeys) { thumbnailKeys.toSet() }
-    val preloadPolicy = remember(thumbnailKeys.size) {
-        SceneThumbnailPreloadPolicy(
-            initialReadyCount = sceneThumbnailInitialReadyCount(thumbnailKeys.size),
-        )
-    }
-    val preloadStatus = SceneThumbnailPreloadStatus(
-        totalCount = thumbnailKeys.size,
-        readyCount = thumbnailStore.readyCount(thumbnailKeySet),
-        terminalCount = thumbnailStore.terminalCount(thumbnailKeySet),
-        elapsedMillis = preloadElapsedMillis,
-    )
-    val showThumbnailLoading = shouldShowSceneThumbnailLoading(
-        policy = preloadPolicy,
-        status = preloadStatus,
-    )
     val shouldPauseThumbnailCapture = isMainListScrollInProgress || blocksMainScreenInput
     val currentCaptureEntry = currentCaptureKey?.sceneId?.let(scenesById::get)
     val currentCaptureRequest = currentCaptureKey
@@ -170,7 +147,6 @@ internal fun ComposiumHostScreen(
     }
 
     LaunchedEffect(thumbnailKeys) {
-        preloadElapsedMillis = 0L
         thumbnailStore.retain(thumbnailKeySet)
         thumbnailQueue.retain(thumbnailKeySet)
         thumbnailRetryTracker.retain(thumbnailKeySet)
@@ -183,13 +159,6 @@ internal fun ComposiumHostScreen(
                 thumbnailQueue.sync(listOf(key))
             }
         }
-
-        val startedAt = SystemClock.uptimeMillis()
-        while (isActive && preloadElapsedMillis < preloadPolicy.initialBudgetMillis) {
-            preloadElapsedMillis = SystemClock.uptimeMillis() - startedAt
-            delay(50)
-        }
-        preloadElapsedMillis = SystemClock.uptimeMillis() - startedAt
     }
 
     LaunchedEffect(visibleSceneIds, thumbnailKeys) {
@@ -330,34 +299,26 @@ internal fun ComposiumHostScreen(
             },
         )
 
-        if (showThumbnailLoading) {
-            SceneThumbnailLoadingScreen(
-                readyCount = preloadStatus.readyCount,
-                totalCount = preloadStatus.totalCount,
-                modifier = Modifier.fillMaxSize(),
+        saveableStateHolder.SaveableStateProvider("route_main") {
+            MainScreen(
+                scenes = scenes,
+                onSceneSelected = ::openScene,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (mainScreenInsets != null) {
+                            Modifier.windowInsetsPadding(mainScreenInsets)
+                        } else {
+                            Modifier
+                        },
+                    ),
+                contentWindowInsets = contentWindowInsets,
+                thumbnailStates = thumbnailStatesBySceneId,
+                onVisibleSceneIdsChanged = { ids -> visibleSceneIds = ids },
+                onListScrollInProgressChanged = { inProgress ->
+                    isMainListScrollInProgress = inProgress
+                },
             )
-        } else {
-            saveableStateHolder.SaveableStateProvider("route_main") {
-                MainScreen(
-                    scenes = scenes,
-                    onSceneSelected = ::openScene,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(
-                            if (mainScreenInsets != null) {
-                                Modifier.windowInsetsPadding(mainScreenInsets)
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    contentWindowInsets = contentWindowInsets,
-                    thumbnailStates = thumbnailStatesBySceneId,
-                    onVisibleSceneIdsChanged = { ids -> visibleSceneIds = ids },
-                    onListScrollInProgressChanged = { inProgress ->
-                        isMainListScrollInProgress = inProgress
-                    },
-                )
-            }
         }
 
         if (blocksMainScreenInput) {

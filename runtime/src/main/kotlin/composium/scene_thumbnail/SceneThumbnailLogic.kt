@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import kotlin.math.roundToInt
 
-internal const val DefaultSceneThumbnailInitialBudgetMillis: Long = 2_000L
 internal val DefaultSceneThumbnailCaptureTimeoutMillis: Long? = null
 internal const val DefaultSceneThumbnailMemoryBudgetBytes: Int = 48 * 1024 * 1024
 internal const val DefaultSceneThumbnailCaptureScale: Float = 3f
@@ -45,18 +44,6 @@ internal sealed interface SceneThumbnailState {
 internal data class SceneThumbnailCaptureFailure(
     val reason: String,
     val throwable: Throwable,
-)
-
-internal data class SceneThumbnailPreloadPolicy(
-    val initialBudgetMillis: Long = DefaultSceneThumbnailInitialBudgetMillis,
-    val initialReadyCount: Int,
-)
-
-internal data class SceneThumbnailPreloadStatus(
-    val totalCount: Int,
-    val readyCount: Int,
-    val terminalCount: Int,
-    val elapsedMillis: Long,
 )
 
 internal data class SceneThumbnailCaptureSurfaceState(
@@ -307,20 +294,6 @@ internal fun sceneThumbnailCardLayout(): SceneThumbnailCardLayout =
         previewHeightDp = 86f,
     )
 
-internal fun sceneThumbnailInitialReadyCount(sceneCount: Int): Int =
-    minOf(6, sceneCount.coerceAtLeast(0))
-
-internal fun shouldShowSceneThumbnailLoading(
-    policy: SceneThumbnailPreloadPolicy,
-    status: SceneThumbnailPreloadStatus,
-): Boolean {
-    if (status.totalCount <= 0) return false
-    if (status.terminalCount >= status.totalCount) return false
-    if (status.readyCount >= policy.initialReadyCount) return false
-    if (status.elapsedMillis >= policy.initialBudgetMillis) return false
-    return true
-}
-
 internal class SceneThumbnailQueue {
     private val pendingKeys = ArrayDeque<SceneThumbnailKey>()
     private val pendingSet = linkedSetOf<SceneThumbnailKey>()
@@ -444,23 +417,6 @@ internal class SceneThumbnailStore(
             remove(key)
         }
     }
-
-    fun terminalCount(keys: Set<SceneThumbnailKey>): Int =
-        keys.count { key ->
-            when (states[key]) {
-                is SceneThumbnailState.Ready,
-                is SceneThumbnailState.Failed,
-                -> true
-
-                SceneThumbnailState.Capturing,
-                SceneThumbnailState.Pending,
-                null,
-                -> false
-            }
-        }
-
-    fun readyCount(keys: Set<SceneThumbnailKey>): Int =
-        keys.count { key -> states[key] is SceneThumbnailState.Ready }
 
     private fun removeReadyMemory(key: SceneThumbnailKey) {
         val byteSize = readyRecency.remove(key) ?: return

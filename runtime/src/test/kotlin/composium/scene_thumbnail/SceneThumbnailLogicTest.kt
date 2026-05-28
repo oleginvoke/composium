@@ -43,65 +43,8 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
-    fun defaultPreloadPolicyGivesMoreTimeForInitialThumbnailLoading() {
-        val policy = SceneThumbnailPreloadPolicy(
-            initialReadyCount = 6,
-        )
-
-        assertEquals(2_000L, policy.initialBudgetMillis)
-    }
-
-    @Test
     fun defaultCapturePolicyDoesNotLimitIndividualSceneDuration() {
         assertNull(DefaultSceneThumbnailCaptureTimeoutMillis)
-    }
-
-    @Test
-    fun initialLoadingCompletesWhenMinimumReadyCountIsReached() {
-        val policy = SceneThumbnailPreloadPolicy(
-            initialBudgetMillis = 1_000,
-            initialReadyCount = 2,
-        )
-        val status = SceneThumbnailPreloadStatus(
-            totalCount = 5,
-            readyCount = 2,
-            terminalCount = 2,
-            elapsedMillis = 200,
-        )
-
-        assertFalse(shouldShowSceneThumbnailLoading(policy, status))
-    }
-
-    @Test
-    fun initialLoadingCompletesWhenBudgetExpires() {
-        val policy = SceneThumbnailPreloadPolicy(
-            initialBudgetMillis = 1_000,
-            initialReadyCount = 6,
-        )
-        val status = SceneThumbnailPreloadStatus(
-            totalCount = 50,
-            readyCount = 1,
-            terminalCount = 1,
-            elapsedMillis = 1_000,
-        )
-
-        assertFalse(shouldShowSceneThumbnailLoading(policy, status))
-    }
-
-    @Test
-    fun initialLoadingStaysVisibleUntilReadyCountOrBudget() {
-        val policy = SceneThumbnailPreloadPolicy(
-            initialBudgetMillis = 1_000,
-            initialReadyCount = 6,
-        )
-        val status = SceneThumbnailPreloadStatus(
-            totalCount = 50,
-            readyCount = 1,
-            terminalCount = 1,
-            elapsedMillis = 999,
-        )
-
-        assertTrue(shouldShowSceneThumbnailLoading(policy, status))
     }
 
     @Test
