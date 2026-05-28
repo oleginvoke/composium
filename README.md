@@ -24,13 +24,10 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/223bb915-500e-40b2-9ef4-2b109c3271c4">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/5de8225d-56fb-4f6e-8816-4c5c24db622c">
+    <img src="https://github.com/user-attachments/assets/5354a184-03e2-4656-a548-9363a1be5539">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/bd0e498c-6fd2-4221-a103-00d23572b0a0">
-</p>
-<p align="center">
-    <img src="https://github.com/user-attachments/assets/921d2a38-517c-4557-a5b0-73ff82662875">
+    <img src="https://github.com/user-attachments/assets/d246e248-bda4-461a-9f2e-1dccd84633a2">
 </p>
 <p align="center">
     <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
