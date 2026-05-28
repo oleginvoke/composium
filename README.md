@@ -73,13 +73,16 @@ The library is meant to help you explore UI, not constrain how you structure it.
 ## Requirements
 
 - Android `minSdk 24`
+- Consumer project `compileSdk 36`
 - JVM target `11`
 - Kotlin `2.0+`
 - `mavenCentral()` and `google()` in your consumer project
 
-If you use KSP, use a KSP plugin version that matches your Kotlin version.
+If you use KSP, use a KSP plugin version that matches your Kotlin version. The library is tested with Kotlin `2.3.21` and KSP `2.3.9`.
 
 ## Installation
+
+Set your app or host module to `compileSdk 36` before adding Composium.
 
 Add repositories:
 

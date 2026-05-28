@@ -7,12 +7,11 @@ val enableMacrobenchmark = providers
 
 plugins {
     alias(libs.plugins.android.test)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "com.example.app.macrobenchmark"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 23

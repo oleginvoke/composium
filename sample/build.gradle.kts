@@ -2,19 +2,18 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.example.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.ComposiumSample"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -67,5 +66,5 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     debugImplementation(libs.androidx.ui.tooling)
     ksp(project(":processor"))
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
 }

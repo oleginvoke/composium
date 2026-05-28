@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -145,25 +147,43 @@ internal fun ComposiumSceneCard(
     }
 }
 
+internal enum class SceneThumbnailPreviewPresentation {
+    Ready,
+    StaticPlaceholder,
+}
+
+internal fun sceneThumbnailPreviewPresentation(
+    state: SceneThumbnailState?,
+): SceneThumbnailPreviewPresentation =
+    when (state) {
+        is SceneThumbnailState.Ready -> SceneThumbnailPreviewPresentation.Ready
+        is SceneThumbnailState.Failed,
+        SceneThumbnailState.Capturing,
+        SceneThumbnailState.Pending,
+        null,
+        -> SceneThumbnailPreviewPresentation.StaticPlaceholder
+    }
+
 @Composable
 private fun SceneThumbnailPreview(
     state: SceneThumbnailState?,
     horizontalAlignment: SceneThumbnailPreviewHorizontalAlignment,
     modifier: Modifier = Modifier,
 ) {
-    when (state) {
-        is SceneThumbnailState.Ready -> {
+    when (sceneThumbnailPreviewPresentation(state)) {
+        SceneThumbnailPreviewPresentation.Ready -> {
+            val readyState = state as SceneThumbnailState.Ready
             BoxWithConstraints(
                 modifier = modifier,
                 contentAlignment = horizontalAlignment.toComposeAlignment(),
             ) {
                 val maxPreviewHeight = SceneThumbnailPreviewMaxHeight
                 val previewSize = calculateSceneThumbnailReadyPreviewSize(
-                    imageWidthPx = state.image.width,
-                    imageHeightPx = state.image.height,
+                    imageWidthPx = readyState.image.width,
+                    imageHeightPx = readyState.image.height,
                     maxWidthDp = maxWidth.value,
                     maxHeightDp = minOf(maxHeight.value, maxPreviewHeight.value),
-                    captureScale = state.captureScale,
+                    captureScale = readyState.captureScale,
                 )
                 Box(
                     modifier = Modifier
@@ -174,7 +194,7 @@ private fun SceneThumbnailPreview(
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
-                        bitmap = state.image,
+                        bitmap = readyState.image,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),
@@ -183,21 +203,8 @@ private fun SceneThumbnailPreview(
             }
         }
 
-        is SceneThumbnailState.Failed -> {
-            SceneThumbnailPlaceholder(
-                text = "Preview unavailable",
-                detail = state.reason,
-                horizontalAlignment = horizontalAlignment,
-                modifier = modifier,
-            )
-        }
-
-        SceneThumbnailState.Capturing,
-        SceneThumbnailState.Pending,
-        null,
-        -> {
-            SceneThumbnailPlaceholder(
-                text = "Preparing preview",
+        SceneThumbnailPreviewPresentation.StaticPlaceholder -> {
+            SceneThumbnailStaticPlaceholder(
                 horizontalAlignment = horizontalAlignment,
                 modifier = modifier,
             )
@@ -206,40 +213,21 @@ private fun SceneThumbnailPreview(
 }
 
 @Composable
-private fun SceneThumbnailPlaceholder(
-    text: String,
-    detail: String? = null,
+private fun SceneThumbnailStaticPlaceholder(
     horizontalAlignment: SceneThumbnailPreviewHorizontalAlignment,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
-            .fillMaxSize(),
-        contentAlignment = horizontalAlignment.toComposeAlignment(),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp),
-            horizontalAlignment = horizontalAlignment.toComposeHorizontalAlignment(),
-        ) {
-            ComposiumText(
-                text = text,
-                style = Tokens.typography.labelSmall,
-                color = Tokens.colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!detail.isNullOrBlank()) {
-                Spacer(Modifier.height(3.dp))
-                ComposiumText(
-                    text = detail,
-                    style = Tokens.typography.labelSmall,
-                    color = Tokens.colors.onSurfaceVariant.copy(alpha = 0.72f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
+            .fillMaxSize()
+            .drawStaticThumbnailPlaceholder(
+                horizontalAlignment = horizontalAlignment,
+                containerColor = Tokens.colors.surface.copy(alpha = 0.38f),
+                primaryShapeColor = Tokens.colors.onSurfaceVariant.copy(alpha = 0.10f),
+                secondaryShapeColor = Tokens.colors.onSurfaceVariant.copy(alpha = 0.07f),
+                accentShapeColor = Tokens.colors.primary.copy(alpha = 0.10f),
+            ),
+    )
 }
 
 private val SceneThumbnailPreviewMaxHeight = 124.dp
@@ -257,16 +245,59 @@ private fun Modifier.drawThumbnailBottomBorder(color: Color): Modifier =
         )
     }
 
+private fun Modifier.drawStaticThumbnailPlaceholder(
+    horizontalAlignment: SceneThumbnailPreviewHorizontalAlignment,
+    containerColor: Color,
+    primaryShapeColor: Color,
+    secondaryShapeColor: Color,
+    accentShapeColor: Color,
+): Modifier =
+    drawBehind {
+        val containerWidth = minOf(size.width * 0.62f, 168.dp.toPx())
+            .coerceAtLeast(minOf(size.width, 72.dp.toPx()))
+        val containerHeight = minOf(size.height * 0.62f, 58.dp.toPx())
+            .coerceAtLeast(minOf(size.height, 34.dp.toPx()))
+        val left = when (horizontalAlignment) {
+            SceneThumbnailPreviewHorizontalAlignment.Start -> 0f
+            SceneThumbnailPreviewHorizontalAlignment.Center -> (size.width - containerWidth) / 2f
+        }.coerceAtLeast(0f)
+        val top = ((size.height - containerHeight) / 2f).coerceAtLeast(0f)
+        val radius = 9.dp.toPx()
+        val smallRadius = 4.dp.toPx()
+        val inset = 10.dp.toPx().coerceAtMost(containerWidth * 0.14f)
+        val lineHeight = 6.dp.toPx().coerceAtMost(containerHeight * 0.16f)
+        val chipSize = 17.dp.toPx().coerceAtMost(containerHeight * 0.34f)
+
+        drawRoundRect(
+            color = containerColor,
+            topLeft = Offset(left, top),
+            size = Size(containerWidth, containerHeight),
+            cornerRadius = CornerRadius(radius, radius),
+        )
+        drawRoundRect(
+            color = primaryShapeColor,
+            topLeft = Offset(left + inset, top + inset),
+            size = Size(containerWidth * 0.42f, lineHeight),
+            cornerRadius = CornerRadius(smallRadius, smallRadius),
+        )
+        drawRoundRect(
+            color = accentShapeColor,
+            topLeft = Offset(left + containerWidth - inset - chipSize, top + inset),
+            size = Size(chipSize, chipSize),
+            cornerRadius = CornerRadius(chipSize / 2f, chipSize / 2f),
+        )
+        drawRoundRect(
+            color = secondaryShapeColor,
+            topLeft = Offset(left + inset, top + containerHeight - inset - lineHeight),
+            size = Size(containerWidth * 0.70f, lineHeight),
+            cornerRadius = CornerRadius(smallRadius, smallRadius),
+        )
+    }
+
 private fun SceneThumbnailPreviewHorizontalAlignment.toComposeAlignment(): Alignment =
     when (this) {
         SceneThumbnailPreviewHorizontalAlignment.Start -> Alignment.CenterStart
         SceneThumbnailPreviewHorizontalAlignment.Center -> Alignment.Center
-    }
-
-private fun SceneThumbnailPreviewHorizontalAlignment.toComposeHorizontalAlignment(): Alignment.Horizontal =
-    when (this) {
-        SceneThumbnailPreviewHorizontalAlignment.Start -> Alignment.Start
-        SceneThumbnailPreviewHorizontalAlignment.Center -> Alignment.CenterHorizontally
     }
 
 private fun formatSceneGroupPath(group: String): String =
