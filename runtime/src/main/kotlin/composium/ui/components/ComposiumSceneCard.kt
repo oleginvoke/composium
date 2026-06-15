@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +34,7 @@ import oleginvoke.com.composium.scene_thumbnail.calculateSceneThumbnailReadyPrev
 import oleginvoke.com.composium.scene_thumbnail.sceneThumbnailCardLayout
 import oleginvoke.com.composium.ui.theme.Tokens
 import oleginvoke.com.composium.ui.theme.pressScale
+import oleginvoke.com.composium.ui.theme.rememberMinPressedState
 
 @Composable
 internal fun ComposiumSceneCard(
@@ -47,7 +46,10 @@ internal fun ComposiumSceneCard(
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
+    val pressed = rememberMinPressedState(
+        interactionSource = interactionSource,
+        minPressedStateMillis = SceneCardMinPressedStateMillis,
+    )
     val layout = remember { sceneThumbnailCardLayout() }
     val previewHeight = layout.previewHeightDp.dp
     val previewPadding = SceneThumbnailPreviewPadding
@@ -55,7 +57,7 @@ internal fun ComposiumSceneCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .pressScale(interactionSource)
+            .pressScale(pressed = pressed)
             .shadow(
                 elevation = if (pressed) 3.dp else 1.dp,
                 shape = Tokens.shapes.medium,
@@ -232,6 +234,7 @@ private fun SceneThumbnailStaticPlaceholder(
 
 private val SceneThumbnailPreviewMaxHeight = 124.dp
 private val SceneThumbnailPreviewPadding = 7.dp
+private const val SceneCardMinPressedStateMillis = 140
 
 private fun Modifier.drawThumbnailBottomBorder(color: Color): Modifier =
     drawBehind {
