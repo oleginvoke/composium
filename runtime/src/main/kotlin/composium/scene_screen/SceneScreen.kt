@@ -346,7 +346,6 @@ private fun SceneScreenTopBar(
             ExpandedTopBarRow(
                 sceneEntry = sceneEntry,
                 selectedTab = controlsSheet.selectedTab,
-                isEyedropperVisible = isEyedropperVisible,
                 callbacks = callbacks,
                 interactive = crossfadeState.expandedInteractive,
                 modifier = Modifier
@@ -391,13 +390,15 @@ private fun SplitTopBarRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
         ) {
-            SceneTopBarActionButton(
-                imageVector = Icons.Outlined.Colorize,
-                contentDescription = eyedropperButtonState.contentDescription,
-                onClick = callbacks::onToggleEyedropper,
-                active = eyedropperButtonState.active,
-                enabled = interactive,
-            )
+            if (controlsLayout != SceneInspectorLayoutMode.Expanded) {
+                SceneTopBarActionButton(
+                    imageVector = Icons.Outlined.Colorize,
+                    contentDescription = eyedropperButtonState.contentDescription,
+                    onClick = callbacks::onToggleEyedropper,
+                    active = eyedropperButtonState.active,
+                    enabled = interactive,
+                )
+            }
             SceneTopBarActionButton(
                 imageVector = settingsButtonState.icon.imageVector(),
                 contentDescription = settingsButtonState.contentDescription,
@@ -418,13 +419,10 @@ private fun SplitTopBarRow(
 private fun ExpandedTopBarRow(
     sceneEntry: SceneEntry,
     selectedTab: SceneInspectorTab,
-    isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
     interactive: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
-
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
@@ -440,13 +438,6 @@ private fun ExpandedTopBarRow(
             sceneEntry = sceneEntry,
             selectedTab = selectedTab,
             modifier = Modifier.weight(1f),
-        )
-        SceneTopBarActionButton(
-            imageVector = Icons.Outlined.Colorize,
-            contentDescription = eyedropperButtonState.contentDescription,
-            onClick = callbacks::onToggleEyedropper,
-            active = eyedropperButtonState.active,
-            enabled = interactive,
         )
         SceneTopBarActionButton(
             imageVector = Icons.Filled.Close,

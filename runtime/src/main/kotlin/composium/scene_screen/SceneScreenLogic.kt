@@ -224,6 +224,7 @@ internal fun reduceSceneScreen(
                 state
             } else {
                 state.copy(
+                    isEyedropperVisible = false,
                     controlsSheet = state.controlsSheet.copy(
                         layoutMode = SceneInspectorLayoutMode.Expanded,
                     ),
@@ -290,6 +291,7 @@ internal fun reduceSceneScreen(
 
                     fraction >= SCENE_INSPECTOR_ARMED_FULL_FRACTION -> {
                         state.copy(
+                            isEyedropperVisible = false,
                             controlsSheet = state.controlsSheet.copy(
                                 layoutMode = SceneInspectorLayoutMode.Expanded,
                             ),
@@ -322,7 +324,11 @@ internal fun reduceSceneScreen(
         }
 
         SceneScreenIntent.ToggleEyedropper -> {
-            state.copy(isEyedropperVisible = !state.isEyedropperVisible)
+            if (state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) {
+                state
+            } else {
+                state.copy(isEyedropperVisible = !state.isEyedropperVisible)
+            }
         }
 
         SceneScreenIntent.HideEyedropper -> {
