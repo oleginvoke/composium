@@ -92,7 +92,7 @@ internal data class ComposiumTypography(
         lineHeight = 16.sp,
     ),
     val labelSmall: TextStyle = TextStyle(
-        fontSize = 11.sp,
+        fontSize = 10.sp,
         fontWeight = FontWeight.Medium,
         letterSpacing = 0.03.em,
         lineHeight = 14.sp,

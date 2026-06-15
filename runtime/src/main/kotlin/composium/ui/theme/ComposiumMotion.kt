@@ -1,5 +1,6 @@
 package oleginvoke.com.composium.ui.theme
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.TweenSpec
@@ -9,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.delay
 import kotlin.math.min
 
 internal object Motion {
@@ -44,8 +47,28 @@ internal object Motion {
 internal fun Modifier.pressScale(
     interactionSource: MutableInteractionSource,
     pressedScale: Float = 0.985f,
+    minPressedStateMillis: Int = 0,
 ): Modifier = composed {
-    val pressed by interactionSource.collectIsPressedAsState()
+    val pressedForAnimation = rememberMinPressedState(
+        interactionSource = interactionSource,
+        minPressedStateMillis = minPressedStateMillis,
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (pressedForAnimation) pressedScale else 1f,
+        animationSpec = Motion.tweenFast(),
+        label = "press_scale",
+    )
+
+    graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+internal fun Modifier.pressScale(
+    pressed: Boolean,
+    pressedScale: Float = 0.985f,
+): Modifier = composed {
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = Motion.tweenFast(),
@@ -56,6 +79,44 @@ internal fun Modifier.pressScale(
         scaleX = scale
         scaleY = scale
     }
+}
+
+@Composable
+internal fun rememberMinPressedState(
+    interactionSource: MutableInteractionSource,
+    minPressedStateMillis: Int,
+): Boolean {
+    val pressed by interactionSource.collectIsPressedAsState()
+    var pressStartedAtMillis by remember { mutableStateOf(0L) }
+    var pressedForAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pressed, minPressedStateMillis) {
+        if (pressed) {
+            pressStartedAtMillis = SystemClock.uptimeMillis()
+            pressedForAnimation = true
+        } else {
+            val releaseDelayMillis = calculateMinPressedStateDelayMillis(
+                pressStartedAtMillis = pressStartedAtMillis,
+                releasedAtMillis = SystemClock.uptimeMillis(),
+                minPressedStateMillis = minPressedStateMillis,
+            )
+            if (releaseDelayMillis > 0L) {
+                delay(releaseDelayMillis)
+            }
+            pressedForAnimation = false
+        }
+    }
+
+    return pressedForAnimation
+}
+
+internal fun calculateMinPressedStateDelayMillis(
+    pressStartedAtMillis: Long,
+    releasedAtMillis: Long,
+    minPressedStateMillis: Int,
+): Long {
+    val elapsedMillis = (releasedAtMillis - pressStartedAtMillis).coerceAtLeast(0L)
+    return (minPressedStateMillis.toLong() - elapsedMillis).coerceAtLeast(0L)
 }
 
 internal fun Modifier.staggeredAppear(index: Int): Modifier = composed {

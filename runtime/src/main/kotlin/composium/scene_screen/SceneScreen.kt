@@ -103,6 +103,8 @@ import kotlin.math.roundToInt
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
 private val SceneEyedropperOverlayTopPadding = 108.dp
+private val SceneTopBarItemSize = 48.dp
+private val SceneTopBarItemSpacing = 4.dp
 
 private fun Float.sanitizedInspectorFraction(): Float =
     if (isNaN()) 0f else coerceIn(0f, 1f)
@@ -344,7 +346,6 @@ private fun SceneScreenTopBar(
             ExpandedTopBarRow(
                 sceneEntry = sceneEntry,
                 selectedTab = controlsSheet.selectedTab,
-                isEyedropperVisible = isEyedropperVisible,
                 callbacks = callbacks,
                 interactive = crossfadeState.expandedInteractive,
                 modifier = Modifier
@@ -373,7 +374,7 @@ private fun SplitTopBarRow(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
         SceneTopBarActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -387,15 +388,17 @@ private fun SplitTopBarRow(
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
         ) {
-            SceneTopBarActionButton(
-                imageVector = Icons.Outlined.Colorize,
-                contentDescription = eyedropperButtonState.contentDescription,
-                onClick = callbacks::onToggleEyedropper,
-                active = eyedropperButtonState.active,
-                enabled = interactive,
-            )
+            if (controlsLayout != SceneInspectorLayoutMode.Expanded) {
+                SceneTopBarActionButton(
+                    imageVector = Icons.Outlined.Colorize,
+                    contentDescription = eyedropperButtonState.contentDescription,
+                    onClick = callbacks::onToggleEyedropper,
+                    active = eyedropperButtonState.active,
+                    enabled = interactive,
+                )
+            }
             SceneTopBarActionButton(
                 imageVector = settingsButtonState.icon.imageVector(),
                 contentDescription = settingsButtonState.contentDescription,
@@ -416,17 +419,14 @@ private fun SplitTopBarRow(
 private fun ExpandedTopBarRow(
     sceneEntry: SceneEntry,
     selectedTab: SceneInspectorTab,
-    isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
     interactive: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
-
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
         SceneTopBarActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -438,13 +438,6 @@ private fun ExpandedTopBarRow(
             sceneEntry = sceneEntry,
             selectedTab = selectedTab,
             modifier = Modifier.weight(1f),
-        )
-        SceneTopBarActionButton(
-            imageVector = Icons.Outlined.Colorize,
-            contentDescription = eyedropperButtonState.contentDescription,
-            onClick = callbacks::onToggleEyedropper,
-            active = eyedropperButtonState.active,
-            enabled = interactive,
         )
         SceneTopBarActionButton(
             imageVector = Icons.Filled.Close,
@@ -465,6 +458,7 @@ private fun SceneSceneTitleIsland(
 
     Box(
         modifier = modifier
+            .height(SceneTopBarItemSize)
             .clip(Tokens.shapes.extraLarge)
             .background(Tokens.colors.surface)
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
@@ -522,7 +516,7 @@ private fun SceneTitleIslandTextColumn(
             text = title,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            style = Tokens.typography.titleLarge,
+            style = Tokens.typography.titleMedium,
             color = titleColor,
         )
     }
@@ -549,6 +543,7 @@ private fun SceneExpandedControlsTitleIsland(
 
     Box(
         modifier = modifier
+            .height(SceneTopBarItemSize)
             .clip(Tokens.shapes.extraLarge)
             .background(Tokens.colors.surface)
             .border(1.dp, Tokens.colors.outlineVariant.copy(alpha = 0.8f), Tokens.shapes.extraLarge)
@@ -567,7 +562,7 @@ private fun SceneExpandedControlsTitleIsland(
                 text = tabLabel,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = Tokens.typography.titleLarge,
+                style = Tokens.typography.titleMedium,
                 color = Tokens.colors.onSurface,
             )
         }
@@ -753,13 +748,17 @@ private fun SceneTopBarActionButton(
 
     Box(
         modifier = modifier
-            .size(44.dp)
+            .size(SceneTopBarItemSize)
             .clip(Tokens.shapes.pill)
             .background(containerColor)
             .border(1.dp, borderColor, Tokens.shapes.pill),
         contentAlignment = Alignment.Center,
     ) {
-        ComposiumIconButton(onClick = onClick, enabled = enabled) {
+        ComposiumIconButton(
+            onClick = onClick,
+            enabled = enabled,
+            size = SceneTopBarItemSize,
+        ) {
             AnimatedContent(
                 targetState = imageVector,
                 transitionSpec = {
