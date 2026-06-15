@@ -626,6 +626,7 @@ private fun GroupHeaderRow(
         animationSpec = Motion.springSnappy(),
         label = "group_chevron",
     )
+    val interactionSource = remember { MutableInteractionSource() }
     val layout = remember(depth) { mainScreenGroupHeaderLayout(depth) }
 
     Row(
@@ -654,7 +655,11 @@ private fun GroupHeaderRow(
                 },
                 shape = Tokens.shapes.medium,
             )
-            .clickable(onClick = onToggled)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onToggled,
+            )
             .padding(
                 start = layout.horizontalPaddingDp.dp,
                 end = 16.dp,
