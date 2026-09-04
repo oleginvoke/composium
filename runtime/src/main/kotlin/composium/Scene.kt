@@ -1,23 +1,15 @@
 package oleginvoke.com.composium
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 
 /**
  * Composium scene definition.
  *
  * @param group Optional group path for scene categorization. `null` or blank means top-level scene.
  * @param name Scene display name.
- * @param enableEdgeToEdge Controls how Composium handles top-bar and system navigation-bar
- * insets for this scene.
- *
- * When `false` (default), Composium keeps the scene content below its top bar and above the
- * navigation bar. [SceneScope.innerPadding] is reported as zero because the runtime has already
- * applied the required spacing.
- *
- * When `true`, Composium lets the scene fill the whole preview area, including the area behind
- * the top bar and navigation bar. The corresponding top and bottom padding is exposed through
- * [SceneScope.innerPadding], and the scene is responsible for applying it where it makes sense
- * for its own layout.
+ * @param tools Selects how Composium presents scene tools.
  * @param thumbnail Optional lightweight content used only for catalog thumbnail capture.
  * If `null`, the runtime captures [content].
  * @param badge Optional content rendered over the catalog card thumbnail area. The runtime
@@ -27,20 +19,20 @@ import androidx.compose.runtime.Composable
 class Scene(
     val group: String?,
     val name: String,
-    val enableEdgeToEdge: Boolean = false,
+    val tools: SceneTools = SceneTools.TopBar,
     val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
     val badge: (@Composable () -> Unit)? = null,
-    val content: @Composable SceneScope.() -> Unit,
+    val content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
 ) {
     constructor(
         group: String?,
         name: String,
-        enableEdgeToEdge: Boolean = false,
-        content: @Composable SceneScope.() -> Unit,
+        tools: SceneTools = SceneTools.TopBar,
+        content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
     ) : this(
         group = group,
         name = name,
-        enableEdgeToEdge = enableEdgeToEdge,
+        tools = tools,
         thumbnail = null,
         badge = null,
         content = content,
@@ -48,4 +40,7 @@ class Scene(
 }
 
 internal fun Scene.thumbnailContent(): @Composable SceneScope.() -> Unit =
-    thumbnail ?: content
+    thumbnail ?: {
+        val scene = this@thumbnailContent
+        scene.content(this, PaddingValues(0.dp))
+    }

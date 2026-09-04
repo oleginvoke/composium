@@ -103,6 +103,7 @@ import kotlin.math.roundToInt
 private val SceneInspectorTabsHeight = 34.dp
 private val SceneInspectorTabsTopGap = 2.dp
 private val SceneEyedropperOverlayTopPadding = 108.dp
+private val SceneTopBarContentHeight = 72.dp
 private val SceneTopBarItemSize = 48.dp
 private val SceneTopBarItemSpacing = 4.dp
 
@@ -593,28 +594,14 @@ private fun SceneScreenContent(
     val bottomInset = contentWindowInsets?.getBottom(density)?.let { inset ->
         with(density) { inset.toDp() }
     } ?: 0.dp
-    val contentTopPadding = topInset + 72.dp
-
-    // Tell the scene what insets the runtime is NOT applying for it.
-    // - enableEdgeToEdge = true  → runtime applies nothing; scene renders behind top bar /
-    //   nav bar and reads `innerPadding` to add the spacing it wants.
-    // - enableEdgeToEdge = false → runtime applies the same spacing itself, so the scene
-    //   sees PaddingValues(0) and just fills its visible area normally.
-    val sceneInnerPadding = if (sceneEntry.scene.enableEdgeToEdge) {
-        PaddingValues(
-            top = contentTopPadding,
-            bottom = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Closed) {
-                bottomInset
-            } else {
-                0.dp
-            },
-        )
-    } else {
-        androidx.compose.foundation.layout.PaddingValues(0.dp)
-    }
-    SideEffect {
-        sceneScope.internalInnerPadding = sceneInnerPadding
-    }
+    val contentTopPadding = topInset + SceneTopBarContentHeight
+    val sceneContentPadding = calculateSceneContentPadding(
+        tools = sceneEntry.scene.tools,
+        statusBarInset = topInset,
+        navigationBarInset = bottomInset,
+        topBarHeight = SceneTopBarContentHeight,
+        inspectorLayoutMode = controlsSheet.layoutMode,
+    )
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -638,10 +625,9 @@ private fun SceneScreenContent(
         label = "scene_split_boundary_shift",
     )
 
-    // BoxWithConstraints fills the full screen (no top padding). The preview pane's outer
-    // .layout decides the scene placement based on enableEdgeToEdge — either filling the
-    // pane edge-to-edge, or sitting inside the safe area below the top bar / above the nav
-    // bar. Inspector positioning is preserved by treating `availableHeightPx` as the
+    // BoxWithConstraints fills the full screen (no top padding). The preview pane fills the
+    // available area while the scene receives explicit content padding. Inspector positioning
+    // is preserved by treating `availableHeightPx` as the
     // safe-area height (= constraints.maxHeight − contentTopPaddingPx).
     BoxWithConstraints(
         modifier = modifier
@@ -663,11 +649,9 @@ private fun SceneScreenContent(
                 sceneScope = sceneScope,
                 availableHeightPx = availableHeightPx,
                 inspectorFractionProvider = inspectorFractionProvider,
-                layoutMode = controlsSheet.layoutMode,
                 splitBoundaryShift = splitBoundaryShift,
                 contentTopPadding = contentTopPadding,
-                bottomInset = bottomInset,
-                enableEdgeToEdge = sceneEntry.scene.enableEdgeToEdge,
+                sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
                 } else {
@@ -791,11 +775,9 @@ private fun ScenePreviewPane(
     sceneScope: SceneScope,
     availableHeightPx: Int,
     inspectorFractionProvider: () -> Float,
-    layoutMode: SceneInspectorLayoutMode,
     splitBoundaryShift: Dp,
     contentTopPadding: Dp,
-    bottomInset: Dp,
-    enableEdgeToEdge: Boolean,
+    sceneContentPadding: PaddingValues,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -803,15 +785,8 @@ private fun ScenePreviewPane(
 
     // The preview pane visually occupies [Y=0, Y=paneHeight] in its parent. The pane height
     // covers everything from the top of the screen down to either the inspector boundary
-    // (Split / Expanded) or the screen bottom (Closed). What changes between edge-to-edge
-    // and not is only the placement of the SCENE inside this pane:
-    //
-    //   - enableEdgeToEdge = true  → scene fills the entire pane, including behind the top
-    //     bar and (in Closed mode) behind the system nav bar. The scene receives both insets
-    //     via SceneScope.innerPadding so it can apply them where appropriate.
-    //   - enableEdgeToEdge = false → scene is offset down by contentTopPadding (so it sits
-    //     below the top bar) and (in Closed mode) shortened by bottomInset (so it sits above
-    //     the nav bar). SceneScope.innerPadding is reported as zero.
+    // (Split / Expanded) or the screen bottom (Closed). The scene always fills this pane and
+    // owns placement of its content through the explicit padding passed to it.
     //
     // Constraints passed to the scene are FULLY BOUNDED (minH = maxH = sceneHeight) so any
     // vertical scrollables inside the scene (LazyColumn / Modifier.verticalScroll) measure
@@ -825,9 +800,6 @@ private fun ScenePreviewPane(
                 val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
                 val shiftPx = splitBoundaryShift.toPx()
                 val topPaddingPx = contentTopPadding.toPx()
-                val applyBottomInset = !enableEdgeToEdge &&
-                    layoutMode == SceneInspectorLayoutMode.Closed
-                val bottomPaddingPx = if (applyBottomInset) bottomInset.toPx() else 0f
                 val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
 
                 val visibleAreaPx = (1f - fraction) * availableHeightPx + shiftPx
@@ -835,8 +807,8 @@ private fun ScenePreviewPane(
                     .roundToInt()
                     .coerceIn(1, ceiling)
 
-                val sceneTopPx = if (enableEdgeToEdge) 0 else topPaddingPx.roundToInt()
-                val sceneBottomPx = bottomPaddingPx.roundToInt()
+                val sceneTopPx = 0
+                val sceneBottomPx = 0
                 val sceneHeight = (paneHeight - sceneTopPx - sceneBottomPx).coerceAtLeast(0)
 
                 val placeable = measurable.measure(
@@ -872,6 +844,7 @@ private fun ScenePreviewPane(
         ScenePreviewContent(
             sceneEntry = sceneEntry,
             sceneScope = sceneScope,
+            contentPadding = sceneContentPadding,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -1373,6 +1346,7 @@ private fun SceneInspectorEmptyState(
 private fun ScenePreviewContent(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
+    contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val settings = sceneScope.preview
@@ -1400,7 +1374,7 @@ private fun ScenePreviewContent(
             propagateMinConstraints = true,
         ) {
             LocalScenePreviewContainer.current.Decoration {
-                sceneEntry.scene.content(sceneScope)
+                sceneEntry.scene.content(sceneScope, contentPadding)
             }
         }
     }

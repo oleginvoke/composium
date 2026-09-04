@@ -49,10 +49,11 @@ private fun benchmarkScene(
 ) = scene(
     group = group,
     name = "Benchmark $index",
-) {
+) { contentPadding ->
     BenchmarkSceneCard(
         title = "Benchmark scene $index",
         description = "Benchmark-only synthetic scene used to stress the catalog, search, and navigation benchmarks.",
+        modifier = Modifier.padding(contentPadding),
     )
 }
 
@@ -60,8 +61,9 @@ private fun benchmarkScene(
 private fun BenchmarkSceneCard(
     title: String,
     description: String,
+    modifier: Modifier = Modifier,
 ) {
-    ElevatedCard {
+    ElevatedCard(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

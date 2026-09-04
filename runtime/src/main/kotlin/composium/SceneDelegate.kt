@@ -1,5 +1,6 @@
 package oleginvoke.com.composium
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import kotlin.reflect.KProperty
 
@@ -8,9 +9,7 @@ import kotlin.reflect.KProperty
  *
  * @param explicitGroup Explicit scene group override.
  * @param explicitName Explicit scene name override.
- * @param enableEdgeToEdge Controls scene inset ownership. When `false` (default), Composium
- * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
- * preview area and receives the top/bottom insets through [SceneScope.innerPadding].
+ * @param tools Selects how Composium presents scene tools.
  * @param content Scene content.
  * @param thumbnail Optional content used only for catalog thumbnail capture.
  * @param badge Optional content rendered in the scene card thumbnail area.
@@ -18,8 +17,8 @@ import kotlin.reflect.KProperty
 class SceneDelegate(
     private val explicitGroup: String?,
     private val explicitName: String?,
-    private val enableEdgeToEdge: Boolean,
-    private val content: @Composable SceneScope.() -> Unit,
+    private val tools: SceneTools,
+    private val content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
     private val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
     private val badge: (@Composable () -> Unit)? = null,
 ) {
@@ -36,7 +35,7 @@ class SceneDelegate(
         return Scene(
             group = group,
             name = name,
-            enableEdgeToEdge = enableEdgeToEdge,
+            tools = tools,
             content = content,
             thumbnail = thumbnail,
             badge = badge,
@@ -51,10 +50,7 @@ class SceneDelegate(
  *
  * @param group Optional group path.
  * @param name Optional explicit scene name. If `null`, property name is used.
- * @param enableEdgeToEdge Controls scene inset ownership. When `false` (default), Composium
- * keeps content out of the top bar and navigation bar. When `true`, the scene fills the whole
- * preview area and receives the top/bottom insets through [SceneScope.innerPadding], so the
- * scene can decide where to apply them.
+ * @param tools Selects how Composium presents scene tools.
  * @param thumbnail Optional lightweight content used only for catalog thumbnail capture. If `null`, [content] is used.
  * @param badge Optional content rendered in the top-end corner of the scene card thumbnail area.
  * @param content Scene content lambda.
@@ -62,14 +58,14 @@ class SceneDelegate(
 fun scene(
     group: String? = null,
     name: String? = null,
-    enableEdgeToEdge: Boolean = false,
+    tools: SceneTools = SceneTools.TopBar,
     thumbnail: (@Composable SceneScope.() -> Unit)? = null,
     badge: (@Composable () -> Unit)? = null,
-    content: @Composable SceneScope.() -> Unit,
+    content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
 ): SceneDelegate = SceneDelegate(
     explicitGroup = group,
     explicitName = name,
-    enableEdgeToEdge = enableEdgeToEdge,
+    tools = tools,
     content = content,
     thumbnail = thumbnail,
     badge = badge,

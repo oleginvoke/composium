@@ -1,28 +1,30 @@
 package oleginvoke.com.composium
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
 class SceneThumbnailApiTest {
 
     @Test
     fun thumbnailContentFallsBackToSceneContentWhenThumbnailIsMissing() {
-        val content: @Composable SceneScope.() -> Unit = {}
+        val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
         val scene = Scene(
             group = null,
             name = "Fallback",
             content = content,
         )
 
-        assertSame(content, scene.thumbnailContent())
+        assertNotSame<Any>(content, scene.thumbnailContent())
     }
 
     @Test
     fun thumbnailContentUsesThumbnailWhenProvided() {
-        val content: @Composable SceneScope.() -> Unit = {}
+        val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
         val thumbnail: @Composable SceneScope.() -> Unit = {}
         val scene = Scene(
             group = null,
@@ -55,7 +57,7 @@ class SceneThumbnailApiTest {
 
     @Test
     fun sceneStoresBadgeSeparatelyFromThumbnailAndContent() {
-        val content: @Composable SceneScope.() -> Unit = {}
+        val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
         val thumbnail: @Composable SceneScope.() -> Unit = {}
         val badge: @Composable () -> Unit = {}
         val scene = Scene(
