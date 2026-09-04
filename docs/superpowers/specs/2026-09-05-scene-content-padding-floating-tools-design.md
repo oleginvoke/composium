@@ -10,7 +10,7 @@ Approved in conversation on 2026-09-05. This document defines the intended publi
 - Remove `enableEdgeToEdge`; edge-to-edge rendering should be determined by where scene content applies the supplied padding.
 - Preserve the existing top-bar experience as the default.
 - Add a per-scene floating-tools presentation for full-screen scenes.
-- Warn when a scene accidentally ignores `contentPadding` without requiring users to install a separate lint dependency.
+- Report an error when a scene ignores `contentPadding` without requiring users to install a separate lint dependency.
 
 ## Non-goals
 
@@ -147,19 +147,24 @@ The tab has an accessible touch target even if its visible capsule is smaller, p
 
 ## Lint Rule
 
-Add a custom lint issue named `UnusedComposiumContentPadding`, modeled after the Material `Scaffold` padding check.
+Add a custom lint issue named `UnusedComposiumContentPaddingParameter`, adapted from the existing `DesignContentPaddingDetector` in `F:\New-STG-design`.
 
-The check reports a warning when a `scene` content lambda receives an implicit or named padding argument but does not reference it. Forwarding the argument to another function counts as usage.
+The issue uses `Severity.ERROR`, matching the STG detector. The check reports an error when a `scene`, direct `Scene` construction, or scene-wrapper content lambda does not reference its implicit or named padding argument. Forwarding the argument to another function counts as usage.
 
-Intentional edge-to-edge code opts out explicitly with an underscore:
+An underscore is still considered unused and produces the error. Intentional full-bleed content must suppress the issue explicitly:
 
 ```kotlin
-val BackgroundScene by scene { _ ->
+@Suppress("UnusedComposiumContentPaddingParameter")
+val BackgroundScene by scene {
     FullScreenBackground()
 }
 ```
 
-Using `_` documents intent and does not produce the warning. The rule does not attempt to prove that padding was applied correctly; it only catches accidental omission.
+The rule does not attempt to prove that padding was applied correctly; it only enforces an explicit reference or an explicit suppression.
+
+Reuse the STG detector's UAST structure for locating the `content` lambda, resolving the actual lambda parameter, handling implicit `it`, rejecting same-named unrelated properties, and respecting nested-lambda shadowing. Composium host detection should use the `SceneScope.(PaddingValues) -> Unit` content signature so project-local scene wrappers are covered in addition to the public `scene` factory and direct `Scene` construction.
+
+Do not carry over the STG-specific exceptions for `TopSpacer`, `BottomSpacer`, `consumeParentScaffoldPadding`, nested `Scaffold` inheritance, or `ScaffoldSheet` hierarchy boundaries. Composium has no equivalent APIs, so only a real reference to the scene lambda's padding parameter counts as usage.
 
 The detector and its `IssueRegistry` live in a dedicated lint module with detector tests. The runtime module uses `lintPublish` so the lint JAR is packaged into the published AAR and automatically runs for consumers without another dependency. This is the supported AAR delivery mechanism for library-provided checks.
 
@@ -179,7 +184,7 @@ This is a source-breaking public API change.
 - Remove `enableEdgeToEdge = true` and apply `contentPadding` only where controls must avoid system or Composium UI.
 - Replace `innerPadding` reads with the new lambda argument.
 - Update project-local scene wrappers to accept and forward `PaddingValues`.
-- Existing scene lambdas that do not name their implicit argument may still compile, but lint warns until they apply the padding or declare `_ ->` explicitly.
+- Existing scene lambdas that do not name their implicit argument may still compile, but lint fails until they reference the padding or explicitly suppress `UnusedComposiumContentPaddingParameter`.
 - Direct `Scene` and `SceneDelegate` construction must migrate to the new `tools` metadata and content function type.
 
 README examples and the sample application are migrated as part of the same change.
@@ -189,6 +194,7 @@ README examples and the sample application are migrated as part of the same chan
 - Unit tests for padding calculation in `TopBar` and `Floating` modes, with closed and split inspectors.
 - Reducer tests for minimizing/restoring floating tools and preserving that state across inspector transitions.
 - UI tests for the four actions, minimized handle, accessibility descriptions, and expanded-inspector visibility.
-- Lint detector tests covering named use, forwarded use, accidental omission, implicit omission, and `_` opt-out.
+- Lint detector tests covering named use, implicit use, forwarded use, accidental named and implicit omission, `_` omission, explicit suppression, unrelated same-named properties, nested-lambda shadowing, same-named functions with the wrong signature, direct `Scene` construction, and project-local scene wrappers.
+- Detector tests proving that calls named `TopSpacer`, `BottomSpacer`, or `consumeParentScaffoldPadding` do not count as usage in Composium.
 - Compilation coverage for `scene`, direct `Scene`, wrappers, `RenderPreview`, thumbnails, and KSP-generated registration.
 - Runtime and processor test suites, sample compilation, and Android lint.
