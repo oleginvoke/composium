@@ -97,6 +97,13 @@ mavenPublishing {
     }
 }
 dependencies {
+    lintChecks(project(":lint")) {
+        isTransitive = false
+    }
+    lintPublish(project(":lint")) {
+        isTransitive = false
+    }
+
     implementation(platform(libs.compose.bom))
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
