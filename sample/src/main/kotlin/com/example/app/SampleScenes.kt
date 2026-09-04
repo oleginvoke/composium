@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -13,8 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
+import oleginvoke.com.composium.RenderPreview
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
@@ -59,6 +62,12 @@ internal val SampleButton by sceneWithDecorator(
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
     )
+}
+
+@Preview()
+@Composable
+private fun SampleButtonScenePreview() {
+    SampleButton.RenderPreview()
 }
 
 @ComposiumScene

@@ -587,6 +587,25 @@ val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
 }
 ```
 
+## Android Studio Previews
+
+A scene can be rendered from a regular Android Studio `@Preview` through the
+`RenderPreview` extension:
+
+```kotlin
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
+import oleginvoke.com.composium.RenderPreview
+
+@Preview(showBackground = true, widthDp = 420, heightDp = 720)
+@Composable
+private fun PrimaryButtonPreview() {
+    PrimaryButtonScene.RenderPreview()
+}
+```
+
+Every preview owns an independent scene scope and uses the scene's default parameter values.
+
 ## Custom Scene Wrappers
 
 If several scenes need the same preview chrome, create a small project-local helper around `scene(...)`.
