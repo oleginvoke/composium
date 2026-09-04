@@ -12,7 +12,6 @@ import com.android.tools.lint.detector.api.SourceCodeScanner
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiParameter
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
@@ -20,6 +19,7 @@ import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UParenthesizedExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReferenceExpression
+import org.jetbrains.uast.kotlin.psi.UastKotlinPsiParameterBase
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 
 class ComposiumContentPaddingDetector : Detector(), SourceCodeScanner {
@@ -57,18 +57,17 @@ class ComposiumContentPaddingDetector : Detector(), SourceCodeScanner {
         if (calledMethodName !in PublicHostNames) return false
         val qualifiedCall = (uastParent as? UQualifiedReferenceExpression)
             ?.takeIf { it.selector === this }
-        val source = (qualifiedCall?.sourcePsi?.text ?: sourcePsi?.text ?: asSourceString())
-            .trimStart()
-        if (
-            !source.startsWith(calledMethodName) &&
-            !source.startsWith("$ComposiumPackage.$calledMethodName")
-        ) return false
+        val callReceiver = qualifiedCall?.receiver ?: receiver
+        if (callReceiver != null) {
+            return (callReceiver.sourcePsi?.text ?: callReceiver.asSourceString()).trim() ==
+                ComposiumPackage
+        }
 
         val containingFile = (sourcePsi?.containingFile ?: context.psiFile) as? KtFile
         return containingFile?.packageFqName?.asString() == ComposiumPackage ||
             containingFile?.importDirectives.orEmpty().any {
                 it.importedFqName?.asString() == "$ComposiumPackage.$calledMethodName"
-            } || source.startsWith("$ComposiumPackage.$calledMethodName")
+            }
     }
 
     private fun UCallExpression.paddingHostName(method: PsiMethod?): String =
@@ -108,16 +107,19 @@ class ComposiumContentPaddingDetector : Detector(), SourceCodeScanner {
         return usesPadding
     }
 
-    private fun ULambdaExpression.contentPaddingParameter(): ContentPaddingParameter =
-        ContentPaddingParameter(
+    private fun ULambdaExpression.contentPaddingParameter(): ContentPaddingParameter {
+        val elements = valueParameters.flatMap {
+            listOfNotNull(it.sourcePsi, it.javaPsi).map { element -> element.parameterDeclaration() }
+        }.toSet()
+        return ContentPaddingParameter(
             names = valueParameters.mapNotNull { it.name }.toSet(),
-            elements = valueParameters.mapNotNullTo(mutableSetOf()) {
-                it.sourcePsi ?: it.javaPsi
-            },
-            textRanges = valueParameters.mapNotNullTo(mutableSetOf()) {
-                it.sourcePsi?.textRange ?: it.javaPsi?.textRange
-            },
+            elements = elements,
+            textRanges = elements.mapNotNullTo(mutableSetOf()) { it.textRange },
         )
+    }
+
+    private fun PsiElement.parameterDeclaration(): PsiElement =
+        (this as? UastKotlinPsiParameterBase<*>)?.ktOrigin ?: navigationElement
 
     private fun UReferenceExpression.isContentPaddingReference(
         parameter: ContentPaddingParameter,
@@ -129,10 +131,10 @@ class ComposiumContentPaddingDetector : Detector(), SourceCodeScanner {
         val isSimpleReference = (sourcePsi?.text ?: asSourceString()).trim() == referenceName
         val resolved = resolve()
         if (resolved != null) {
-            if (resolved in parameter.elements) return true
-            if (resolved.textRange in parameter.textRanges) return true
-            return resolved is PsiParameter && isSimpleReference &&
-                !isShadowedByNestedLambdaParameter(referenceName, contentLambda)
+            val declaration = resolved.parameterDeclaration()
+            return declaration in parameter.elements ||
+                (declaration.containingFile == contentLambda.sourcePsi?.containingFile &&
+                    declaration.textRange in parameter.textRanges)
         }
         return isSimpleReference &&
             !isShadowedByNestedLambdaParameter(referenceName, contentLambda)

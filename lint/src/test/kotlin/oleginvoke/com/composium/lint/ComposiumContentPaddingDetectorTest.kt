@@ -51,6 +51,35 @@ class ComposiumContentPaddingDetectorTest : LintDetectorTest() {
         check("scene { contentPadding -> consume(Holder().contentPadding) }").expectUnused()
     }
 
+    fun testLocalFunctionParameterShadow_reportsError() {
+        check("""
+            scene { padding ->
+                fun consumeLocal(padding: Int) { consume(padding) }
+                consumeLocal(1)
+            }
+        """.trimIndent()).expectUnused()
+    }
+
+    fun testLocalFunctionCapturesScenePadding_isClean() {
+        check("""
+            scene { padding ->
+                fun consumeLocal() { consume(padding) }
+                consumeLocal()
+            }
+        """.trimIndent()).expectClean()
+    }
+
+    fun testLocalClassMethodParameterShadow_reportsError() {
+        check("""
+            scene { padding ->
+                class Local {
+                    fun consumeLocal(padding: Int) { consume(padding) }
+                }
+                Local().consumeLocal(1)
+            }
+        """.trimIndent()).expectUnused()
+    }
+
     fun testSameNamedFunctionWithWrongSignature_isIgnored() {
         lint().files(
             kotlin("""
@@ -143,6 +172,14 @@ class ComposiumContentPaddingDetectorTest : LintDetectorTest() {
         checkUnresolved("""
             package example
             fun example() { scene { Unit } }
+        """).expectClean()
+    }
+
+    fun testUnresolvedScenePrefixedReceiver_isIgnored() {
+        checkUnresolved("""
+            package example
+            import oleginvoke.com.composium.scene
+            fun example() { sceneHolder.scene { Unit } }
         """).expectClean()
     }
 
