@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import oleginvoke.com.composium.SceneTools
 import kotlin.math.roundToInt
 
 internal const val DEFAULT_SCENE_INSPECTOR_SPLIT_FRACTION = 0.60f
@@ -189,11 +190,36 @@ internal fun calculateSceneInspectorContentClipOffset(
     }
 }
 
+internal fun shouldShowFloatingTools(
+    tools: SceneTools,
+    inspectorLayoutMode: SceneInspectorLayoutMode,
+): Boolean = tools == SceneTools.Floating &&
+    inspectorLayoutMode != SceneInspectorLayoutMode.Expanded
+
+internal fun floatingToolsToggleContentDescription(isMinimized: Boolean): String =
+    if (isMinimized) "Show tools" else "Minimize tools"
+
 internal fun reduceSceneScreen(
     state: SceneScreenState,
     intent: SceneScreenIntent,
 ): SceneScreenState {
     return when (intent) {
+        SceneScreenIntent.MinimizeFloatingTools -> {
+            if (state.isFloatingToolsMinimized) {
+                state
+            } else {
+                state.copy(isFloatingToolsMinimized = true)
+            }
+        }
+
+        SceneScreenIntent.ShowFloatingTools -> {
+            if (!state.isFloatingToolsMinimized) {
+                state
+            } else {
+                state.copy(isFloatingToolsMinimized = false)
+            }
+        }
+
         SceneScreenIntent.ShowControls -> {
             if (state.controlsSheet.layoutMode != SceneInspectorLayoutMode.Closed) {
                 state

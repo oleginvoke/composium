@@ -130,6 +130,14 @@ internal fun SceneScreen(
                 onBack.invoke()
             }
 
+            override fun onMinimizeFloatingTools() {
+                store.dispatch(SceneScreenIntent.MinimizeFloatingTools)
+            }
+
+            override fun onShowFloatingTools() {
+                store.dispatch(SceneScreenIntent.ShowFloatingTools)
+            }
+
             override fun onToggleControls() {
                 val intent = calculateSceneSettingsButtonClickIntent(store.state.controlsSheet.layoutMode)
                 intent?.let(store::dispatch)

@@ -32,6 +32,7 @@ internal data class ControlsSheetUiState(
 internal data class SceneScreenState(
     val controlsSheet: ControlsSheetUiState = ControlsSheetUiState(),
     val isEyedropperVisible: Boolean = false,
+    val isFloatingToolsMinimized: Boolean = false,
 )
 
 internal data class SceneScreenUiState(
@@ -43,6 +44,8 @@ internal data class SceneScreenUiState(
 )
 
 internal sealed interface SceneScreenIntent {
+    data object MinimizeFloatingTools : SceneScreenIntent
+    data object ShowFloatingTools : SceneScreenIntent
     data object ShowControls : SceneScreenIntent
     data object HideControls : SceneScreenIntent
     data object ExpandControls : SceneScreenIntent
@@ -58,6 +61,8 @@ internal sealed interface SceneScreenIntent {
 
 internal interface SceneScreenCallbacks {
     fun onBack()
+    fun onMinimizeFloatingTools()
+    fun onShowFloatingTools()
     fun onToggleControls()
     fun onDismissControls()
     fun onExpandControls()
