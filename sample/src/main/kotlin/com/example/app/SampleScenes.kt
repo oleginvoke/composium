@@ -1,9 +1,11 @@
 package com.example.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
@@ -21,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
 import oleginvoke.com.composium.RenderPreview
+import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
@@ -90,6 +93,7 @@ internal val testList by sceneWithDecorator(
 internal val tonalNestedPlayground by scene(
     group = "Buttons/Secondary/Tonal",
     name = "Nested playground",
+    tools = SceneTools.Floating,
 ) { contentPadding ->
     val title: String by param("Invite teammate")
     val enabled: Boolean by param(true)
@@ -100,14 +104,20 @@ internal val tonalNestedPlayground by scene(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
-        contentAlignment = Alignment.Center,
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        NestedButtonSceneContent(
-            title = title,
-            enabled = enabled,
-            size = size,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            NestedButtonSceneContent(
+                title = title,
+                enabled = enabled,
+                size = size,
+            )
+        }
     }
 }
 

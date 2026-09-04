@@ -25,6 +25,10 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -104,6 +108,9 @@ dependencies {
     // Previews live in the debug source-set.
     debugImplementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(kotlin("test-junit"))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
 }

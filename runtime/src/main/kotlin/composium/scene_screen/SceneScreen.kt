@@ -46,8 +46,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Colorize
-import androidx.compose.material.icons.outlined.CropFree
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -69,7 +67,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +84,7 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
 import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
 import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
@@ -292,15 +290,49 @@ internal fun SceneScreen(
             }
         }
 
-        SceneScreenTopBar(
-            sceneEntry = sceneEntry,
-            controlsSheet = state.controlsSheet,
-            isDarkTheme = themeController.isDarkTheme,
-            isEyedropperVisible = state.isEyedropperVisible,
-            callbacks = callbacks,
-            statusBarInsets = contentWindowInsets,
-            modifier = Modifier.align(Alignment.TopStart),
-        )
+        if (
+            sceneEntry.scene.tools == SceneTools.TopBar ||
+            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+        ) {
+            SceneScreenTopBar(
+                sceneEntry = sceneEntry,
+                controlsSheet = state.controlsSheet,
+                isDarkTheme = themeController.isDarkTheme,
+                isEyedropperVisible = state.isEyedropperVisible,
+                callbacks = callbacks,
+                statusBarInsets = contentWindowInsets,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        }
+
+        if (
+            shouldShowFloatingTools(
+                tools = sceneEntry.scene.tools,
+                inspectorLayoutMode = state.controlsSheet.layoutMode,
+            )
+        ) {
+            SceneFloatingTools(
+                controlsLayout = state.controlsSheet.layoutMode,
+                isMinimized = state.isFloatingToolsMinimized,
+                isDarkTheme = themeController.isDarkTheme,
+                isEyedropperVisible = state.isEyedropperVisible,
+                onBack = callbacks::onBack,
+                onToggleControls = callbacks::onToggleControls,
+                onToggleEyedropper = callbacks::onToggleEyedropper,
+                onThemeChange = callbacks::onThemeChange,
+                onMinimize = callbacks::onMinimizeFloatingTools,
+                onShow = callbacks::onShowFloatingTools,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .then(
+                        contentWindowInsets
+                            .onlyTopAndHorizontalOrNull()
+                            ?.let(Modifier::windowInsetsPadding)
+                            ?: Modifier,
+                    )
+                    .padding(top = 12.dp, end = 12.dp),
+            )
+        }
     }
 }
 
@@ -385,7 +417,7 @@ private fun SplitTopBarRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = if (isVisible) "Close settings" else "Back",
             onClick = if (isVisible) callbacks::onDismissControls else callbacks::onBack,
@@ -400,7 +432,7 @@ private fun SplitTopBarRow(
             horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
         ) {
             if (controlsLayout != SceneInspectorLayoutMode.Expanded) {
-                SceneTopBarActionButton(
+                SceneToolActionButton(
                     imageVector = Icons.Outlined.Colorize,
                     contentDescription = eyedropperButtonState.contentDescription,
                     onClick = callbacks::onToggleEyedropper,
@@ -408,7 +440,7 @@ private fun SplitTopBarRow(
                     enabled = interactive,
                 )
             }
-            SceneTopBarActionButton(
+            SceneToolActionButton(
                 imageVector = settingsButtonState.icon.imageVector(),
                 contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
@@ -437,7 +469,7 @@ private fun ExpandedTopBarRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "Back to split layout",
             onClick = callbacks::onNavigateBackFromExpandedControls,
@@ -448,7 +480,7 @@ private fun ExpandedTopBarRow(
             selectedTab = selectedTab,
             modifier = Modifier.weight(1f),
         )
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.Filled.Close,
             contentDescription = "Close settings",
             onClick = callbacks::onDismissControls,
@@ -699,81 +731,6 @@ private fun SceneScreenContent(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SceneTopBarActionButton(
-    imageVector: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    active: Boolean = false,
-    enabled: Boolean = true,
-) {
-    val containerColor by animateColorAsState(
-        // The light-theme primaryContainer token bakes in alpha 0.83 (0xD3B5D9E8). Override
-        // to fully opaque so the active settings button is solid like the other top bar
-        // elements rather than letting preview content bleed through.
-        targetValue = if (active) {
-            Tokens.colors.primaryContainer
-        } else {
-            Tokens.colors.surface
-        },
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_container",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (active) {
-            Color.Transparent
-        } else {
-            Tokens.colors.outlineVariant.copy(alpha = 0.8f)
-        },
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_border",
-    )
-    val tint by animateColorAsState(
-        targetValue = if (active) Tokens.colors.primary else Tokens.colors.onSurface,
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_tint",
-    )
-
-    Box(
-        modifier = modifier
-            .size(SceneTopBarItemSize)
-            .clip(Tokens.shapes.pill)
-            .background(containerColor)
-            .border(1.dp, borderColor, Tokens.shapes.pill),
-        contentAlignment = Alignment.Center,
-    ) {
-        ComposiumIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            size = SceneTopBarItemSize,
-        ) {
-            AnimatedContent(
-                targetState = imageVector,
-                transitionSpec = {
-                    fadeIn(animationSpec = Motion.tweenStandard()) togetherWith
-                        fadeOut(animationSpec = Motion.tweenStandard())
-                },
-                label = "scene_top_bar_button_icon",
-            ) { targetIcon ->
-                ComposiumIcon(
-                    imageVector = targetIcon,
-                    contentDescription = contentDescription,
-                    tint = tint,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-    }
-}
-
-private fun SceneSettingsButtonIcon.imageVector(): ImageVector {
-    return when (this) {
-        SceneSettingsButtonIcon.Settings -> Icons.Outlined.Tune
-        SceneSettingsButtonIcon.Expand -> Icons.Outlined.CropFree
     }
 }
 
