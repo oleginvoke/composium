@@ -183,7 +183,7 @@ This is a source-breaking public API change.
 - Remove `enableEdgeToEdge = false` and apply `contentPadding` to the scene root or relevant child.
 - Remove `enableEdgeToEdge = true` and apply `contentPadding` only where controls must avoid system or Composium UI.
 - Replace `innerPadding` reads with the new lambda argument.
-- Update project-local scene wrappers to accept and forward `PaddingValues`.
+- Update project-local scene wrappers either to consume `PaddingValues` as part of their own layout or to expose and forward `SceneScope.(PaddingValues) -> Unit`.
 - Existing scene lambdas that do not name their implicit argument may still compile, but lint fails until they reference the padding or explicitly suppress `UnusedComposiumContentPaddingParameter`.
 - Direct `Scene` and `SceneDelegate` construction must migrate to the new `tools` metadata and content function type.
 
