@@ -1,3 +1,4 @@
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,14 +26,20 @@ private fun ComposiumHostScreenPreview() {
     LaunchedEffect(Unit) {
         if (ComposiumRuntime.scenes.isEmpty()) {
             ComposiumRuntime.register(
-                Scene(group = "Preview", name = "Demo") {
-                    ComposiumText("Hello from ComposiumHostScreen preview")
+                Scene(group = "Preview", name = "Demo") { contentPadding ->
+                    ComposiumText(
+                        text = "Hello from ComposiumHostScreen preview",
+                        modifier = Modifier.padding(contentPadding),
+                    )
                 }
             )
             ComposiumRuntime.register(
-                Scene(group = "Preview", name = "With params") {
+                Scene(group = "Preview", name = "With params") { contentPadding ->
                     var enabled: Boolean by param(true, "Enabled")
-                    ComposiumText("Enabled = $enabled")
+                    ComposiumText(
+                        text = "Enabled = $enabled",
+                        modifier = Modifier.padding(contentPadding),
+                    )
                 }
             )
         }
