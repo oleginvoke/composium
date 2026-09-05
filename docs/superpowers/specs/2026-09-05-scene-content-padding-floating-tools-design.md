@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved in conversation on 2026-09-05. This document defines the intended public API and runtime behavior before implementation.
+Approved in conversation on 2026-09-05 and amended with draggable floating tools on 2026-09-05.
 
 ## Goals
 
@@ -14,7 +14,6 @@ Approved in conversation on 2026-09-05. This document defines the intended publi
 
 ## Non-goals
 
-- Draggable floating tools.
 - Persisting the minimized state across scene visits or process restarts.
 - Including the floating tools bounds in `contentPadding`.
 - A mode with no discoverable way to restore Composium tools.
@@ -107,9 +106,10 @@ The fallback from `thumbnail` to regular scene content is implemented as an invo
 
 ### Placement
 
-- Fixed at the physical top-right of the scene screen.
-- Positioned below the status-bar inset.
-- Uses approximately 12 dp top and right margins.
+- Starts at the physical top-right of the scene screen, below the status-bar inset.
+- Dragging the central eye moves the complete surface freely across the scene screen, including over the split inspector.
+- The complete 104 by 104 dp surface stays within all system insets and a 12 dp screen margin. Bounds remain based on the expanded surface while it is minimized, so restoring it cannot reveal clipped controls.
+- Positioning stays physical and does not mirror in RTL layouts.
 - Rendered outside the color-eyedropper capture host, like the current top bar, so Composium UI is not sampled as scene content.
 
 ### Expanded state
@@ -134,9 +134,11 @@ Activating the central eye hides the grid around it. Only the circular eye remai
 - The surface starts expanded each time a scene screen is entered.
 - The minimized state is local to that scene-screen instance.
 - It is not persisted when leaving and reopening the scene.
-- No drag gesture is implemented in this version.
+- The dragged position survives minimize/restore and inspector transitions, but resets on the next scene-screen entry.
+- Window-size and orientation changes clamp the current position into the new safe bounds.
+- There is no edge snapping, fling, or persisted position.
 
-The eye has a 48 by 48 dp accessible touch target around its smaller visible circle, plus `Hide tools` and `Show tools` content descriptions for its two states.
+The eye is a 40 by 40 dp visible and semantic control with `Hide tools` and `Show tools` content descriptions for its two states. Its hit box does not overlap the surrounding action cells; platform minimum-touch-target expansion may still apply in otherwise empty space. A tap toggles visibility, while movement beyond touch slop starts dragging without also toggling the tools.
 
 ### Inspector and eyedropper interaction
 
@@ -174,6 +176,7 @@ The detector and its `IssueRegistry` live in a dedicated lint module with detect
 
 - `SceneTools` is immutable scene metadata.
 - Floating minimized state belongs to `SceneScreenState` and changes through explicit intents in the existing reducer.
+- Floating position is transient scene-screen UI state. Placement and clamping are isolated as pure logic from the gesture host.
 - Padding calculation is a pure function of tools presentation, window insets, and inspector layout mode so it can be unit tested independently.
 - Floating tools rendering is a separate composable from the existing top bar; both consume the same callbacks and state-derived button models.
 - Existing scene parameter state, inspector state, theme controller, and eyedropper state remain the sources of truth.
@@ -195,7 +198,7 @@ README examples and the sample application are migrated as part of the same chan
 
 - Unit tests for padding calculation in `TopBar` and `Floating` modes, with closed and split inspectors.
 - Reducer tests for minimizing/restoring floating tools and preserving that state across inspector transitions.
-- UI tests for the four equal sections, central eye, hidden state, accessibility descriptions, and expanded-inspector visibility.
+- UI tests for the four equal sections, central eye, non-overlapping action hit areas, drag movement, safe-bound clamping, hidden state, accessibility descriptions, and expanded-inspector visibility.
 - Lint detector tests covering named use, implicit use, forwarded use, accidental named and implicit omission, `_` omission, explicit suppression, unrelated same-named properties, nested-lambda shadowing, same-named functions with the wrong signature, direct `Scene` construction, and project-local scene wrappers.
 - Detector tests proving that calls named `TopSpacer`, `BottomSpacer`, or `consumeParentScaffoldPadding` do not count as usage in Composium.
 - Compilation coverage for `scene`, direct `Scene`, wrappers, `RenderPreview`, thumbnails, and KSP-generated registration.

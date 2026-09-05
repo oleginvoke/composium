@@ -61,11 +61,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -121,6 +121,7 @@ internal fun SceneScreen(
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
     val store = rememberSceneScreenStore(sceneEntry.id)
     val state = store.state
+    val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
@@ -316,7 +317,7 @@ internal fun SceneScreen(
                 inspectorLayoutMode = state.controlsSheet.layoutMode,
             )
         ) {
-            SceneFloatingTools(
+            SceneFloatingToolsOverlay(
                 controlsLayout = state.controlsSheet.layoutMode,
                 isMinimized = state.isFloatingToolsMinimized,
                 isDarkTheme = themeController.isDarkTheme,
@@ -327,15 +328,9 @@ internal fun SceneScreen(
                 onThemeChange = callbacks::onThemeChange,
                 onMinimize = callbacks::onMinimizeFloatingTools,
                 onShow = callbacks::onShowFloatingTools,
-                modifier = Modifier
-                    .align(AbsoluteAlignment.TopRight)
-                    .then(
-                        contentWindowInsets
-                            .onlyTopAndHorizontalOrNull()
-                            ?.let(Modifier::windowInsetsPadding)
-                            ?: Modifier,
-                    )
-                    .absolutePadding(top = 12.dp, right = 12.dp),
+                position = floatingToolsPosition,
+                contentWindowInsets = contentWindowInsets,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

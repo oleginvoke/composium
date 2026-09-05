@@ -8,9 +8,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,14 +32,18 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -51,9 +57,8 @@ import oleginvoke.com.composium.ui.components.ComposiumSurface
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 
-private val SceneFloatingToolsSize = 104.dp
+internal val SceneFloatingToolsSize = 104.dp
 private val SceneFloatingToolCellSize = 52.dp
-private val SceneFloatingEyeTouchSize = 48.dp
 private val SceneFloatingEyeSize = 40.dp
 
 @Composable
@@ -68,6 +73,7 @@ internal fun SceneFloatingTools(
     onThemeChange: (Boolean) -> Unit,
     onMinimize: () -> Unit,
     onShow: () -> Unit,
+    onDrag: (Offset) -> Unit = {},
     modifier: Modifier = Modifier,
 ) = CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     val settingsButtonState = calculateSceneSettingsButtonState(controlsLayout)
@@ -106,6 +112,7 @@ internal fun SceneFloatingTools(
         SceneFloatingToolsEye(
             isMinimized = isMinimized,
             onClick = if (isMinimized) onShow else onMinimize,
+            onDrag = onDrag,
             modifier = Modifier
                 .align(Alignment.Center)
                 .zIndex(1f),
@@ -204,18 +211,36 @@ private fun SceneFloatingToolCell(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun SceneFloatingToolsEye(
     isMinimized: Boolean,
     onClick: () -> Unit,
+    onDrag: (Offset) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val currentOnDrag by rememberUpdatedState(onDrag)
     Box(
         modifier = modifier
-            .size(SceneFloatingEyeTouchSize)
+            .size(SceneFloatingEyeSize)
             .semantics {
                 contentDescription = floatingToolsToggleContentDescription(isMinimized)
                 role = Role.Button
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    orientationLock = null,
+                    onDragStart = { down, slopTriggerChange, overSlopOffset ->
+                        currentOnDrag(
+                            slopTriggerChange.position - down.position - overSlopOffset,
+                        )
+                    },
+                    shouldAwaitTouchSlop = { true },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        currentOnDrag(dragAmount)
+                    },
+                )
             }
             .clickable(
                 interactionSource = interactionSource,

@@ -6,8 +6,11 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -115,11 +118,11 @@ class SceneFloatingToolsPlacementTest {
         val back = actionBounds("Back")
         val properties = actionBounds("Open properties")
         // At density 1, the 104 dp grid is inset by physical right 20 + margin 12,
-        // while the 48 dp eye remains centered over the grid intersection.
-        assertEquals(screen.right - 60f, expandedEye.right, 0.01f)
-        assertEquals(screen.top + 64f, expandedEye.top, 0.01f)
-        assertEquals(48f, expandedEye.width, 0.01f)
-        assertEquals(48f, expandedEye.height, 0.01f)
+        // while the 40 dp eye remains centered over the grid intersection.
+        assertEquals(screen.right - 64f, expandedEye.right, 0.01f)
+        assertEquals(screen.top + 68f, expandedEye.top, 0.01f)
+        assertEquals(40f, expandedEye.width, 0.01f)
+        assertEquals(40f, expandedEye.height, 0.01f)
         assertEquals(52f, back.width, 0.01f)
         assertEquals(52f, back.height, 0.01f)
         assertEquals(back.right, properties.left, 0.01f)
@@ -142,8 +145,8 @@ class SceneFloatingToolsPlacementTest {
         val eye = actionBounds("Show tools")
         val bitmap = drawScene("${direction.name.lowercase()}-minimized")
         try {
-            // All four points lie inside the 48 x 48 touch target but outside its 40 dp eye.
-            listOf(2 to 24, 24 to 2, 46 to 24, 24 to 46).forEach { (x, y) ->
+            // The square corners remain transparent around the circular eye.
+            listOf(2 to 2, 38 to 2, 2 to 38, 38 to 38).forEach { (x, y) ->
                 assertEquals(
                     "The eye touch area must show scene pixels at ($x, $y)",
                     Color.Blue.toArgb(),
@@ -182,12 +185,17 @@ class SceneFloatingToolsPlacementTest {
                 LocalDensity provides Density(1f),
             ) {
                 ComposiumTheme(darkTheme = false) {
-                    SceneScreen(
-                        sceneEntry = entry,
-                        onBack = {},
-                        contentWindowInsets = WindowInsets(left = 7, top = 24, right = 20),
-                        modifier = Modifier.testTag("screen"),
-                    )
+                    val insets = WindowInsets(left = 7, top = 24, right = 20)
+                    Box(Modifier.fillMaxSize().testTag("screen")) {
+                        SceneScreen(
+                            sceneEntry = entry,
+                            onBack = {},
+                            contentWindowInsets = insets,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .windowInsetsPadding(insets.only(WindowInsetsSides.Horizontal)),
+                        )
+                    }
                 }
             }
         }

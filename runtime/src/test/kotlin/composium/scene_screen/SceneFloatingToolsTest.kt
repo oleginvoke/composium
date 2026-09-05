@@ -4,9 +4,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -102,6 +105,36 @@ class SceneFloatingToolsTest {
 
         composeRule.onNodeWithContentDescription("Hide tools").performClick()
         assertEquals(1, minimizeClicks)
+    }
+
+    @Test
+    fun transparentAreaAroundEyeDoesNotInterceptPropertiesClick() {
+        var minimizeClicks = 0
+        var propertiesClicks = 0
+        composeRule.setContent {
+            ComposiumTheme(darkTheme = false) {
+                SceneFloatingTools(
+                    controlsLayout = SceneInspectorLayoutMode.Closed,
+                    isMinimized = false,
+                    isDarkTheme = false,
+                    isEyedropperVisible = false,
+                    onBack = {},
+                    onToggleControls = { propertiesClicks++ },
+                    onToggleEyedropper = {},
+                    onThemeChange = {},
+                    onMinimize = { minimizeClicks++ },
+                    onShow = {},
+                )
+            }
+        }
+
+        // The point is outside the visible 40 dp eye, but inside its old 48 dp touch box.
+        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
+            click(Offset(x = 2f, y = 29f))
+        }
+
+        assertEquals(1, propertiesClicks)
+        assertEquals(0, minimizeClicks)
     }
 
     @Test
