@@ -197,7 +197,7 @@ internal fun shouldShowFloatingTools(
     inspectorLayoutMode != SceneInspectorLayoutMode.Expanded
 
 internal fun floatingToolsToggleContentDescription(isMinimized: Boolean): String =
-    if (isMinimized) "Show tools" else "Minimize tools"
+    if (isMinimized) "Show tools" else "Hide tools"
 
 internal fun reduceSceneScreen(
     state: SceneScreenState,

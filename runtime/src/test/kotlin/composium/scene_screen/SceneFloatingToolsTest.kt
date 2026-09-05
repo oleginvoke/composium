@@ -1,5 +1,9 @@
 package oleginvoke.com.composium.scene_screen
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -77,7 +81,7 @@ class SceneFloatingToolsTest {
     }
 
     @Test
-    fun minimizeHandleDispatchesMinimize() {
+    fun centeredEyeDispatchesHide() {
         var minimizeClicks = 0
         composeRule.setContent {
             ComposiumTheme(darkTheme = false) {
@@ -96,8 +100,49 @@ class SceneFloatingToolsTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Minimize tools").performClick()
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
         assertEquals(1, minimizeClicks)
+    }
+
+    @Test
+    fun eyeStaysAtTheGridCenterWhenToolsCollapse() {
+        composeRule.setContent {
+            var minimized by remember { mutableStateOf(false) }
+            ComposiumTheme(darkTheme = false) {
+                SceneFloatingTools(
+                    controlsLayout = SceneInspectorLayoutMode.Closed,
+                    isMinimized = minimized,
+                    isDarkTheme = false,
+                    isEyedropperVisible = false,
+                    onBack = {},
+                    onToggleControls = {},
+                    onToggleEyedropper = {},
+                    onThemeChange = {},
+                    onMinimize = { minimized = true },
+                    onShow = { minimized = false },
+                )
+            }
+        }
+        val back = actionBounds("Back")
+        val properties = actionBounds("Open properties")
+        val eyedropper = actionBounds("Open eyedropper")
+        val theme = actionBounds("Switch to dark theme")
+        val expandedEye = actionBounds("Hide tools")
+
+        assertEquals(52f, back.width, 0.01f)
+        assertEquals(52f, back.height, 0.01f)
+        assertEquals(back.right, properties.left, 0.01f)
+        assertEquals(back.bottom, eyedropper.top, 0.01f)
+        assertEquals(properties.left, theme.left, 0.01f)
+        assertEquals(eyedropper.top, theme.top, 0.01f)
+        assertEquals(back.right, expandedEye.center.x, 0.01f)
+        assertEquals(back.bottom, expandedEye.center.y, 0.01f)
+
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
+
+        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Open properties").assertDoesNotExist()
+        assertEquals(expandedEye, actionBounds("Show tools"))
     }
 
     @Test
@@ -147,4 +192,9 @@ class SceneFloatingToolsTest {
             }
         }
     }
+
+    private fun actionBounds(description: String) = composeRule
+        .onNodeWithContentDescription(description)
+        .fetchSemanticsNode()
+        .boundsInRoot
 }

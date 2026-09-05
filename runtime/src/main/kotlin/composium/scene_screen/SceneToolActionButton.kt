@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
@@ -35,6 +37,9 @@ internal fun SceneToolActionButton(
     modifier: Modifier = Modifier,
     active: Boolean = false,
     enabled: Boolean = true,
+    size: Dp = SceneToolActionSize,
+    containerShape: Shape = Tokens.shapes.pill,
+    showBorder: Boolean = true,
 ) {
     val containerColor by animateColorAsState(
         // The light-theme primaryContainer token bakes in alpha 0.83 (0xD3B5D9E8). Override
@@ -65,16 +70,22 @@ internal fun SceneToolActionButton(
 
     Box(
         modifier = modifier
-            .size(SceneToolActionSize)
-            .clip(Tokens.shapes.pill)
+            .size(size)
+            .clip(containerShape)
             .background(containerColor)
-            .border(1.dp, borderColor, Tokens.shapes.pill),
+            .then(
+                if (showBorder) {
+                    Modifier.border(1.dp, borderColor, containerShape)
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         ComposiumIconButton(
             onClick = onClick,
             enabled = enabled,
-            size = SceneToolActionSize,
+            size = size,
         ) {
             AnimatedContent(
                 targetState = imageVector,

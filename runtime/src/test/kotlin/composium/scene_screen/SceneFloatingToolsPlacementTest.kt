@@ -46,13 +46,39 @@ class SceneFloatingToolsPlacementTest {
     private lateinit var ownerView: View
 
     @Test
-    fun minimizedToolsPaintOnlyTheCapsuleInLtrHost() {
-        assertTransparentHandleTouchArea(LayoutDirection.Ltr)
+    fun minimizedToolsPaintOnlyTheEyeInLtrHost() {
+        assertTransparentEyeTouchArea(LayoutDirection.Ltr)
     }
 
     @Test
-    fun minimizedToolsPaintOnlyTheCapsuleInRtlHost() {
-        assertTransparentHandleTouchArea(LayoutDirection.Rtl)
+    fun minimizedToolsPaintOnlyTheEyeInRtlHost() {
+        assertTransparentEyeTouchArea(LayoutDirection.Rtl)
+    }
+
+    @Test
+    fun activeToolFillsItsWholeQuadrant() {
+        renderScene(LayoutDirection.Ltr)
+        composeRule.onNodeWithContentDescription("Open properties").performClick()
+        val back = actionBounds("Back")
+        val properties = actionBounds("Expand settings")
+        val bitmap = drawScene("active-quadrant")
+        try {
+            val inactiveCorner = bitmap.getPixel(
+                back.right.toInt() - 6,
+                back.top.toInt() + 6,
+            )
+            val activeCorner = bitmap.getPixel(
+                properties.left.toInt() + 6,
+                properties.top.toInt() + 6,
+            )
+            assertNotEquals(
+                "The active state must fill the rectangular quadrant, including its inner corner",
+                inactiveCorner,
+                activeCorner,
+            )
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @Test
@@ -85,43 +111,49 @@ class SceneFloatingToolsPlacementTest {
     private fun assertStablePhysicalAnchor(direction: LayoutDirection) {
         renderScene(direction)
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
-        val expandedHandle = actionBounds("Minimize tools")
-        // At density 1, physical right inset 20 + margin 12, top inset 24 + margin 12.
-        assertEquals(screen.right - 32f, expandedHandle.right, 0.01f)
-        assertEquals(screen.top + 36f, expandedHandle.top, 0.01f)
-        assertEquals(48f, expandedHandle.width, 0.01f)
-        assertEquals(48f, expandedHandle.height, 0.01f)
-        assertEquals(expandedHandle.right, actionBounds("Open properties").right, 0.01f)
-        assertEquals(expandedHandle.bottom, actionBounds("Back").top, 0.01f)
+        val expandedEye = actionBounds("Hide tools")
+        val back = actionBounds("Back")
+        val properties = actionBounds("Open properties")
+        // At density 1, the 104 dp grid is inset by physical right 20 + margin 12,
+        // while the 48 dp eye remains centered over the grid intersection.
+        assertEquals(screen.right - 60f, expandedEye.right, 0.01f)
+        assertEquals(screen.top + 64f, expandedEye.top, 0.01f)
+        assertEquals(48f, expandedEye.width, 0.01f)
+        assertEquals(48f, expandedEye.height, 0.01f)
+        assertEquals(52f, back.width, 0.01f)
+        assertEquals(52f, back.height, 0.01f)
+        assertEquals(back.right, properties.left, 0.01f)
+        assertEquals(back.right, expandedEye.center.x, 0.01f)
+        assertEquals(back.bottom, expandedEye.center.y, 0.01f)
 
-        composeRule.onNodeWithContentDescription("Minimize tools").performClick()
-        assertEquals(expandedHandle, actionBounds("Show tools"))
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
+        assertEquals(expandedEye, actionBounds("Show tools"))
         composeRule.onNodeWithContentDescription("Show tools").performClick()
-        assertEquals(expandedHandle, actionBounds("Minimize tools"))
+        assertEquals(expandedEye, actionBounds("Hide tools"))
     }
 
     private fun actionBounds(description: String) = composeRule
         .onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
 
-    private fun assertTransparentHandleTouchArea(direction: LayoutDirection) {
+    private fun assertTransparentEyeTouchArea(direction: LayoutDirection) {
         renderScene(direction)
         drawScene("${direction.name.lowercase()}-expanded").recycle()
-        composeRule.onNodeWithContentDescription("Minimize tools").performClick()
-        val handle = actionBounds("Show tools")
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
+        val eye = actionBounds("Show tools")
         val bitmap = drawScene("${direction.name.lowercase()}-minimized")
         try {
-            // All four points lie inside the 48 x 48 touch target but outside its small capsule.
-            listOf(4 to 24, 24 to 4, 44 to 24, 4 to 40).forEach { (x, y) ->
+            // All four points lie inside the 48 x 48 touch target but outside its 40 dp eye.
+            listOf(2 to 24, 24 to 2, 46 to 24, 24 to 46).forEach { (x, y) ->
                 assertEquals(
-                    "The handle touch area must show scene pixels at ($x, $y)",
+                    "The eye touch area must show scene pixels at ($x, $y)",
                     Color.Blue.toArgb(),
-                    bitmap.getPixel(handle.left.toInt() + x, handle.top.toInt() + y),
+                    bitmap.getPixel(eye.left.toInt() + x, eye.top.toInt() + y),
                 )
             }
             assertNotEquals(
-                "The visible capsule must remain discoverable",
+                "The visible eye control must remain discoverable",
                 Color.Blue.toArgb(),
-                bitmap.getPixel(handle.center.x.toInt(), handle.bottom.toInt() - 9),
+                bitmap.getPixel(eye.center.x.toInt(), eye.center.y.toInt()),
             )
         } finally {
             bitmap.recycle()

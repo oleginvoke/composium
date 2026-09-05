@@ -114,27 +114,29 @@ The fallback from `thumbnail` to regular scene content is implemented as an invo
 
 ### Expanded state
 
-The tools appear as one compact surface containing a 2 by 2 grid:
+The tools appear as one compact rounded surface containing an evenly divided 2 by 2 grid:
 
 ```text
 Back       Properties
 Eyedropper Theme
 ```
 
-Each action has at least a 48 by 48 dp touch target, with a compact 18-20 dp icon. The surface should read as one component rather than four unrelated floating buttons. Active properties and eyedropper states reuse the current top-bar visual feedback. Theme uses a simplified light/dark icon toggle instead of the current wide switch.
+Each action has at least a 48 by 48 dp touch target, with a compact 18-20 dp icon. The actions have no independent circular containers: an outer contour and a thin internal cross divide the surface into four rectangular sections. An active Properties or Eyedropper action fills its complete section. Theme uses a simplified light/dark icon toggle instead of the current wide switch.
+
+A circular visibility control is centered over the grid intersection. Its `VisibilityOff` state hides the surrounding grid, while `Visibility` restores it. The grid fades and scales toward or away from this fixed center; the eye icon uses a matching compact fade-and-scale transition.
 
 The Back action remains available in addition to Android system Back. Both use the existing scene back behavior.
 
 ### Minimized state
 
-A small chevron tab is visually attached above the expanded surface. Activating it minimizes the grid. Only the small tab remains, at the same top-right anchor, with its chevron reversed to indicate restoration.
+Activating the central eye hides the grid around it. Only the circular eye remains in exactly the same position, without an additional backing surface.
 
 - The surface starts expanded each time a scene screen is entered.
 - The minimized state is local to that scene-screen instance.
 - It is not persisted when leaving and reopening the scene.
 - No drag gesture is implemented in this version.
 
-The tab has an accessible touch target even if its visible capsule is smaller, plus `Minimize tools` and `Show tools` content descriptions for its two states.
+The eye has a 48 by 48 dp accessible touch target around its smaller visible circle, plus `Hide tools` and `Show tools` content descriptions for its two states.
 
 ### Inspector and eyedropper interaction
 
@@ -193,7 +195,7 @@ README examples and the sample application are migrated as part of the same chan
 
 - Unit tests for padding calculation in `TopBar` and `Floating` modes, with closed and split inspectors.
 - Reducer tests for minimizing/restoring floating tools and preserving that state across inspector transitions.
-- UI tests for the four actions, minimized handle, accessibility descriptions, and expanded-inspector visibility.
+- UI tests for the four equal sections, central eye, hidden state, accessibility descriptions, and expanded-inspector visibility.
 - Lint detector tests covering named use, implicit use, forwarded use, accidental named and implicit omission, `_` omission, explicit suppression, unrelated same-named properties, nested-lambda shadowing, same-named functions with the wrong signature, direct `Scene` construction, and project-local scene wrappers.
 - Detector tests proving that calls named `TopSpacer`, `BottomSpacer`, or `consumeParentScaffoldPadding` do not count as usage in Composium.
 - Compilation coverage for `scene`, direct `Scene`, wrappers, `RenderPreview`, thumbnails, and KSP-generated registration.

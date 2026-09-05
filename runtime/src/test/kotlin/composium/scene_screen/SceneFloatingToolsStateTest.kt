@@ -40,7 +40,7 @@ class SceneFloatingToolsStateTest {
 
     @Test
     fun toggleDescriptionsDescribeTheResultingAction() {
-        assertEquals("Minimize tools", floatingToolsToggleContentDescription(isMinimized = false))
+        assertEquals("Hide tools", floatingToolsToggleContentDescription(isMinimized = false))
         assertEquals("Show tools", floatingToolsToggleContentDescription(isMinimized = true))
     }
 }

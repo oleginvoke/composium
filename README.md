@@ -332,9 +332,9 @@ val FullScreenScene by scene(
 }
 ```
 
-Apply `contentPadding` only to the children that must remain unobscured when a background, map, list, or custom surface should draw edge to edge. `SceneTools.TopBar` is the default. `SceneTools.Floating` replaces it with a compact overlay fixed at the physical top-right, below the status bar. The expanded surface uses a 2 by 2 action grid: Back and Properties on the first row, then Eyedropper and Theme on the second.
+Apply `contentPadding` only to the children that must remain unobscured when a background, map, list, or custom surface should draw edge to edge. `SceneTools.TopBar` is the default. `SceneTools.Floating` replaces it with a compact overlay fixed at the physical top-right, below the status bar. The expanded surface is one evenly divided 2 by 2 grid: Back and Properties on the first row, then Eyedropper and Theme on the second. Active state fills the complete grid section rather than a separate circular button.
 
-The attached chevron handle minimizes the surface, leaving only the handle at the same top-right anchor; the handle restores the grid. Properties opens the split inspector and becomes its expand action there. The floating surface is hidden while the inspector is expanded, where the expanded-inspector top bar provides navigation and closing controls, and returns in its previous minimized or expanded state when the preview returns. Floating tools are overlays: they never contribute to `contentPadding` and are never included in eyedropper sampling.
+A circular eye control sits over the grid intersection. It hides the four sections with a centered scale-and-fade animation, leaving only the eye in place, and restores them with the reverse animation. Properties opens the split inspector and becomes its expand action there. The floating surface is hidden while the inspector is expanded, where the expanded-inspector top bar provides navigation and closing controls, and returns in its previous hidden or expanded state when the preview returns. Floating tools are overlays: they never contribute to `contentPadding` and are never included in eyedropper sampling.
 
 The bundled lint check reports an error when scene content does not reference its padding. For intentional full-bleed content, suppress that one issue explicitly:
 
