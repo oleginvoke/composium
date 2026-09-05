@@ -91,12 +91,42 @@ class SceneFloatingToolsPlacementTest {
         val bitmap = drawScene("eye-gap")
         try {
             assertEquals(
-                "The 4 dp ring outside the eye must be genuinely transparent",
+                "The inner part of the 8 dp gap must remain genuinely transparent",
                 Color.Blue.toArgb(),
                 bitmap.getPixel(
                     back.right.toInt(),
                     back.bottom.toInt() - 22,
                 ),
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    fun expandedToolsDrawTranslucentShadowInsideGapEdge() {
+        renderScene(LayoutDirection.Ltr, backgroundColor = Color.White)
+        val back = actionBounds("Back")
+        val bitmap = drawScene("eye-gap-shadow")
+        try {
+            val scenePixel = Color.White.toArgb()
+            val surfacePixel = bitmap.getPixel(
+                back.left.toInt() + 8,
+                back.top.toInt() + 8,
+            )
+            val shadowPixel = bitmap.getPixel(
+                back.right.toInt() + 12,
+                back.bottom.toInt() - 24,
+            )
+            assertNotEquals(
+                "The cutout edge must shade the scene instead of remaining fully clear",
+                scenePixel,
+                shadowPixel,
+            )
+            assertNotEquals(
+                "The inner shadow must remain translucent rather than repainting the grid surface",
+                surfacePixel,
+                shadowPixel,
             )
         } finally {
             bitmap.recycle()
@@ -191,9 +221,12 @@ class SceneFloatingToolsPlacementTest {
         bitmap
     }
 
-    private fun renderScene(direction: LayoutDirection) {
+    private fun renderScene(
+        direction: LayoutDirection,
+        backgroundColor: Color = Color.Blue,
+    ) {
         val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating) { padding ->
-            Box(Modifier.fillMaxSize().background(Color.Blue)) {
+            Box(Modifier.fillMaxSize().background(backgroundColor)) {
                 Box(Modifier.fillMaxSize().padding(padding))
             }
         })

@@ -128,10 +128,9 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // The point is outside both the 40 dp eye and the new 48 dp circular gap,
-        // while still lying inside the old square 48 dp touch box.
+        // Relative to the eye center this is (20, -21), just outside the 28 dp gap radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 10f, y = 30f))
+            click(Offset(x = 20f, y = 31f))
         }
 
         assertEquals(1, propertiesClicks)
@@ -159,10 +158,10 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // Relative to the eye center this is (2, -21): outside the 20 dp eye radius,
-        // but inside the requested 24 dp transparent gap radius.
+        // Relative to the eye center this is (2, -26): outside the old 24 dp gap radius,
+        // but inside the requested 28 dp radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 2f, y = 31f))
+            click(Offset(x = 2f, y = 26f))
         }
 
         assertEquals(0, propertiesClicks)
