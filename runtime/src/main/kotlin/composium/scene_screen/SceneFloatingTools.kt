@@ -24,14 +24,17 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.NightsStay
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumSurface
@@ -55,36 +58,38 @@ internal fun SceneFloatingTools(
     onMinimize: () -> Unit,
     onShow: () -> Unit,
     modifier: Modifier = Modifier,
-) {
+) = CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     val settingsButtonState = calculateSceneSettingsButtonState(controlsLayout)
     val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
 
-    ComposiumSurface(
+    Column(
         modifier = modifier,
-        color = Tokens.colors.surface,
-        shape = Tokens.shapes.large,
-        border = BorderStroke(
-            width = 1.dp,
-            color = Tokens.colors.outlineVariant.copy(alpha = 0.8f),
-        ),
+        horizontalAlignment = Alignment.End,
     ) {
-        Column(horizontalAlignment = Alignment.End) {
-            SceneFloatingToolsHandle(
-                isMinimized = isMinimized,
-                onClick = if (isMinimized) onShow else onMinimize,
-            )
-            AnimatedVisibility(
-                visible = !isMinimized,
-                enter = fadeIn(Motion.tweenStandard()) +
-                    expandVertically(
-                        animationSpec = Motion.tweenStandard(),
-                        expandFrom = Alignment.Top,
-                    ),
-                exit = fadeOut(Motion.tweenFast()) +
-                    shrinkVertically(
-                        animationSpec = Motion.tweenStandard(),
-                        shrinkTowards = Alignment.Top,
-                    ),
+        SceneFloatingToolsHandle(
+            isMinimized = isMinimized,
+            onClick = if (isMinimized) onShow else onMinimize,
+        )
+        AnimatedVisibility(
+            visible = !isMinimized,
+            enter = fadeIn(Motion.tweenStandard()) +
+                expandVertically(
+                    animationSpec = Motion.tweenStandard(),
+                    expandFrom = Alignment.Top,
+                ),
+            exit = fadeOut(Motion.tweenFast()) +
+                shrinkVertically(
+                    animationSpec = Motion.tweenStandard(),
+                    shrinkTowards = Alignment.Top,
+                ),
+        ) {
+            ComposiumSurface(
+                color = Tokens.colors.surface,
+                shape = Tokens.shapes.large,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Tokens.colors.outlineVariant.copy(alpha = 0.8f),
+                ),
             ) {
                 Column {
                     Row {
@@ -145,7 +150,7 @@ private fun SceneFloatingToolsHandle(
                 indication = null,
                 onClick = onClick,
             ),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.BottomCenter,
     ) {
         Box(
             modifier = Modifier

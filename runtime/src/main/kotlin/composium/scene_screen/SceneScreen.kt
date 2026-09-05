@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,7 +127,14 @@ internal fun SceneScreen(
     val callbacks = remember(store, onBack, themeController.onThemeChange) {
         object : SceneScreenCallbacks {
             override fun onBack() {
-                onBack.invoke()
+                val currentState = store.state
+                when {
+                    currentState.isEyedropperVisible -> onHideEyedropper()
+                    currentState.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded ->
+                        onNavigateBackFromExpandedControls()
+                    currentState.controlsSheet.isVisible -> onDismissControls()
+                    else -> onBack.invoke()
+                }
             }
 
             override fun onMinimizeFloatingTools() {
@@ -191,11 +200,7 @@ internal fun SceneScreen(
 
     SceneScreenBackHandler(
         enabled = state.isEyedropperVisible || state.controlsSheet.isVisible,
-        onBack = when {
-            state.isEyedropperVisible -> callbacks::onHideEyedropper
-            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded -> callbacks::onNavigateBackFromExpandedControls
-            else -> callbacks::onDismissControls
-        },
+        onBack = callbacks::onBack,
     )
 
     val targetFraction = when (state.controlsSheet.layoutMode) {
@@ -323,14 +328,14 @@ internal fun SceneScreen(
                 onMinimize = callbacks::onMinimizeFloatingTools,
                 onShow = callbacks::onShowFloatingTools,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(AbsoluteAlignment.TopRight)
                     .then(
                         contentWindowInsets
                             .onlyTopAndHorizontalOrNull()
                             ?.let(Modifier::windowInsetsPadding)
                             ?: Modifier,
                     )
-                    .padding(top = 12.dp, end = 12.dp),
+                    .absolutePadding(top = 12.dp, right = 12.dp),
             )
         }
     }
@@ -420,7 +425,7 @@ private fun SplitTopBarRow(
         SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = if (isVisible) "Close settings" else "Back",
-            onClick = if (isVisible) callbacks::onDismissControls else callbacks::onBack,
+            onClick = callbacks::onBack,
             enabled = interactive,
         )
         SceneSceneTitleIsland(
@@ -472,7 +477,7 @@ private fun ExpandedTopBarRow(
         SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "Back to split layout",
-            onClick = callbacks::onNavigateBackFromExpandedControls,
+            onClick = callbacks::onBack,
             enabled = interactive,
         )
         SceneExpandedControlsTitleIsland(
@@ -1321,6 +1326,16 @@ private fun ScenePreviewContent(
     val resolvedDensityValue = settings.displayScaleOverride?.let { stableDensity * it } ?: baseDensity.density
     val resolvedFontScale = settings.fontScaleOverride ?: baseDensity.fontScale
     val layoutDirection = if (settings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    // Insets and Composium chrome were measured in host dp. Preserve their physical bounds
+    // when scene content applies this padding with its overridden density and direction.
+    val paddingDensityRatio = baseDensity.density / resolvedDensityValue
+    val hostLayoutDirection = LocalLayoutDirection.current
+    val previewContentPadding = PaddingValues.Absolute(
+        left = contentPadding.calculateLeftPadding(hostLayoutDirection) * paddingDensityRatio,
+        top = contentPadding.calculateTopPadding() * paddingDensityRatio,
+        right = contentPadding.calculateRightPadding(hostLayoutDirection) * paddingDensityRatio,
+        bottom = contentPadding.calculateBottomPadding() * paddingDensityRatio,
+    )
 
     CompositionLocalProvider(
         LocalLayoutDirection provides layoutDirection,
@@ -1339,7 +1354,7 @@ private fun ScenePreviewContent(
             propagateMinConstraints = true,
         ) {
             LocalScenePreviewContainer.current.Decoration {
-                sceneEntry.scene.content(sceneScope, contentPadding)
+                sceneEntry.scene.content(sceneScope, previewContentPadding)
             }
         }
     }
