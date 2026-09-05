@@ -85,6 +85,25 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
+    fun expandedToolsLeaveSceneVisibleThroughGapAroundEye() {
+        renderScene(LayoutDirection.Ltr)
+        val back = actionBounds("Back")
+        val bitmap = drawScene("eye-gap")
+        try {
+            assertEquals(
+                "The 4 dp ring outside the eye must be genuinely transparent",
+                Color.Blue.toArgb(),
+                bitmap.getPixel(
+                    back.right.toInt(),
+                    back.bottom.toInt() - 22,
+                ),
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
     fun rtlHostKeepsPhysicalRightAnchorWhenMinimizingAndRestoring() {
         assertStablePhysicalAnchor(LayoutDirection.Rtl)
     }

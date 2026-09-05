@@ -108,7 +108,7 @@ class SceneFloatingToolsTest {
     }
 
     @Test
-    fun transparentAreaAroundEyeDoesNotInterceptPropertiesClick() {
+    fun areaImmediatelyOutsideEyeGapDispatchesPropertiesClick() {
         var minimizeClicks = 0
         var propertiesClicks = 0
         composeRule.setContent {
@@ -128,12 +128,44 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // The point is outside the visible 40 dp eye, but inside its old 48 dp touch box.
+        // The point is outside both the 40 dp eye and the new 48 dp circular gap,
+        // while still lying inside the old square 48 dp touch box.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 2f, y = 29f))
+            click(Offset(x = 10f, y = 30f))
         }
 
         assertEquals(1, propertiesClicks)
+        assertEquals(0, minimizeClicks)
+    }
+
+    @Test
+    fun gapAroundEyeDoesNotDispatchAnyAction() {
+        var minimizeClicks = 0
+        var propertiesClicks = 0
+        composeRule.setContent {
+            ComposiumTheme(darkTheme = false) {
+                SceneFloatingTools(
+                    controlsLayout = SceneInspectorLayoutMode.Closed,
+                    isMinimized = false,
+                    isDarkTheme = false,
+                    isEyedropperVisible = false,
+                    onBack = {},
+                    onToggleControls = { propertiesClicks++ },
+                    onToggleEyedropper = {},
+                    onThemeChange = {},
+                    onMinimize = { minimizeClicks++ },
+                    onShow = {},
+                )
+            }
+        }
+
+        // Relative to the eye center this is (2, -21): outside the 20 dp eye radius,
+        // but inside the requested 24 dp transparent gap radius.
+        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
+            click(Offset(x = 2f, y = 31f))
+        }
+
+        assertEquals(0, propertiesClicks)
         assertEquals(0, minimizeClicks)
     }
 

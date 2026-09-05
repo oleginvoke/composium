@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Colorize
@@ -38,10 +40,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -60,6 +67,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 internal val SceneFloatingToolsSize = 104.dp
 private val SceneFloatingToolCellSize = 52.dp
 private val SceneFloatingEyeSize = 40.dp
+private val SceneFloatingEyeGapSize = 48.dp
 
 @Composable
 internal fun SceneFloatingTools(
@@ -109,6 +117,14 @@ internal fun SceneFloatingTools(
             )
         }
 
+        if (!isMinimized) {
+            SceneFloatingToolsEyeGap(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .zIndex(0.5f),
+            )
+        }
+
         SceneFloatingToolsEye(
             isMinimized = isMinimized,
             onClick = if (isMinimized) onShow else onMinimize,
@@ -132,7 +148,19 @@ private fun SceneFloatingToolsGrid(
 ) {
     val dividerColor = Tokens.colors.outlineVariant.copy(alpha = 0.8f)
     ComposiumSurface(
-        modifier = Modifier.size(SceneFloatingToolsSize),
+        modifier = Modifier
+            .size(SceneFloatingToolsSize)
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                drawContent()
+                drawCircle(
+                    color = Color.Transparent,
+                    radius = SceneFloatingEyeGapSize.toPx() / 2f,
+                    blendMode = BlendMode.Clear,
+                )
+            },
         color = Tokens.colors.surface,
         shape = Tokens.shapes.medium,
         border = BorderStroke(width = 1.dp, color = dividerColor),
@@ -190,6 +218,20 @@ private fun SceneFloatingToolsGrid(
             )
         }
     }
+}
+
+@Composable
+private fun SceneFloatingToolsEyeGap(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(SceneFloatingEyeGapSize)
+            .clip(CircleShape)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {})
+            },
+    )
 }
 
 @Composable

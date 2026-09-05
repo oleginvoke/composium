@@ -123,7 +123,7 @@ Eyedropper Theme
 
 Each action has at least a 48 by 48 dp touch target, with a compact 18-20 dp icon. The actions have no independent circular containers: an outer contour and a thin internal cross divide the surface into four rectangular sections. An active Properties or Eyedropper action fills its complete section. Theme uses a simplified light/dark icon toggle instead of the current wide switch.
 
-A circular visibility control is centered over the grid intersection. Its `VisibilityOff` state hides the surrounding grid, while `Visibility` restores it. The grid fades and scales toward or away from this fixed center; the eye icon uses a matching compact fade-and-scale transition.
+A circular visibility control is centered over the grid intersection. A 48 dp transparent circular cutout leaves a 4 dp non-interactive gap around the 40 dp eye, reducing accidental activation of either the eye or a neighboring action. Its `VisibilityOff` state hides the surrounding grid, while `Visibility` restores it. The grid fades and scales toward or away from this fixed center; the eye icon uses a matching compact fade-and-scale transition.
 
 The Back action remains available in addition to Android system Back. Both use the existing scene back behavior.
 
