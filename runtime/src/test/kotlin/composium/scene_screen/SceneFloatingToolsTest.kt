@@ -128,9 +128,9 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // Relative to the eye center this is (20, -21), just outside the 28 dp gap radius.
+        // Relative to the eye center this is (12, -24), just outside the 26 dp gap radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 20f, y = 31f))
+            click(Offset(x = 12f, y = 28f))
         }
 
         assertEquals(1, propertiesClicks)
@@ -158,10 +158,9 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // Relative to the eye center this is (2, -26): outside the old 24 dp gap radius,
-        // but inside the requested 28 dp radius.
+        // Relative to the eye center this is (2, -25): inside the requested 26 dp radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 2f, y = 26f))
+            click(Offset(x = 2f, y = 27f))
         }
 
         assertEquals(0, propertiesClicks)

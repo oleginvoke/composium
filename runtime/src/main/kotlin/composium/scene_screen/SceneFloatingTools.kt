@@ -41,14 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -68,7 +67,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 internal val SceneFloatingToolsSize = 104.dp
 private val SceneFloatingToolCellSize = 52.dp
 private val SceneFloatingEyeSize = 40.dp
-private val SceneFloatingEyeGapSize = 56.dp
+private val SceneFloatingEyeGapSize = 52.dp
 
 @Composable
 internal fun SceneFloatingTools(
@@ -148,7 +147,6 @@ private fun SceneFloatingToolsGrid(
     onThemeChange: (Boolean) -> Unit,
 ) {
     val dividerColor = Tokens.colors.outlineVariant.copy(alpha = 0.8f)
-    val gapShadowColor = Tokens.colors.scrim.copy(alpha = 0.16f)
     ComposiumSurface(
         modifier = Modifier
             .size(SceneFloatingToolsSize)
@@ -157,13 +155,7 @@ private fun SceneFloatingToolsGrid(
             }
             .drawWithCache {
                 val gapRadius = SceneFloatingEyeGapSize.toPx() / 2f
-                val gapCenter = Offset(x = size.width / 2f, y = size.height / 2f)
-                val gapShadow = Brush.radialGradient(
-                    0.88f to Color.Transparent,
-                    1f to gapShadowColor,
-                    center = gapCenter,
-                    radius = gapRadius,
-                )
+                val gapOutlineWidth = 1.dp.toPx()
                 onDrawWithContent {
                     drawContent()
                     drawCircle(
@@ -172,8 +164,9 @@ private fun SceneFloatingToolsGrid(
                         blendMode = BlendMode.Clear,
                     )
                     drawCircle(
-                        brush = gapShadow,
-                        radius = gapRadius,
+                        color = dividerColor,
+                        radius = gapRadius - gapOutlineWidth / 2f,
+                        style = Stroke(width = gapOutlineWidth),
                     )
                 }
             },
@@ -310,11 +303,6 @@ private fun SceneFloatingToolsEye(
         Box(
             modifier = Modifier
                 .size(SceneFloatingEyeSize)
-                .shadow(
-                    elevation = 2.dp,
-                    shape = Tokens.shapes.pill,
-                    clip = false,
-                )
                 .clip(Tokens.shapes.pill)
                 .background(Tokens.colors.surfaceVariant)
                 .border(

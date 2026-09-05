@@ -91,7 +91,7 @@ class SceneFloatingToolsPlacementTest {
         val bitmap = drawScene("eye-gap")
         try {
             assertEquals(
-                "The inner part of the 8 dp gap must remain genuinely transparent",
+                "The inner part of the 6 dp gap must remain genuinely transparent",
                 Color.Blue.toArgb(),
                 bitmap.getPixel(
                     back.right.toInt(),
@@ -104,29 +104,37 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun expandedToolsDrawTranslucentShadowInsideGapEdge() {
+    fun expandedToolsKeepGapClearWithoutShadow() {
         renderScene(LayoutDirection.Ltr, backgroundColor = Color.White)
         val back = actionBounds("Back")
-        val bitmap = drawScene("eye-gap-shadow")
+        val bitmap = drawScene("eye-gap-clear")
         try {
-            val scenePixel = Color.White.toArgb()
-            val surfacePixel = bitmap.getPixel(
-                back.left.toInt() + 8,
-                back.top.toInt() + 8,
+            assertEquals(
+                "The gap must expose the scene background without a shadow",
+                Color.White.toArgb(),
+                bitmap.getPixel(
+                    back.right.toInt(),
+                    back.bottom.toInt() - 24,
+                ),
             )
-            val shadowPixel = bitmap.getPixel(
-                back.right.toInt() + 12,
-                back.bottom.toInt() - 24,
-            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    fun expandedToolsOutlineTheEyeGap() {
+        renderScene(LayoutDirection.Ltr, backgroundColor = Color.White)
+        val back = actionBounds("Back")
+        val bitmap = drawScene("eye-gap-outline")
+        try {
             assertNotEquals(
-                "The cutout edge must shade the scene instead of remaining fully clear",
-                scenePixel,
-                shadowPixel,
-            )
-            assertNotEquals(
-                "The inner shadow must remain translucent rather than repainting the grid surface",
-                surfacePixel,
-                shadowPixel,
+                "The transparent gap must have a visible outline on a white scene",
+                Color.White.toArgb(),
+                bitmap.getPixel(
+                    back.right.toInt(),
+                    back.bottom.toInt() - 25,
+                ),
             )
         } finally {
             bitmap.recycle()
