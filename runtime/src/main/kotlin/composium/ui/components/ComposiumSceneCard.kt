@@ -5,9 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +43,7 @@ internal fun ComposiumSceneCard(
     name: String,
     group: String?,
     thumbnailState: SceneThumbnailState?,
+    hasThumbnail: Boolean,
     badge: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -80,29 +83,31 @@ internal fun ComposiumSceneCard(
         Column(
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(previewHeight)
-                    .background(Tokens.colors.surfaceVariant.copy(alpha = 0.42f))
-                    .drawThumbnailBottomBorder(
-                        color = Tokens.colors.outlineVariant.copy(alpha = 0.52f),
-                    ),
-            ) {
-                SceneThumbnailPreview(
-                    state = thumbnailState,
-                    horizontalAlignment = layout.previewHorizontalAlignment,
+            if (hasThumbnail) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(previewPadding),
-                )
-
-                if (badge != null) {
-                    Box(
+                        .fillMaxWidth()
+                        .height(previewHeight)
+                        .background(Tokens.colors.surfaceVariant.copy(alpha = 0.42f))
+                        .drawThumbnailBottomBorder(
+                            color = Tokens.colors.outlineVariant.copy(alpha = 0.52f),
+                        ),
+                ) {
+                    SceneThumbnailPreview(
+                        state = thumbnailState,
+                        horizontalAlignment = layout.previewHorizontalAlignment,
                         modifier = Modifier
-                            .align(Alignment.TopEnd),
-                    ) {
-                        badge()
+                            .fillMaxSize()
+                            .padding(previewPadding),
+                    )
+
+                    if (badge != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd),
+                        ) {
+                            badge()
+                        }
                     }
                 }
             }
@@ -117,13 +122,22 @@ internal fun ComposiumSceneCard(
                         bottom = 12.dp,
                     ),
             ) {
-                ComposiumText(
-                    text = name,
-                    style = Tokens.typography.titleMedium,
-                    color = Tokens.colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ComposiumText(
+                        text = name,
+                        style = Tokens.typography.titleMedium,
+                        color = Tokens.colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!hasThumbnail && badge != null) {
+                        badge()
+                    }
+                }
 
                 if (!group.isNullOrBlank()) {
                     Spacer(Modifier.height(6.dp))

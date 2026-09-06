@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
 class SceneThumbnailApiTest {
@@ -19,7 +18,41 @@ class SceneThumbnailApiTest {
             content = content,
         )
 
-        assertNotSame<Any>(content, scene.thumbnailContent())
+        assertNotNull(scene.thumbnail)
+        assertSame(scene.thumbnail, scene.thumbnailContent())
+    }
+
+    @Test
+    fun explicitNullDisablesThumbnailForDirectScene() {
+        val scene = Scene(group = null, name = "Disabled", thumbnail = null, content = {})
+
+        assertNull(scene.thumbnail)
+        assertNull(scene.thumbnailContent())
+    }
+
+    @Test
+    fun explicitNullDisablesThumbnailForDelegatedScene() {
+        val disabled by scene(thumbnail = null, content = {})
+
+        assertNull(disabled.thumbnail)
+        assertNull(disabled.thumbnailContent())
+    }
+
+    @Test
+    fun omittedThumbnailIsResolvedForDelegatedScene() {
+        val automatic by scene(content = {})
+
+        assertNotNull(automatic.thumbnail)
+        assertSame(automatic.thumbnail, automatic.thumbnailContent())
+    }
+
+    @Test
+    fun directDelegateConstructionDistinguishesOmittedThumbnailFromNull() {
+        val automatic by SceneDelegate(null, "Automatic", SceneTools.TopBar, content = {})
+        val disabled by SceneDelegate(null, "Disabled", SceneTools.TopBar, content = {}, thumbnail = null)
+
+        assertNotNull(automatic.thumbnail)
+        assertNull(disabled.thumbnail)
     }
 
     @Test

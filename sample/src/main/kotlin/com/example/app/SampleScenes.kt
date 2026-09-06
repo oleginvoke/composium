@@ -95,7 +95,7 @@ internal val tonalNestedPlayground by scene(
     name = "Nested playground",
     tools = SceneTools.Floating,
 ) { contentPadding ->
-    val title: String by param("Invite teammate")
+    val title: String by param(options = listOf())
     val enabled: Boolean by param(true)
     val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
         inferred.reversed()
@@ -118,6 +118,24 @@ internal val tonalNestedPlayground by scene(
                 size = size,
             )
         }
+    }
+}
+
+@ComposiumScene
+internal val noThumbnailDemo by scene(
+    group = "Thumbnails",
+    name = "No thumbnail",
+    thumbnail = null,
+) { contentPadding ->
+    val text: String by param("This scene opens normally, but has no catalog preview.")
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, style = MaterialTheme.typography.titleMedium)
     }
 }
 

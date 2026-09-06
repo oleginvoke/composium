@@ -21,6 +21,7 @@ internal fun SceneThumbnailRenderSurface(
     captureScale: Float = DefaultSceneThumbnailCaptureScale,
     modifier: Modifier = Modifier,
 ) {
+    val thumbnail = sceneEntry.scene.thumbnailContent() ?: return
     require(captureScale > 0f) { "captureScale must be > 0" }
 
     CompositionLocalProvider(
@@ -34,7 +35,7 @@ internal fun SceneThumbnailRenderSurface(
             contentAlignment = Alignment.Center,
         ) {
             with(sceneScope) {
-                sceneEntry.scene.thumbnailContent().invoke(this)
+                thumbnail.invoke(this)
             }
         }
     }

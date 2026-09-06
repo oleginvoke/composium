@@ -9,11 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.Scene
@@ -56,6 +59,7 @@ class ComposiumHostFloatingToolsPlacementTest {
             }
         }
 
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(sceneName))
         composeRule.onNodeWithText(sceneName).performClick()
 
         val host = composeRule.onNodeWithTag("host").fetchSemanticsNode().boundsInRoot

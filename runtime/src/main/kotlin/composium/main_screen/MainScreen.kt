@@ -360,6 +360,7 @@ private fun MainScreenContent(
                             name = item.entry.scene.name,
                             group = item.entry.scene.group,
                             thumbnailState = thumbnailStates[item.entry.id],
+                            hasThumbnail = item.entry.scene.thumbnail != null,
                             badge = item.entry.scene.badge,
                             onClick = { callbacks.onSceneSelected(item.entry.id) },
                         )

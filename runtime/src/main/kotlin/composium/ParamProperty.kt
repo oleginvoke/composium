@@ -8,10 +8,11 @@ import kotlin.reflect.KType
 
 /**
  * Property delegate returned by [SceneScope.param].
+ * Obtain instances through [SceneScope.param] so controls registration is configured.
  *
  * @param state Backing Compose state.
  */
-class ParamProperty<T>(
+class ParamProperty<T> internal constructor(
     internal val state: MutableState<T>,
 ) : ReadWriteProperty<Any?, T> {
 

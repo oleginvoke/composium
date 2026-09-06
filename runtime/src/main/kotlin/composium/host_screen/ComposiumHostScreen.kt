@@ -99,7 +99,7 @@ internal fun ComposiumHostScreen(
     val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
     val blocksMainScreenInput = shouldBlockMainScreenInput(state)
     val thumbnailKeys = remember(sceneIds, themeController.isDarkTheme) {
-        scenes.map { entry ->
+        scenes.filter { it.scene.thumbnail != null }.map { entry ->
             SceneThumbnailKey(
                 sceneId = entry.id,
                 isDarkTheme = themeController.isDarkTheme,

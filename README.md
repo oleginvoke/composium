@@ -388,9 +388,23 @@ internal val paymentForm by scene(
 
 Use custom thumbnails for cases where the catalog should show a simplified, stable, or intentionally framed version of the component while keeping the real scene interactive and complete.
 
+Omitting `thumbnail` captures the scene's `content`. Passing `thumbnail = null` explicitly disables capture for that scene and removes the entire preview area from its catalog card, without a placeholder or reserved space:
+
+```kotlin
+internal val paymentScreen by scene(thumbnail = null) { contentPadding ->
+    PaymentScreen(Modifier.padding(contentPadding))
+}
+```
+
+The card remains clickable and opens the scene normally. If a `badge` is provided, it appears beside the card title instead of over a preview. These defaults also apply to scenes created directly through `Scene`.
+
+**Migration:** explicit `thumbnail = null` previously fell back to `content`. Remove that argument to keep automatic capture. A nullable thumbnail variable that evaluates to `null` now disables capture as well.
+
+Thumbnail capture runs a real composition: effects in the captured content can start requests, subscriptions, or analytics before the scene is opened. Use a custom thumbnail with static sample data, or disable capture, for scenes with such effects. A custom `thumbnail` is also ordinary composable content and does not automatically suppress effects.
+
 ### Scene card badges
 
-Use `badge` when a scene needs an extra marker inside its catalog card. Composium renders it in the top-end corner of the thumbnail area and only adds a small outer padding; the badge content controls its own size, shape, colors, and behavior.
+Use `badge` when a scene needs an extra marker inside its catalog card. Composium renders it in the top-end corner of the thumbnail area, or beside the title when `thumbnail = null`; the badge content controls its own size, shape, colors, and behavior.
 
 This is useful for lightweight per-scene metadata that should be visible before opening the scene, for example:
 
@@ -452,6 +466,21 @@ internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
 ```
 
 `param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
+
+`SceneDelegate` and `ParamProperty` are public return types, but their constructors are internal. Create them through `scene(...)` and `param(...)`; custom scene factories can still return `SceneDelegate`. If you previously called these constructors directly, migrate to the corresponding factory. Direct construction of `Scene` remains supported.
+
+### Parameter names must be unique
+
+A parameter's name is both its controls label and its registration key. By default it is the delegated property's name; an explicit `name` replaces it. All simultaneously active parameter declarations in the same `SceneScope` must have different names, including parameters declared by helper composables or repeated calls to the same helper.
+
+```kotlin
+val title: String by param("Hello", name = "Title")
+val subtitle: String by param("World", name = "Subtitle")
+```
+
+Declaring a different parameter with an occupied name throws `IllegalStateException` with the conflicting name and a suggestion to rename it. The same rule applies when changing `name` dynamically. Previously, such conflicts silently replaced controls and could remove another parameter's control during disposal.
+
+Recomposition and options/default updates of the same declaration are allowed. A name can be reused after its previous declaration leaves composition. Separate scene scopes may use identical names.
 
 ### How Composium renders parameter controls
 

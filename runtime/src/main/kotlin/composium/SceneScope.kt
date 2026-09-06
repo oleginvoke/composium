@@ -24,6 +24,8 @@ import kotlin.reflect.KType
  * Scope available inside [Scene.content].
  *
  * Provides parameter declaration helpers used by Composium controls UI.
+ * Parameter names must be unique among active declarations within this scope.
+ * Registering a different parameter with an occupied name throws [IllegalStateException].
  */
 class SceneScope internal constructor() {
 
@@ -31,6 +33,7 @@ class SceneScope internal constructor() {
     internal val preview: SceneSystemSettings = SceneSystemSettings()
 
     private val paramBindings: MutableMap<String, ParamBinding> = hashMapOf()
+    private val paramBindingOwners: MutableMap<String, ParamProperty<*>> = hashMapOf()
     private val paramDescriptorIndexes: MutableMap<String, Int> = hashMapOf()
     private val paramStateSnapshots: MutableMap<String, ParamStateSnapshot> = hashMapOf()
 
@@ -436,13 +439,27 @@ class SceneScope internal constructor() {
         }
     }
 
-    private fun registerBinding(binding: ParamBinding) {
+    private fun registerBinding(binding: ParamBinding, owner: ParamProperty<*>) {
+        val existingOwner = paramBindingOwners[binding.name]
+        check(existingOwner == null || existingOwner === owner) {
+            "Duplicate scene parameter name \"${binding.name}\". " +
+                "Parameter names must be unique within a scene. " +
+                "Use a different property name or pass a unique name to param()."
+        }
+
+        // Validate the new name before releasing the previous registration.
+        owner.lastRegisteredName?.takeIf { it != binding.name }?.let { previousName ->
+            unregisterBinding(previousName, owner)
+        }
+        paramBindingOwners[binding.name] = owner
         paramBindings[binding.name] = binding
         paramStateSnapshots[binding.name] = binding.snapshot()
         upsertDescriptor(binding.toDescriptor())
     }
 
-    private fun unregisterBinding(paramName: String) {
+    private fun unregisterBinding(paramName: String, owner: ParamProperty<*>) {
+        if (paramBindingOwners[paramName] !== owner) return
+        paramBindingOwners.remove(paramName)
         val removed = paramBindings.remove(paramName) ?: return
         paramStateSnapshots.remove(paramName)
         removeDescriptor(removed.name)
@@ -519,9 +536,11 @@ class SceneScope internal constructor() {
             }
         }
 
-        DisposableEffect(property) {
+        // Release renamed bindings during disposal, before any SideEffect registers
+        // this composition's names. This also allows two declarations to swap names.
+        DisposableEffect(property, name) {
             onDispose {
-                property.lastRegisteredName?.let(::unregisterBinding)
+                property.lastRegisteredName?.let { unregisterBinding(it, property) }
                 property.lastRegisteredName = null
                 property.bindingSignature = null
             }
@@ -530,11 +549,14 @@ class SceneScope internal constructor() {
         LaunchedEffect(property) {
             snapshotFlow {
                 val registeredName = property.lastRegisteredName ?: return@snapshotFlow null
+                if (paramBindingOwners[registeredName] !== property) return@snapshotFlow null
                 paramBindings[registeredName]?.snapshot()?.let { registeredName to it }
             }
                 .filterNotNull()
                 .collect { (registeredName, _) ->
-                    refreshDescriptorIfStateChanged(registeredName)
+                    if (paramBindingOwners[registeredName] === property) {
+                        refreshDescriptorIfStateChanged(registeredName)
+                    }
                 }
         }
 
@@ -565,10 +587,6 @@ class SceneScope internal constructor() {
             if (property.bindingSignature == signature && previousName == resolvedName) {
                 refreshDescriptorIfStateChanged(resolvedName)
                 return@SideEffect
-            }
-
-            if (previousName != null && previousName != resolvedName) {
-                unregisterBinding(previousName)
             }
 
             val optionItems: List<ParamOption<T>>? = explicitOptionItems
@@ -797,7 +815,7 @@ class SceneScope internal constructor() {
                 }
             }
 
-            registerBinding(binding)
+            registerBinding(binding, property)
             property.bindingSignature = signature
             property.lastRegisteredName = resolvedName
         }
