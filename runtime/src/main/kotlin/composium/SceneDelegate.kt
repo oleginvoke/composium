@@ -22,13 +22,37 @@ class SceneDelegate(
     private val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
     private val badge: (@Composable () -> Unit)? = null,
 ) {
+    @Volatile
+    private var cachedScene: Scene? = null
+
     /**
-     * Builds [Scene] from delegated property metadata.
+     * Binds a separate lazy cache to each property, including when a delegate is reused.
+     * Binding does not create the [Scene] or execute its content.
+     */
+    operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): SceneDelegate =
+        SceneDelegate(
+            explicitGroup = explicitGroup,
+            explicitName = explicitName ?: property.name,
+            tools = tools,
+            content = content,
+            thumbnail = thumbnail,
+            badge = badge,
+        )
+
+    /**
+     * Creates [Scene] on the first read and returns the same instance on subsequent reads.
      *
      * @param thisRef Owner instance of delegated property.
      * @param property Delegated property metadata.
      */
     operator fun getValue(thisRef: Any?, property: KProperty<*>): Scene {
+        cachedScene?.let { return it }
+        return synchronized(this) {
+            cachedScene ?: createScene(property).also { cachedScene = it }
+        }
+    }
+
+    private fun createScene(property: KProperty<*>): Scene {
         // If group is not provided, we keep it null so the scene is rendered at the top level.
         val group = explicitGroup?.takeIf { it.isNotBlank() }
         val name = explicitName ?: property.name

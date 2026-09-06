@@ -268,6 +268,12 @@ Notes:
 - scenes still use the same runtime API as KSP mode;
 - annotations are not needed in manual mode.
 
+For both automatic and manual registration, scene names must be unique within a group. Registering the same `Scene` instance again is silent. A different instance with the same group and name is ignored: the first scene stays in the catalog, and Composium logs a warning with the `Composium` tag once per conflicting group/name pair per process.
+
+Each property declared with `val MyScene by scene { ... }` creates its `Scene` lazily on the first read and returns that same instance on later reads. The cache belongs to the property delegate: top-level and singleton properties normally retain it for the process lifetime, while instance properties retain it with their owner. Creating or reading the definition does not execute its composable content; parameter state still belongs to the rendered scene's `SceneScope`.
+
+When constructing `Scene(...)` directly, keep and reuse the instance for repeated registration. Reconstructing it with the same group and name is treated as a conflicting definition and produces the warning described above.
+
 ## Organizing Scenes
 
 Composium does not force a single scene structure.

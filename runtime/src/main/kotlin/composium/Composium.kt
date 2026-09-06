@@ -8,13 +8,16 @@ package oleginvoke.com.composium
  * by passing direct [Scene] references to [register] or [registerAll].
  *
  * Registrations are deduplicated by scene id (`group + name`).
+ * Registering the same instance again is silent. A different instance with the same id
+ * is ignored with a Logcat warning, once per conflicting id per process.
  */
 object Composium {
 
     /**
      * Registers a single [scene].
      *
-     * Safe to call multiple times for the same scene. Duplicate scene ids are ignored.
+     * Safe to call multiple times for the same instance. Conflicting instances are ignored
+     * with a warning; the first registered scene is kept.
      */
     fun register(scene: Scene) {
         ComposiumRuntime.register(scene)
@@ -23,7 +26,8 @@ object Composium {
     /**
      * Registers all [scenes].
      *
-     * Safe to call multiple times for the same scene set. Duplicate scene ids are ignored.
+     * Safe to call multiple times for the same instances. Conflicting instances are ignored
+     * with a warning; the first registered scene for each id is kept.
      */
     fun registerAll(vararg scenes: Scene) {
         ComposiumRuntime.registerAll(*scenes)
@@ -32,7 +36,8 @@ object Composium {
     /**
      * Registers all [scenes].
      *
-     * Safe to call multiple times for the same scene set. Duplicate scene ids are ignored.
+     * Safe to call multiple times for the same instances. Conflicting instances are ignored
+     * with a warning; the first registered scene for each id is kept.
      */
     fun registerAll(scenes: Iterable<Scene>) {
         ComposiumRuntime.registerAll(scenes)
