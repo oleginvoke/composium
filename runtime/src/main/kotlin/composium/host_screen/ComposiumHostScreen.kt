@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import oleginvoke.com.composium.ComposiumRuntime
+import oleginvoke.com.composium.SceneKey
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailCaptureHost
@@ -90,7 +91,7 @@ internal fun ComposiumHostScreen(
     val thumbnailStore = remember { SceneThumbnailStore() }
     val thumbnailQueue = remember { SceneThumbnailQueue() }
     val thumbnailRetryTracker = remember { SceneThumbnailFailureRetryTracker() }
-    var visibleSceneIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var visibleSceneIds by remember { mutableStateOf<List<SceneKey>>(emptyList()) }
     var isMainListScrollInProgress by remember { mutableStateOf(false) }
     var currentCaptureKey by remember { mutableStateOf<SceneThumbnailKey?>(null) }
 
@@ -120,7 +121,7 @@ internal fun ComposiumHostScreen(
         }
     val thumbnailStatesBySceneId = thumbnailStore.statesBySceneId()
 
-    fun openScene(sceneId: String) {
+    fun openScene(sceneId: SceneKey) {
         state = reduceComposiumHostScreen(
             state = state,
             intent = ComposiumHostScreenIntent.SceneSelected(sceneId),
@@ -355,7 +356,9 @@ internal fun ComposiumHostScreen(
                     ),
                 label = "scene_overlay",
             ) {
-                saveableStateHolder.SaveableStateProvider("route_scene_$renderedSceneId") {
+                saveableStateHolder.SaveableStateProvider(
+                    "route_scene_${renderedSceneEntry.id.toSaveableKey()}",
+                ) {
                     key(renderedSceneId) {
                         SceneScreen(
                             sceneEntry = renderedSceneEntry,

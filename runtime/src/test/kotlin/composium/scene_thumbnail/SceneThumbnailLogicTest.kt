@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
+import oleginvoke.com.composium.SceneKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,20 +14,38 @@ import kotlin.test.assertTrue
 class SceneThumbnailLogicTest {
 
     private val keyA = SceneThumbnailKey(
-        sceneId = "group::A",
+        sceneId = SceneKey("group", "A"),
         isDarkTheme = false,
         viewportWidthPx = 360,
         viewportHeightPx = 640,
         targetWidthPx = 180,
         targetHeightPx = 320,
     )
-    private val keyB = keyA.copy(sceneId = "group::B")
-    private val keyC = keyA.copy(sceneId = "group::C")
+    private val keyB = keyA.copy(sceneId = SceneKey("group", "B"))
+    private val keyC = keyA.copy(sceneId = SceneKey("group", "C"))
+
+    @Test
+    fun collidingLegacyIdsKeepIndependentThumbnailStates() {
+        val first = keyA.copy(sceneId = SceneKey("Buttons::Primary", "Disabled"))
+        val second = keyA.copy(sceneId = SceneKey("Buttons", "Primary::Disabled"))
+        val store = SceneThumbnailStore()
+        store.putFailed(first, "first failure")
+        store.putCapturing(second)
+
+        assertEquals(SceneThumbnailState.Failed("first failure"), store.thumbnailFor(first))
+        assertEquals(SceneThumbnailState.Capturing, store.thumbnailFor(second))
+        assertEquals(2, store.statesBySceneId().size)
+
+        val queue = SceneThumbnailQueue()
+        queue.sync(listOf(first, second))
+        assertEquals(first, queue.next())
+        assertEquals(second, queue.next())
+    }
 
     @Test
     fun defaultThumbnailKeyUsesTripleResolutionCapture() {
         val key = SceneThumbnailKey(
-            sceneId = "group::Default",
+            sceneId = SceneKey("group", "Default"),
             isDarkTheme = false,
         )
 
@@ -116,7 +135,7 @@ class SceneThumbnailLogicTest {
             decision = SceneThumbnailFailureDecision.Fail,
         )
 
-        assertTrue(message.contains("sceneId=group::A"))
+        assertTrue(message.contains("sceneId=${keyA.sceneId}"))
         assertTrue(message.contains("sceneName=Nested playground"))
         assertTrue(message.contains("sceneGroup=Buttons/Secondary/Tonal"))
         assertTrue(message.contains("attempt=2/2"))

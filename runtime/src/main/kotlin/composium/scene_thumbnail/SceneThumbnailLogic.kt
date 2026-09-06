@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
+import oleginvoke.com.composium.SceneKey
 import kotlin.math.roundToInt
 
 internal val DefaultSceneThumbnailCaptureTimeoutMillis: Long? = null
@@ -17,7 +18,7 @@ internal const val DefaultSceneThumbnailTargetHeightPx: Int = 960
 internal const val DefaultSceneThumbnailFailureRetryCount: Int = 1
 
 internal data class SceneThumbnailKey(
-    val sceneId: String,
+    val sceneId: SceneKey,
     val isDarkTheme: Boolean,
     val captureScale: Float = DefaultSceneThumbnailCaptureScale,
     val viewportWidthPx: Int = DefaultSceneThumbnailViewportWidthPx,
@@ -356,7 +357,7 @@ internal class SceneThumbnailStore(
         return states[key]
     }
 
-    fun statesBySceneId(): Map<String, SceneThumbnailState> =
+    fun statesBySceneId(): Map<SceneKey, SceneThumbnailState> =
         states.entries.associate { (key, state) -> key.sceneId to state }
 
     fun needsCapture(key: SceneThumbnailKey): Boolean =

@@ -1,16 +1,18 @@
 package oleginvoke.com.composium.host_screen
 
+import oleginvoke.com.composium.SceneKey
+
 internal data class ComposiumHostScreenState(
-    val selectedSceneId: String? = null,
-    val renderedSceneId: String? = null,
+    val selectedSceneId: SceneKey? = null,
+    val renderedSceneId: SceneKey? = null,
     val isSceneVisible: Boolean = false,
 )
 
 internal sealed interface ComposiumHostScreenIntent {
-    data class SceneSelected(val sceneId: String) : ComposiumHostScreenIntent
+    data class SceneSelected(val sceneId: SceneKey) : ComposiumHostScreenIntent
     data object SceneClosed : ComposiumHostScreenIntent
     data object TransitionSettled : ComposiumHostScreenIntent
-    data class AvailableScenesChanged(val sceneIds: Set<String>) : ComposiumHostScreenIntent
+    data class AvailableScenesChanged(val sceneIds: Set<SceneKey>) : ComposiumHostScreenIntent
 }
 
 internal fun shouldBlockMainScreenInput(state: ComposiumHostScreenState): Boolean {

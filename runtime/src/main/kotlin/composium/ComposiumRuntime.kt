@@ -6,13 +6,13 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 internal data class SceneEntry(
     val scene: Scene,
 ) {
-    val id: String get() = "${scene.group ?: ""}::${scene.name}"
+    val id: SceneKey = SceneKey(group = scene.group.orEmpty(), name = scene.name)
 }
 
 internal object ComposiumRuntime {
 
     private val _scenes: SnapshotStateList<SceneEntry> = mutableStateListOf()
-    private val registeredSceneIds: MutableSet<String> = hashSetOf()
+    private val registeredSceneIds: MutableSet<SceneKey> = hashSetOf()
 
     val scenes: List<SceneEntry> get() = _scenes
 

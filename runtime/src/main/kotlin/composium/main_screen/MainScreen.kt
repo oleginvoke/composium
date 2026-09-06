@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import oleginvoke.com.composium.R
 import oleginvoke.com.composium.SceneEntry
+import oleginvoke.com.composium.SceneKey
 import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailState
 import oleginvoke.com.composium.ui.components.ComposiumButton
@@ -83,11 +84,11 @@ import oleginvoke.com.composium.ui.theme.Tokens
 @Composable
 internal fun MainScreen(
     scenes: List<SceneEntry>,
-    onSceneSelected: (sceneId: String) -> Unit,
+    onSceneSelected: (sceneId: SceneKey) -> Unit,
     modifier: Modifier = Modifier,
     contentWindowInsets: WindowInsets? = null,
-    thumbnailStates: Map<String, SceneThumbnailState> = emptyMap(),
-    onVisibleSceneIdsChanged: (List<String>) -> Unit = {},
+    thumbnailStates: Map<SceneKey, SceneThumbnailState> = emptyMap(),
+    onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit = {},
     onListScrollInProgressChanged: (Boolean) -> Unit = {},
 ) {
     val themeController = LocalComposiumThemeController.current
@@ -100,9 +101,7 @@ internal fun MainScreen(
     var topBarHeightDp by remember { mutableStateOf(0f) }
     val scenesContentKey by remember(scenes) {
         derivedStateOf {
-            scenes.map { entry ->
-                "${entry.id}|${entry.scene.group.orEmpty()}|${entry.scene.name}"
-            }
+            scenes.map { entry -> entry.id }
         }
     }
     val sceneSearchIndex = remember(scenesContentKey) {
@@ -142,7 +141,7 @@ internal fun MainScreen(
                 )
             }
 
-            override fun onSceneSelected(sceneId: String) {
+            override fun onSceneSelected(sceneId: SceneKey) {
                 val inputDismissal = calculateSceneSelectionInputDismissal()
                 if (inputDismissal.clearFocus) {
                     focusManager.clearFocus()
@@ -271,8 +270,8 @@ private fun MainScreenContent(
     catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
     contentWindowInsets: WindowInsets?,
-    thumbnailStates: Map<String, SceneThumbnailState>,
-    onVisibleSceneIdsChanged: (List<String>) -> Unit,
+    thumbnailStates: Map<SceneKey, SceneThumbnailState>,
+    onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit,
     onListScrollInProgressChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     extraTopPaddingDp: Float = 0f,
@@ -763,7 +762,7 @@ private sealed interface MainScreenListItem {
         val depth: Int,
         val connectorContinuations: List<Boolean>,
     ) : MainScreenListItem {
-        override val key: String = "scene_${entry.id}"
+        override val key: String = "scene_${entry.id.toSaveableKey()}"
     }
 }
 
