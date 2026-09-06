@@ -105,6 +105,10 @@ dependencies {
 
 Use this mode when you want automatic scene collection.
 
+In a multi-module project, keep all scene declarations and the Composium KSP processor in a single showcase module, such as `:sample` or `:catalog`. That module depends on the modules containing the UI components and declares scenes for those components. It can run as a standalone sample app or expose a public composable entry point for a host app to display the showcase.
+
+Automatic discovery collects scenes declared in that showcase module; it does not collect annotated scenes from compiled dependencies. Do not configure the Composium processor in multiple scene-containing modules included in the same app: each generates the same registry class, causing a duplicate-class build error. The runtime dependency itself can be used in multiple modules; this restriction applies to scene discovery and registry generation.
+
 ### Optional: without KSP
 
 ```kotlin
