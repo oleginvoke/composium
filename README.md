@@ -264,15 +264,15 @@ fun DebugCatalog() {
 ```
 
 Notes:
-- manual registration is deduplicated by scene id (`group + name`);
+- manual registration identifies scenes by their group and name;
 - scenes still use the same runtime API as KSP mode;
 - annotations are not needed in manual mode.
 
-For both automatic and manual registration, scene names must be unique within a group. Registering the same `Scene` instance again is silent. A different instance with the same group and name is ignored: the first scene stays in the catalog, and Composium logs a warning with the `Composium` tag once per conflicting group/name pair per process.
+For both automatic and manual registration, scene names must be unique within a group. Registering the same `Scene` instance again is safe. If a different scene uses the same group and name, the first scene is kept and Composium logs a warning with the `Composium` tag.
 
-Each property declared with `val MyScene by scene { ... }` creates its `Scene` lazily on the first read and returns that same instance on later reads. The cache belongs to the property delegate: top-level and singleton properties normally retain it for the process lifetime, while instance properties retain it with their owner. Creating or reading the definition does not execute its composable content; parameter state still belongs to the rendered scene's `SceneScope`.
+Repeated reads of a property declared with `val MyScene by scene { ... }` return the same `Scene` instance. Reading the property does not render its content.
 
-When constructing `Scene(...)` directly, keep and reuse the instance for repeated registration. Reconstructing it with the same group and name is treated as a conflicting definition and produces the warning described above.
+When constructing `Scene(...)` directly, keep and reuse the instance for repeated registration.
 
 ## Organizing Scenes
 
@@ -342,9 +342,9 @@ val FullScreenScene by scene(
 }
 ```
 
-Apply `contentPadding` only to the children that must remain unobscured when a background, map, list, or custom surface should draw edge to edge. `SceneTools.TopBar` is the default. `SceneTools.Floating` replaces it with a compact overlay that starts at the physical top-right, below the status bar. The expanded surface is one evenly divided 2 by 2 grid: Back and Properties on the first row, then Eyedropper and Theme on the second. Active state fills the complete grid section rather than a separate circular button.
+For edge-to-edge content, apply `contentPadding` only to the children that must remain unobscured. `SceneTools.TopBar` is the default. Use `SceneTools.Floating` to replace the top bar with a compact overlay containing Back, Properties, Eyedropper, and Theme controls.
 
-A circular eye control sits over the grid intersection with a 6 dp transparent, non-interactive gap separating it from the four actions. A thin circular outline keeps the cutout visible on light scene backgrounds without adding a shadow. Tap the eye to hide or restore the sections with a centered scale-and-fade animation, or drag it to move the complete surface anywhere inside the screen's safe bounds. The position survives minimize/restore and inspector transitions for the current scene visit. Properties opens the split inspector and becomes its expand action there. The floating surface is hidden while the inspector is expanded, where the expanded-inspector top bar provides navigation and closing controls. Floating tools are overlays: they never contribute to `contentPadding` and are never included in eyedropper sampling.
+The overlay starts at the top-right, below the status bar. Tap its eye button to hide or show the tools, or drag the eye to reposition them. Properties opens the controls panel; tapping it again expands the panel. Floating tools do not contribute to `contentPadding` or appear in eyedropper samples.
 
 The bundled lint check reports an error when scene content does not reference its padding. For intentional full-bleed content, suppress that one issue explicitly:
 
@@ -398,7 +398,7 @@ internal val paymentScreen by scene(thumbnail = null) { contentPadding ->
 
 The card remains clickable and opens the scene normally. If a `badge` is provided, it appears beside the card title instead of over a preview. These defaults also apply to scenes created directly through `Scene`.
 
-**Migration:** explicit `thumbnail = null` previously fell back to `content`. Remove that argument to keep automatic capture. A nullable thumbnail variable that evaluates to `null` now disables capture as well.
+A nullable thumbnail variable that evaluates to `null` also disables capture.
 
 Thumbnail capture runs a real composition: effects in the captured content can start requests, subscriptions, or analytics before the scene is opened. Use a custom thumbnail with static sample data, or disable capture, for scenes with such effects. A custom `thumbnail` is also ordinary composable content and does not automatically suppress effects.
 
@@ -467,20 +467,16 @@ internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
 
 `param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
 
-`SceneDelegate` and `ParamProperty` are public return types, but their constructors are internal. Create them through `scene(...)` and `param(...)`; custom scene factories can still return `SceneDelegate`. If you previously called these constructors directly, migrate to the corresponding factory. Direct construction of `Scene` remains supported.
-
 ### Parameter names must be unique
 
-A parameter's name is both its controls label and its registration key. By default it is the delegated property's name; an explicit `name` replaces it. All simultaneously active parameter declarations in the same `SceneScope` must have different names, including parameters declared by helper composables or repeated calls to the same helper.
+Parameter names must be unique within a scene, including parameters declared by helper composables. By default, the name matches the delegated property; pass `name` to set a different label:
 
 ```kotlin
 val title: String by param("Hello", name = "Title")
 val subtitle: String by param("World", name = "Subtitle")
 ```
 
-Declaring a different parameter with an occupied name throws `IllegalStateException` with the conflicting name and a suggestion to rename it. The same rule applies when changing `name` dynamically. Previously, such conflicts silently replaced controls and could remove another parameter's control during disposal.
-
-Recomposition and options/default updates of the same declaration are allowed. A name can be reused after its previous declaration leaves composition. Separate scene scopes may use identical names.
+Duplicate names throw `IllegalStateException` identifying the conflict. This also applies when changing `name` dynamically. Different scenes can use the same parameter names.
 
 ### How Composium renders parameter controls
 
@@ -839,6 +835,14 @@ Give QA a stable in-app surface where they can switch component states without h
 ### Local experimentation
 
 Use scenes as a fast sandbox for composing UI states that would be awkward to wire into production navigation.
+
+## Migration Notes
+
+When upgrading from the API with `enableEdgeToEdge` and `SceneScope.innerPadding`:
+
+- Remove `enableEdgeToEdge` and replace `innerPadding` reads with the scene lambda's `contentPadding` argument. Apply it to the root or relevant children, as shown in [Scene content padding and tools](#scene-content-padding-and-tools).
+- Remove explicit `thumbnail = null` if you want to keep automatic thumbnails. It now disables the preview instead of falling back to scene content.
+- Replace direct `SceneDelegate(...)` and `ParamProperty(...)` constructor calls with `scene(...)` and `param(...)`. The types remain public, so custom factories can still return them. Direct `Scene(...)` construction remains supported.
 
 ## Contributing
 
