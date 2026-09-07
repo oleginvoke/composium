@@ -1,0 +1,5 @@
+// Opt-in fixture: kept out of the normal sample and publication build.
+settingsEvaluated { settings ->
+    settings.include(':api-consumer')
+    settings.project(':api-consumer').projectDir = new File(settings.rootDir, 'tests/api-consumer')
+}

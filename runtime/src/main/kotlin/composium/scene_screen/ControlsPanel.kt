@@ -12,9 +12,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowOverflow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,11 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,7 +80,6 @@ internal fun ControlsPanel(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ParamCard(
     paramDescriptor: ParamDescriptor,
@@ -171,30 +164,12 @@ private fun ParamCard(
                         is ObjectParamDescriptor -> {
                             val options = paramDescriptor.options
                             val hasChoices = options.size > 1
-                            var expanded by rememberSaveable { mutableStateOf(false) }
 
                             if (hasChoices) {
                                 FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    maxLines = if (!expanded) 2 else Int.MAX_VALUE,
-                                    overflow = FlowRowOverflow.expandIndicator {
-                                        ComposiumChip(
-                                            text = "Show all",
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = ComposiumChipDefaults.colors(
-                                                selectedBackgroundColor = Tokens.colors.secondaryContainer,
-                                                selectedBorderColor = Tokens.colors.secondaryContainer,
-                                                selectedContentColor = Tokens.colors.onSecondaryContainer,
-                                                unselectedBackgroundColor = Tokens.colors.secondaryContainer,
-                                                unselectedBorderColor = Tokens.colors.secondaryContainer,
-                                                unselectedContentColor = Tokens.colors.onSecondaryContainer,
-                                            ),
-                                            modifier = Modifier.height(24.dp),
-                                            onClick = { expanded = true },
-                                        )
-                                    },
                                 ) {
                                     options.forEach { option ->
                                         ComposiumChip(

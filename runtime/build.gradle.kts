@@ -104,7 +104,12 @@ dependencies {
         isTransitive = false
     }
 
-    implementation(platform(libs.compose.bom))
+    // Types from these artifacts are part of Composium's public API.
+    api(platform(libs.compose.bom))
+    api(libs.compose.runtime)
+    api(libs.compose.ui)
+    api(libs.compose.foundation.layout)
+
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
     implementation(libs.androidx.activity)
