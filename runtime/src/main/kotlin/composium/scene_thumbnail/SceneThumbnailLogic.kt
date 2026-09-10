@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import oleginvoke.com.composium.SceneKey
 import kotlin.math.roundToInt
+import kotlinx.coroutines.channels.Channel
 
 internal val DefaultSceneThumbnailCaptureTimeoutMillis: Long? = null
 internal const val DefaultSceneThumbnailMemoryBudgetBytes: Int = 48 * 1024 * 1024
@@ -298,6 +299,14 @@ internal fun sceneThumbnailCardLayout(): SceneThumbnailCardLayout =
 internal class SceneThumbnailQueue {
     private val pendingKeys = ArrayDeque<SceneThumbnailKey>()
     private val pendingSet = linkedSetOf<SceneThumbnailKey>()
+    private val workAvailable = Channel<Unit>(Channel.CONFLATED)
+
+    suspend fun awaitNext(): SceneThumbnailKey {
+        while (true) {
+            next()?.let { return it }
+            workAvailable.receive()
+        }
+    }
 
     fun sync(keys: List<SceneThumbnailKey>) {
         keys.forEach(::enqueueBack)
@@ -333,12 +342,14 @@ internal class SceneThumbnailQueue {
     private fun enqueueBack(key: SceneThumbnailKey) {
         if (pendingSet.add(key)) {
             pendingKeys.addLast(key)
+            workAvailable.trySend(Unit)
         }
     }
 
     private fun enqueueFront(key: SceneThumbnailKey) {
         if (pendingSet.add(key)) {
             pendingKeys.addFirst(key)
+            workAvailable.trySend(Unit)
         }
     }
 }

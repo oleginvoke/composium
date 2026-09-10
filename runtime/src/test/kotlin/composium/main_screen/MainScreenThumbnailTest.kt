@@ -1,13 +1,20 @@
 package oleginvoke.com.composium.main_screen
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.Scene
 import oleginvoke.com.composium.SceneEntry
@@ -26,6 +33,31 @@ import kotlin.test.assertTrue
 class MainScreenThumbnailTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun lastVisibleSceneIsReportedByKeyWithoutCountingTheMetadataRow() {
+        val scenes = listOf("First", "Middle", "Last").map {
+            SceneEntry(Scene(null, it, thumbnail = {}, content = {}))
+        }
+        var visibleIds = emptyList<SceneKey>()
+        composeRule.setContent {
+            ComposiumTheme(darkTheme = false) {
+                Box(Modifier.requiredSize(320.dp, 140.dp)) {
+                    MainScreen(
+                        scenes = scenes,
+                        onSceneSelected = {},
+                        contentWindowInsets = WindowInsets(0),
+                        onVisibleSceneIdsChanged = { visibleIds = it },
+                    )
+                }
+            }
+        }
+        // One metadata row precedes the three cards. The viewport fits only the last card.
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(3).performTouchInput { swipeUp() }
+        val viewportHeight = composeRule.onNode(hasScrollToIndexAction()).fetchSemanticsNode().boundsInRoot.height
+        assertTrue(viewportHeight <= with(composeRule.density) { 140.dp.toPx() })
+        composeRule.runOnIdle { assertEquals(listOf(scenes.last().id), visibleIds) }
+    }
 
     @Test
     fun disabledThumbnailRemovesPreviewSpaceButKeepsBadgeAndNavigation() {

@@ -295,13 +295,16 @@ private fun MainScreenContent(
         )
     }
 
-    LaunchedEffect(listState, listItems, onVisibleSceneIdsChanged) {
+    val sceneIdsByItemKey = remember(listItems) {
+        listItems.filterIsInstance<MainScreenListItem.SceneItem>()
+            .associate { item -> item.key to item.entry.id }
+    }
+
+    LaunchedEffect(listState, sceneIdsByItemKey, onVisibleSceneIdsChanged) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo
                 .mapNotNull { visibleItem ->
-                    (listItems.getOrNull(visibleItem.index) as? MainScreenListItem.SceneItem)
-                        ?.entry
-                        ?.id
+                    sceneIdsByItemKey[visibleItem.key]
                 }
                 .distinct()
         }.collect(onVisibleSceneIdsChanged)

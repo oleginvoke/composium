@@ -40,8 +40,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.SceneKey
 import oleginvoke.com.composium.main_screen.MainScreen
@@ -180,29 +178,20 @@ internal fun ComposiumHostScreen(
         }
     }
 
-    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture) {
-        while (isActive) {
-            if (shouldPauseThumbnailCapture || currentCaptureKey != null) {
-                delay(50)
-                continue
-            }
-
-            var nextKey = thumbnailQueue.next()
-            while (nextKey != null && !thumbnailStore.needsCapture(nextKey)) {
-                nextKey = thumbnailQueue.next()
-            }
-
-            if (nextKey == null) {
-                delay(120)
-            } else {
-                thumbnailStore.putCapturing(nextKey)
-                currentCaptureKey = nextKey
-            }
+    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture, currentCaptureKey) {
+        if (shouldPauseThumbnailCapture || currentCaptureKey != null) return@LaunchedEffect
+        var nextKey = thumbnailQueue.awaitNext()
+        while (!thumbnailStore.needsCapture(nextKey)) {
+            nextKey = thumbnailQueue.awaitNext()
         }
+        thumbnailStore.putCapturing(nextKey)
+        currentCaptureKey = nextKey
     }
 
-    LaunchedEffect(currentCaptureKey, currentCaptureEntry, thumbnailKeySet) {
-        val captureKey = currentCaptureKey ?: return@LaunchedEffect
+    // Keep the key and entry from the same composition, even if an earlier effect starts work.
+    val captureEntryKey = currentCaptureKey
+    LaunchedEffect(captureEntryKey, currentCaptureEntry, thumbnailKeySet) {
+        val captureKey = captureEntryKey ?: return@LaunchedEffect
         if (currentCaptureEntry == null) {
             when (
                 resolveSceneThumbnailUnavailableDecision(
