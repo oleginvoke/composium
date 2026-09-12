@@ -102,7 +102,7 @@ import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 import kotlin.math.roundToInt
 
-private val SceneInspectorTabsHeight = 34.dp
+private val SceneInspectorTabsHeight = 40.dp
 private val SceneInspectorTabsTopGap = 2.dp
 private val SceneEyedropperOverlayTopPadding = 108.dp
 private val SceneTopBarContentHeight = 72.dp
@@ -1083,7 +1083,7 @@ private fun SceneInspectorTabs(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(indicatorWidth)
-                    .height(28.dp)
+                    .height(SceneInspectorTabsHeight - inset * 2)
                     .align(Alignment.CenterStart)
                     .clip(Tokens.shapes.pill)
                     .background(Tokens.colors.primaryContainer.copy(alpha = 0.6f)),
