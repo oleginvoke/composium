@@ -757,6 +757,38 @@ val PrimaryButtonScene by sceneWithFrame(group = "Buttons") {
 }
 ```
 
+## Window Insets
+
+`ComposiumScreen()` accounts for system bars and display cutouts by default. It keeps the background
+edge-to-edge while positioning its own UI and providing the appropriate `contentPadding` to scenes.
+Floating tools do not contribute to scene padding. Keyboard handling is separate from these default insets.
+
+When embedding Composium inside a `Scaffold`, apply **and consume** the outer padding:
+
+```kotlin
+Scaffold { innerPadding ->
+    ComposiumScreen(
+        modifier = Modifier
+            .padding(innerPadding)
+            .consumeWindowInsets(innerPadding),
+    )
+}
+```
+
+Composium excludes insets already consumed by its parents. A plain `Modifier.padding(...)` does not
+mark insets as consumed. If your container handles all system padding itself, disable Composium's
+insets explicitly:
+
+```kotlin
+ComposiumScreen(
+    modifier = Modifier.padding(innerPadding),
+    contentWindowInsets = WindowInsets(0),
+)
+```
+
+You can also supply custom `WindowInsets` to control which sides and inset types Composium handles.
+This configures content placement; it does not enable edge-to-edge on the activity's window.
+
 ## Theme Control
 
 Composium supports two theme ownership models.

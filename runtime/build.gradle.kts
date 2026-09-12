@@ -124,5 +124,6 @@ dependencies {
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.material3)
     testImplementation(libs.robolectric)
 }

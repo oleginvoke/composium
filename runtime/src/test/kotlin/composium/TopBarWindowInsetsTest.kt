@@ -5,7 +5,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class TopBarWindowInsetsTest {
 
@@ -26,10 +25,5 @@ class TopBarWindowInsetsTest {
         assertEquals(20, result.getTop(density))
         assertEquals(30, result.getRight(density, LayoutDirection.Ltr))
         assertEquals(0, result.getBottom(density))
-    }
-
-    @Test
-    fun nullableTopBarWindowInsetsStayNull() {
-        assertNull((null as WindowInsets?).onlyTopAndHorizontalOrNull())
     }
 }

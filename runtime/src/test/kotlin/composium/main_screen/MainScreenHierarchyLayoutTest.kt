@@ -156,7 +156,7 @@ class MainScreenHierarchyLayoutTest {
     @Test
     fun listContentPaddingIncludesViewportOverlapPadding() {
         val padding = mainScreenListContentPadding(
-            contentWindowInsets = null,
+            contentWindowInsets = WindowInsets(0),
             density = density,
             extraTopPaddingDp = 32f,
         )
@@ -167,7 +167,7 @@ class MainScreenHierarchyLayoutTest {
     @Test
     fun listContentPaddingUsesBasePaddingWithoutWindowInsets() {
         val padding = mainScreenListContentPadding(
-            contentWindowInsets = null,
+            contentWindowInsets = WindowInsets(0),
             density = density,
         )
 

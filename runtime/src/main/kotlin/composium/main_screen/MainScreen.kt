@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,7 +70,7 @@ import androidx.compose.ui.unit.sp
 import oleginvoke.com.composium.R
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneKey
-import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
+import oleginvoke.com.composium.onlyTopAndHorizontal
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailState
 import oleginvoke.com.composium.ui.components.ComposiumButton
 import oleginvoke.com.composium.ui.components.ComposiumIcon
@@ -86,7 +88,7 @@ internal fun MainScreen(
     scenes: List<SceneEntry>,
     onSceneSelected: (sceneId: SceneKey) -> Unit,
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
     thumbnailStates: Map<SceneKey, SceneThumbnailState> = emptyMap(),
     onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit = {},
     onListScrollInProgressChanged: (Boolean) -> Unit = {},
@@ -99,6 +101,10 @@ internal fun MainScreen(
     val store = rememberMainScreenStore()
     val state = store.state
     var topBarHeightDp by remember { mutableStateOf(0f) }
+    var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
+    val remainingInsets = remember(contentWindowInsets, consumedInsets) {
+        contentWindowInsets.exclude(consumedInsets)
+    }
     val scenesContentKey by remember(scenes) {
         derivedStateOf {
             scenes.map { entry -> entry.id }
@@ -167,6 +173,7 @@ internal fun MainScreen(
 
     Box(
         modifier = modifier
+            .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize()
             .background(Tokens.colors.surface)
             .clickable(
@@ -183,7 +190,8 @@ internal fun MainScreen(
             expandedGroups = state.expandedGroups,
             catalogStatus = catalogStatus,
             callbacks = callbacks,
-            contentWindowInsets = contentWindowInsets,
+            // Manual padding reads need exclusion; the top bar's windowInsetsPadding does it itself.
+            contentWindowInsets = remainingInsets,
             thumbnailStates = thumbnailStates,
             onVisibleSceneIdsChanged = onVisibleSceneIdsChanged,
             onListScrollInProgressChanged = onListScrollInProgressChanged,
@@ -209,18 +217,13 @@ private fun MainScreenTopBar(
     query: String,
     isDarkTheme: Boolean,
     callbacks: MainScreenCallbacks,
-    statusBarInsets: WindowInsets? = null,
+    statusBarInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                statusBarInsets
-                    .onlyTopAndHorizontalOrNull()
-                    ?.let(Modifier::windowInsetsPadding)
-                    ?: Modifier,
-            )
+            .windowInsetsPadding(statusBarInsets.onlyTopAndHorizontal())
             .padding(
                 start = 16.dp,
                 end = 16.dp,
@@ -269,7 +272,7 @@ private fun MainScreenContent(
     expandedGroups: Set<String>,
     catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
-    contentWindowInsets: WindowInsets?,
+    contentWindowInsets: WindowInsets,
     thumbnailStates: Map<SceneKey, SceneThumbnailState>,
     onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit,
     onListScrollInProgressChanged: (Boolean) -> Unit,

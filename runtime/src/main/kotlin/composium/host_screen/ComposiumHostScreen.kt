@@ -60,7 +60,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 @Composable
 internal fun ComposiumHostScreen(
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
 ) {
     val scenes = ComposiumRuntime.scenes
     val themeController = LocalComposiumThemeController.current
@@ -72,10 +72,10 @@ internal fun ComposiumHostScreen(
         derivedStateOf { scenes.map { entry -> entry.id } }
     }
     val mainScreenInsets = remember(contentWindowInsets) {
-        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
+        contentWindowInsets.only(WindowInsetsSides.Horizontal)
     }
     val sceneOverlayInsets = remember(contentWindowInsets) {
-        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
+        contentWindowInsets.only(WindowInsetsSides.Horizontal)
     }
     val transitionScaleSpec = remember {
         spring<Float>(
@@ -295,13 +295,7 @@ internal fun ComposiumHostScreen(
                 onSceneSelected = ::openScene,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (mainScreenInsets != null) {
-                            Modifier.windowInsetsPadding(mainScreenInsets)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .windowInsetsPadding(mainScreenInsets),
                 contentWindowInsets = contentWindowInsets,
                 thumbnailStates = thumbnailStatesBySceneId,
                 onVisibleSceneIdsChanged = { ids -> visibleSceneIds = ids },
@@ -336,13 +330,7 @@ internal fun ComposiumHostScreen(
                     ),
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (sceneOverlayInsets != null) {
-                            Modifier.windowInsetsPadding(sceneOverlayInsets)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .windowInsetsPadding(sceneOverlayInsets),
                 label = "scene_overlay",
             ) {
                 saveableStateHolder.SaveableStateProvider(

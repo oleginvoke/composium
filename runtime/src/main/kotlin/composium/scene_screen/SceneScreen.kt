@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -89,7 +91,7 @@ import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
 import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
-import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
+import oleginvoke.com.composium.onlyTopAndHorizontal
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
 import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
@@ -115,13 +117,17 @@ internal fun SceneScreen(
     sceneEntry: SceneEntry,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
 ) {
     val themeController = LocalComposiumThemeController.current
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
     val store = rememberSceneScreenStore(sceneEntry.id)
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
+    var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
+    val remainingInsets = remember(contentWindowInsets, consumedInsets) {
+        contentWindowInsets.exclude(consumedInsets)
+    }
     val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
@@ -256,6 +262,7 @@ internal fun SceneScreen(
 
     Box(
         modifier = modifier
+            .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize(),
     ) {
         ColorEyedropperHost(
@@ -278,7 +285,8 @@ internal fun SceneScreen(
                     isDarkTheme = themeController.isDarkTheme,
                     callbacks = callbacks,
                     paramsCallbacks = paramsCallbacks,
-                    contentWindowInsets = contentWindowInsets,
+                    // Raw getTop/getBottom reads do not account for parent consumption.
+                    contentWindowInsets = remainingInsets,
                     inspectorFractionProvider = inspectorFractionProvider,
                     isInspectorComposed = isInspectorComposed,
                     onInspectorDragUpdate = onInspectorDragUpdate,
@@ -329,7 +337,7 @@ internal fun SceneScreen(
                 onMinimize = callbacks::onMinimizeFloatingTools,
                 onShow = callbacks::onShowFloatingTools,
                 position = floatingToolsPosition,
-                contentWindowInsets = contentWindowInsets,
+                contentWindowInsets = remainingInsets,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -343,7 +351,7 @@ private fun SceneScreenTopBar(
     isDarkTheme: Boolean,
     isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
-    statusBarInsets: WindowInsets? = null,
+    statusBarInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     val controlsLayout = controlsSheet.layoutMode
@@ -361,12 +369,7 @@ private fun SceneScreenTopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                statusBarInsets
-                    .onlyTopAndHorizontalOrNull()
-                    ?.let(Modifier::windowInsetsPadding)
-                    ?: Modifier,
-            )
+            .windowInsetsPadding(statusBarInsets.onlyTopAndHorizontal())
             .padding(horizontal = 12.dp)
             .padding(top = 10.dp, bottom = 12.dp),
     ) {
@@ -624,16 +627,12 @@ private fun SceneScreenContent(
     onInspectorDragUpdate: (Float) -> Unit,
     onInspectorDragStop: (Float) -> Unit,
     liveDragFractionProvider: () -> Float,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val topInset = contentWindowInsets?.getTop(density)?.let { inset ->
-        with(density) { inset.toDp() }
-    } ?: 0.dp
-    val bottomInset = contentWindowInsets?.getBottom(density)?.let { inset ->
-        with(density) { inset.toDp() }
-    } ?: 0.dp
+    val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
+    val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
     val contentTopPadding = topInset + SceneTopBarContentHeight
     val sceneContentPadding = calculateSceneContentPadding(
         tools = sceneEntry.scene.tools,

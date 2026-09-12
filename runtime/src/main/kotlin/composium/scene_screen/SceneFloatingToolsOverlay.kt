@@ -30,7 +30,7 @@ internal fun SceneFloatingToolsOverlay(
     onMinimize: () -> Unit,
     onShow: () -> Unit,
     position: MutableState<Offset?>,
-    contentWindowInsets: WindowInsets?,
+    contentWindowInsets: WindowInsets,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -41,8 +41,8 @@ internal fun SceneFloatingToolsOverlay(
         // ComposiumHostScreen already consumes the horizontal system insets around SceneScreen.
         // Top and bottom remain unconsumed so scene content can draw edge to edge there.
         val safeInsets = SceneFloatingToolsSafeInsets(
-            top = contentWindowInsets?.getTop(density) ?: 0,
-            bottom = contentWindowInsets?.getBottom(density) ?: 0,
+            top = contentWindowInsets.getTop(density),
+            bottom = contentWindowInsets.getBottom(density),
         )
         val placementBounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = constraints.maxWidth, height = constraints.maxHeight),
@@ -57,7 +57,8 @@ internal fun SceneFloatingToolsOverlay(
         )
 
         SideEffect {
-            if (position.value != displayedPosition) {
+            // Until the user drags, keep following the default anchor as insets settle or change.
+            if (position.value != null && position.value != displayedPosition) {
                 position.value = displayedPosition
             }
         }
