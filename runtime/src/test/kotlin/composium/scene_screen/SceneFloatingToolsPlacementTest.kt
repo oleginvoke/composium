@@ -49,92 +49,52 @@ class SceneFloatingToolsPlacementTest {
     private lateinit var ownerView: View
 
     @Test
-    fun minimizedToolsPaintOnlyTheEyeInLtrHost() {
-        assertTransparentEyeTouchArea(LayoutDirection.Ltr)
+    fun collapsedCapsuleRevealsSceneWhereActionsWere() {
+        renderScene(LayoutDirection.Ltr)
+        val back = actionBounds("Back")
+        val theme = actionBounds("Switch to dark theme")
+        drawScene("light-expanded").recycle()
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
+        val eye = actionBounds("Show tools")
+        val bitmap = drawScene("light-minimized")
+        try {
+            listOf(back.center, theme.center).forEach { point ->
+                assertEquals(Color.Blue.toArgb(), bitmap.getPixel(point.x.toInt(), point.y.toInt()))
+            }
+            assertNotEquals(Color.Blue.toArgb(), bitmap.getPixel(eye.center.x.toInt(), eye.center.y.toInt()))
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @Test
-    fun minimizedToolsPaintOnlyTheEyeInRtlHost() {
-        assertTransparentEyeTouchArea(LayoutDirection.Rtl)
-    }
-
-    @Test
-    fun activeToolFillsItsWholeQuadrant() {
+    fun activeActionHasDistinctFillInsideCapsule() {
         renderScene(LayoutDirection.Ltr)
         composeRule.onNodeWithContentDescription("Open properties").performClick()
         val back = actionBounds("Back")
         val properties = actionBounds("Expand settings")
-        val bitmap = drawScene("active-quadrant")
-        try {
-            val inactiveCorner = bitmap.getPixel(
-                back.right.toInt() - 6,
-                back.top.toInt() + 6,
-            )
-            val activeCorner = bitmap.getPixel(
-                properties.left.toInt() + 6,
-                properties.top.toInt() + 6,
-            )
-            assertNotEquals(
-                "The active state must fill the rectangular quadrant, including its inner corner",
-                inactiveCorner,
-                activeCorner,
-            )
-        } finally {
-            bitmap.recycle()
-        }
-    }
-
-    @Test
-    fun expandedToolsLeaveSceneVisibleThroughGapAroundEye() {
-        renderScene(LayoutDirection.Ltr)
-        val back = actionBounds("Back")
-        val bitmap = drawScene("eye-gap")
-        try {
-            assertEquals(
-                "The inner part of the 6 dp gap must remain genuinely transparent",
-                Color.Blue.toArgb(),
-                bitmap.getPixel(
-                    back.right.toInt(),
-                    back.bottom.toInt() - 22,
-                ),
-            )
-        } finally {
-            bitmap.recycle()
-        }
-    }
-
-    @Test
-    fun expandedToolsKeepGapClearWithoutShadow() {
-        renderScene(LayoutDirection.Ltr, backgroundColor = Color.White)
-        val back = actionBounds("Back")
-        val bitmap = drawScene("eye-gap-clear")
-        try {
-            assertEquals(
-                "The gap must expose the scene background without a shadow",
-                Color.White.toArgb(),
-                bitmap.getPixel(
-                    back.right.toInt(),
-                    back.bottom.toInt() - 24,
-                ),
-            )
-        } finally {
-            bitmap.recycle()
-        }
-    }
-
-    @Test
-    fun expandedToolsOutlineTheEyeGap() {
-        renderScene(LayoutDirection.Ltr, backgroundColor = Color.White)
-        val back = actionBounds("Back")
-        val bitmap = drawScene("eye-gap-outline")
+        val bitmap = drawScene("light-active")
         try {
             assertNotEquals(
-                "The transparent gap must have a visible outline on a white scene",
-                Color.White.toArgb(),
-                bitmap.getPixel(
-                    back.right.toInt(),
-                    back.bottom.toInt() - 25,
-                ),
+                bitmap.getPixel(back.center.x.toInt(), back.top.toInt() + 6),
+                bitmap.getPixel(properties.center.x.toInt(), properties.top.toInt() + 6),
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    fun darkCapsuleRemainsVisibleOverDarkScene() {
+        renderScene(LayoutDirection.Ltr, backgroundColor = Color.Black, darkTheme = true)
+        val back = actionBounds("Back")
+        val eye = actionBounds("Hide tools")
+        val bitmap = drawScene("dark-expanded")
+        try {
+            assertNotEquals(Color.Black.toArgb(), bitmap.getPixel(back.center.x.toInt(), back.top.toInt() - 3))
+            assertNotEquals(
+                bitmap.getPixel(back.center.x.toInt(), back.top.toInt() + 6),
+                bitmap.getPixel(eye.center.x.toInt(), eye.top.toInt() + 6),
             )
         } finally {
             bitmap.recycle()
@@ -152,20 +112,14 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun rtlHostKeepsBackPropertiesAndEyedropperThemeInPhysicalOrder() {
+    fun rtlHostKeepsActionsInVerticalOrder() {
         renderScene(LayoutDirection.Rtl)
-        val back = actionBounds("Back")
-        val properties = actionBounds("Open properties")
-        val eyedropper = actionBounds("Open eyedropper")
-        val theme = actionBounds("Switch to dark theme")
-
-        assertTrue("Back must be physically left of Properties", back.left < properties.left)
-        assertEquals(back.right, properties.left, 0.01f)
-        assertEquals(back.left, eyedropper.left, 0.01f)
-        assertEquals(properties.left, theme.left, 0.01f)
-        assertEquals(back.top, properties.top, 0.01f)
-        assertEquals(back.bottom, eyedropper.top, 0.01f)
-        assertEquals(eyedropper.top, theme.top, 0.01f)
+        val actions = listOf("Back", "Open properties", "Hide tools", "Open eyedropper", "Switch to dark theme")
+            .map(::actionBounds)
+        actions.zipWithNext().forEach { (above, below) ->
+            assertTrue(above.bottom < below.top)
+            assertEquals(above.center.x, below.center.x, 0.01f)
+        }
     }
 
     private fun assertStablePhysicalAnchor(direction: LayoutDirection) {
@@ -173,18 +127,13 @@ class SceneFloatingToolsPlacementTest {
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
         val expandedEye = actionBounds("Hide tools")
         val back = actionBounds("Back")
-        val properties = actionBounds("Open properties")
-        // At density 1, the 104 dp grid is inset by physical right 20 + margin 12,
-        // while the 40 dp eye remains centered over the grid intersection.
-        assertEquals(screen.right - 64f, expandedEye.right, 0.01f)
-        assertEquals(screen.top + 68f, expandedEye.top, 0.01f)
-        assertEquals(40f, expandedEye.width, 0.01f)
-        assertEquals(40f, expandedEye.height, 0.01f)
-        assertEquals(52f, back.width, 0.01f)
-        assertEquals(52f, back.height, 0.01f)
-        assertEquals(back.right, properties.left, 0.01f)
-        assertEquals(back.right, expandedEye.center.x, 0.01f)
-        assertEquals(back.bottom, expandedEye.center.y, 0.01f)
+        // 64 dp capsule, 8 dp internal padding, and physical right inset 20 + margin 12.
+        assertEquals(screen.right - 40f, expandedEye.right, 0.01f)
+        assertEquals(screen.top + 152f, expandedEye.top, 0.01f)
+        assertEquals(48f, expandedEye.width, 0.01f)
+        assertEquals(56f, expandedEye.height, 0.01f)
+        assertEquals(screen.top + 44f, back.top, 0.01f)
+        assertEquals(back.center.x, expandedEye.center.x, 0.01f)
 
         composeRule.onNodeWithContentDescription("Hide tools").performClick()
         assertEquals(expandedEye, actionBounds("Show tools"))
@@ -194,31 +143,6 @@ class SceneFloatingToolsPlacementTest {
 
     private fun actionBounds(description: String) = composeRule
         .onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
-
-    private fun assertTransparentEyeTouchArea(direction: LayoutDirection) {
-        renderScene(direction)
-        drawScene("${direction.name.lowercase()}-expanded").recycle()
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-        val eye = actionBounds("Show tools")
-        val bitmap = drawScene("${direction.name.lowercase()}-minimized")
-        try {
-            // The square corners remain transparent around the circular eye.
-            listOf(2 to 2, 38 to 2, 2 to 38, 38 to 38).forEach { (x, y) ->
-                assertEquals(
-                    "The eye touch area must show scene pixels at ($x, $y)",
-                    Color.Blue.toArgb(),
-                    bitmap.getPixel(eye.left.toInt() + x, eye.top.toInt() + y),
-                )
-            }
-            assertNotEquals(
-                "The visible eye control must remain discoverable",
-                Color.Blue.toArgb(),
-                bitmap.getPixel(eye.center.x.toInt(), eye.center.y.toInt()),
-            )
-        } finally {
-            bitmap.recycle()
-        }
-    }
 
     private fun drawScene(name: String): Bitmap = composeRule.runOnIdle {
         val bitmap = Bitmap.createBitmap(ownerView.width, ownerView.height, Bitmap.Config.ARGB_8888)
@@ -232,6 +156,7 @@ class SceneFloatingToolsPlacementTest {
     private fun renderScene(
         direction: LayoutDirection,
         backgroundColor: Color = Color.Blue,
+        darkTheme: Boolean = false,
     ) {
         val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating) { padding ->
             Box(Modifier.fillMaxSize().background(backgroundColor)) {
@@ -244,7 +169,7 @@ class SceneFloatingToolsPlacementTest {
                 LocalLayoutDirection provides direction,
                 LocalDensity provides Density(1f),
             ) {
-                ComposiumTheme(darkTheme = false) {
+                ComposiumTheme(darkTheme = darkTheme) {
                     val insets = WindowInsets(left = 7, top = 24, right = 20)
                     Box(Modifier.fillMaxSize().testTag("screen")) {
                         SceneScreen(

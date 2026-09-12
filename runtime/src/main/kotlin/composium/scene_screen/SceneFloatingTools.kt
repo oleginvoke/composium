@@ -2,6 +2,7 @@ package oleginvoke.com.composium.scene_screen
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -10,21 +11,18 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Colorize
@@ -40,15 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -58,16 +48,20 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumSurface
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
+import oleginvoke.com.composium.ui.theme.pressScale
 
-internal val SceneFloatingToolsSize = 104.dp
-private val SceneFloatingToolCellSize = 52.dp
-private val SceneFloatingEyeSize = 40.dp
-private val SceneFloatingEyeGapSize = 52.dp
+private val SceneFloatingToolsPadding = 8.dp
+private val SceneFloatingToolSize = 48.dp
+private val SceneFloatingEyeHeight = 56.dp
+private val SceneFloatingToolSpacing = 6.dp
+internal val SceneFloatingToolsWidth = SceneFloatingToolSize + SceneFloatingToolsPadding * 2
+internal val SceneFloatingToolsHeight =
+    SceneFloatingToolSize * 4 + SceneFloatingEyeHeight + SceneFloatingToolSpacing * 4 + SceneFloatingToolsPadding * 2
+private val SceneFloatingToolsCollapsedHeight = SceneFloatingEyeHeight + SceneFloatingToolsPadding * 2
 
 @Composable
 internal fun SceneFloatingTools(
@@ -86,177 +80,99 @@ internal fun SceneFloatingTools(
 ) = CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     val settingsButtonState = calculateSceneSettingsButtonState(controlsLayout)
     val eyedropperButtonState = calculateSceneEyedropperButtonState(isEyedropperVisible)
+    val capsuleHeight by animateDpAsState(
+        targetValue = if (isMinimized) SceneFloatingToolsCollapsedHeight else SceneFloatingToolsHeight,
+        animationSpec = Motion.springSnappy(),
+        label = "scene_floating_tools_height",
+    )
 
+    // Keep the expanded footprint as the drag anchor: collapsing never moves the eye.
     Box(
-        modifier = modifier.size(SceneFloatingToolsSize),
+        modifier = modifier.size(width = SceneFloatingToolsWidth, height = SceneFloatingToolsHeight),
         contentAlignment = Alignment.Center,
     ) {
-        AnimatedVisibility(
-            visible = !isMinimized,
-            enter = fadeIn(Motion.tweenStandard()) +
-                scaleIn(
-                    animationSpec = Motion.springSnappy(),
-                    initialScale = 0.72f,
-                    transformOrigin = TransformOrigin.Center,
-                ),
-            exit = fadeOut(Motion.tweenFast()) +
-                scaleOut(
-                    animationSpec = Motion.tweenFast(),
-                    targetScale = 0.72f,
-                    transformOrigin = TransformOrigin.Center,
-                ),
+        ComposiumSurface(
+            modifier = Modifier
+                .size(width = SceneFloatingToolsWidth, height = capsuleHeight)
+                .pointerInput(Unit) {
+                    // Gaps belong to the toolbar, not to the scene underneath it.
+                    detectTapGestures(onTap = {})
+                },
+            color = Tokens.colors.surface,
+            shape = Tokens.shapes.pill,
+            border = BorderStroke(1.dp, Tokens.colors.outlineVariant),
         ) {
-            SceneFloatingToolsGrid(
-                settingsButtonState = settingsButtonState,
-                eyedropperButtonState = eyedropperButtonState,
-                isDarkTheme = isDarkTheme,
-                onBack = onBack,
-                onToggleControls = onToggleControls,
-                onToggleEyedropper = onToggleEyedropper,
-                onThemeChange = onThemeChange,
-            )
+            // The surface clips the full-height actions as it contracts towards the eye.
+            Box(
+                Modifier.requiredSize(width = SceneFloatingToolsWidth, height = SceneFloatingToolsHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                AnimatedVisibility(
+                    visible = !isMinimized,
+                    enter = fadeIn(Motion.tweenStandard()) +
+                        scaleIn(animationSpec = Motion.springSnappy(), initialScale = 0.85f),
+                    exit = fadeOut(Motion.tweenFast()) +
+                        scaleOut(animationSpec = Motion.tweenFast(), targetScale = 0.85f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(SceneFloatingToolsPadding),
+                        verticalArrangement = Arrangement.spacedBy(SceneFloatingToolSpacing),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        SceneFloatingToolAction(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            onClick = onBack,
+                            enabled = !isMinimized,
+                        )
+                        SceneFloatingToolAction(
+                            imageVector = settingsButtonState.icon.imageVector(),
+                            contentDescription = settingsButtonState.contentDescription,
+                            onClick = onToggleControls,
+                            active = settingsButtonState.active,
+                            enabled = !isMinimized,
+                        )
+                        Spacer(Modifier.height(SceneFloatingEyeHeight))
+                        SceneFloatingToolAction(
+                            imageVector = Icons.Outlined.Colorize,
+                            contentDescription = eyedropperButtonState.contentDescription,
+                            onClick = onToggleEyedropper,
+                            active = eyedropperButtonState.active,
+                            enabled = !isMinimized,
+                        )
+                        SceneFloatingToolAction(
+                            imageVector = if (isDarkTheme) Icons.Outlined.NightsStay else Icons.Outlined.WbSunny,
+                            contentDescription = if (isDarkTheme) "Switch to light theme" else "Switch to dark theme",
+                            onClick = { onThemeChange(!isDarkTheme) },
+                            enabled = !isMinimized,
+                        )
+                    }
+                }
+            }
         }
-
-        if (!isMinimized) {
-            SceneFloatingToolsEyeGap(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .zIndex(0.5f),
-            )
-        }
-
         SceneFloatingToolsEye(
             isMinimized = isMinimized,
             onClick = if (isMinimized) onShow else onMinimize,
             onDrag = onDrag,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .zIndex(1f),
         )
     }
 }
 
 @Composable
-private fun SceneFloatingToolsGrid(
-    settingsButtonState: SceneSettingsButtonState,
-    eyedropperButtonState: SceneEyedropperButtonState,
-    isDarkTheme: Boolean,
-    onBack: () -> Unit,
-    onToggleControls: () -> Unit,
-    onToggleEyedropper: () -> Unit,
-    onThemeChange: (Boolean) -> Unit,
-) {
-    val dividerColor = Tokens.colors.outlineVariant.copy(alpha = 0.8f)
-    ComposiumSurface(
-        modifier = Modifier
-            .size(SceneFloatingToolsSize)
-            .graphicsLayer {
-                compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .drawWithCache {
-                val gapRadius = SceneFloatingEyeGapSize.toPx() / 2f
-                val gapOutlineWidth = 1.dp.toPx()
-                onDrawWithContent {
-                    drawContent()
-                    drawCircle(
-                        color = Color.Transparent,
-                        radius = gapRadius,
-                        blendMode = BlendMode.Clear,
-                    )
-                    drawCircle(
-                        color = dividerColor,
-                        radius = gapRadius - gapOutlineWidth / 2f,
-                        style = Stroke(width = gapOutlineWidth),
-                    )
-                }
-            },
-        color = Tokens.colors.surface,
-        shape = Tokens.shapes.medium,
-        border = BorderStroke(width = 1.dp, color = dividerColor),
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            Column {
-                Row {
-                    SceneFloatingToolCell(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        onClick = onBack,
-                    )
-                    SceneFloatingToolCell(
-                        imageVector = settingsButtonState.icon.imageVector(),
-                        contentDescription = settingsButtonState.contentDescription,
-                        onClick = onToggleControls,
-                        active = settingsButtonState.active,
-                    )
-                }
-                Row {
-                    SceneFloatingToolCell(
-                        imageVector = Icons.Outlined.Colorize,
-                        contentDescription = eyedropperButtonState.contentDescription,
-                        onClick = onToggleEyedropper,
-                        active = eyedropperButtonState.active,
-                    )
-                    SceneFloatingToolCell(
-                        imageVector = if (isDarkTheme) {
-                            Icons.Outlined.NightsStay
-                        } else {
-                            Icons.Outlined.WbSunny
-                        },
-                        contentDescription = if (isDarkTheme) {
-                            "Switch to light theme"
-                        } else {
-                            "Switch to dark theme"
-                        },
-                        onClick = { onThemeChange(!isDarkTheme) },
-                    )
-                }
-            }
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .width(1.dp)
-                    .fillMaxHeight()
-                    .background(dividerColor),
-            )
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .height(1.dp)
-                    .fillMaxWidth()
-                    .background(dividerColor),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SceneFloatingToolsEyeGap(
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .size(SceneFloatingEyeGapSize)
-            .clip(CircleShape)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = {})
-            },
-    )
-}
-
-@Composable
-private fun SceneFloatingToolCell(
+private fun SceneFloatingToolAction(
     imageVector: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
     active: Boolean = false,
+    enabled: Boolean = true,
 ) {
     SceneToolActionButton(
         imageVector = imageVector,
         contentDescription = contentDescription,
         onClick = onClick,
         active = active,
-        size = SceneFloatingToolCellSize,
-        containerShape = RectangleShape,
+        enabled = enabled,
+        size = SceneFloatingToolSize,
         showBorder = false,
     )
 }
@@ -267,13 +183,14 @@ private fun SceneFloatingToolsEye(
     isMinimized: Boolean,
     onClick: () -> Unit,
     onDrag: (Offset) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val currentOnDrag by rememberUpdatedState(onDrag)
     Box(
-        modifier = modifier
-            .size(SceneFloatingEyeSize)
+        modifier = Modifier
+            .size(width = SceneFloatingToolSize, height = SceneFloatingEyeHeight)
+            .clip(Tokens.shapes.pill)
+            .background(Tokens.colors.primaryContainer)
             .semantics {
                 contentDescription = floatingToolsToggleContentDescription(isMinimized)
                 role = Role.Button
@@ -282,9 +199,7 @@ private fun SceneFloatingToolsEye(
                 detectDragGestures(
                     orientationLock = null,
                     onDragStart = { down, slopTriggerChange, overSlopOffset ->
-                        currentOnDrag(
-                            slopTriggerChange.position - down.position - overSlopOffset,
-                        )
+                        currentOnDrag(slopTriggerChange.position - down.position - overSlopOffset)
                     },
                     shouldAwaitTouchSlop = { true },
                     onDrag = { change, dragAmount ->
@@ -300,37 +215,22 @@ private fun SceneFloatingToolsEye(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(SceneFloatingEyeSize)
-                .clip(Tokens.shapes.pill)
-                .background(Tokens.colors.surfaceVariant)
-                .border(
-                    width = 1.dp,
-                    color = Tokens.colors.outlineVariant,
-                    shape = Tokens.shapes.pill,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            AnimatedContent(
-                targetState = isMinimized,
-                transitionSpec = {
-                    (fadeIn(Motion.tweenStandard()) + scaleIn(initialScale = 0.7f)) togetherWith
-                        (fadeOut(Motion.tweenFast()) + scaleOut(targetScale = 0.7f))
-                },
-                label = "scene_floating_tools_eye",
-            ) { minimized ->
-                ComposiumIcon(
-                    imageVector = if (minimized) {
-                        Icons.Outlined.Visibility
-                    } else {
-                        Icons.Outlined.VisibilityOff
-                    },
-                    contentDescription = null,
-                    tint = Tokens.colors.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+        AnimatedContent(
+            targetState = isMinimized,
+            transitionSpec = {
+                (fadeIn(Motion.tweenStandard()) + scaleIn(initialScale = 0.7f)) togetherWith
+                    (fadeOut(Motion.tweenFast()) + scaleOut(targetScale = 0.7f))
+            },
+            label = "scene_floating_tools_eye",
+        ) { minimized ->
+            ComposiumIcon(
+                imageVector = if (minimized) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                contentDescription = null,
+                tint = Tokens.colors.onPrimaryContainer,
+                modifier = Modifier
+                    .size(24.dp)
+                    .pressScale(interactionSource, pressedScale = 0.9f),
+            )
         }
     }
 }

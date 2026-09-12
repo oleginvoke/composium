@@ -1,13 +1,19 @@
 package oleginvoke.com.composium.scene_screen
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
@@ -108,7 +114,7 @@ class SceneFloatingToolsTest {
     }
 
     @Test
-    fun areaImmediatelyOutsideEyeGapDispatchesPropertiesClick() {
+    fun bottomOfPropertiesButtonDoesNotToggleEye() {
         var minimizeClicks = 0
         var propertiesClicks = 0
         composeRule.setContent {
@@ -128,9 +134,8 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // Relative to the eye center this is (12, -24), just outside the 26 dp gap radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 12f, y = 28f))
+            click(Offset(x = center.x, y = height - 2f))
         }
 
         assertEquals(1, propertiesClicks)
@@ -138,7 +143,7 @@ class SceneFloatingToolsTest {
     }
 
     @Test
-    fun gapAroundEyeDoesNotDispatchAnyAction() {
+    fun spaceBetweenPropertiesAndEyeDoesNotDispatchAnyAction() {
         var minimizeClicks = 0
         var propertiesClicks = 0
         composeRule.setContent {
@@ -158,9 +163,8 @@ class SceneFloatingToolsTest {
             }
         }
 
-        // Relative to the eye center this is (2, -25): inside the requested 26 dp radius.
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = 2f, y = 27f))
+            click(Offset(x = center.x, y = height + 3f))
         }
 
         assertEquals(0, propertiesClicks)
@@ -168,7 +172,7 @@ class SceneFloatingToolsTest {
     }
 
     @Test
-    fun eyeStaysAtTheGridCenterWhenToolsCollapse() {
+    fun verticalActionsDoNotOverlapEyeAndEyeStaysFixedWhenToolsCollapse() {
         composeRule.setContent {
             var minimized by remember { mutableStateOf(false) }
             ComposiumTheme(darkTheme = false) {
@@ -192,20 +196,52 @@ class SceneFloatingToolsTest {
         val theme = actionBounds("Switch to dark theme")
         val expandedEye = actionBounds("Hide tools")
 
-        assertEquals(52f, back.width, 0.01f)
-        assertEquals(52f, back.height, 0.01f)
-        assertEquals(back.right, properties.left, 0.01f)
-        assertEquals(back.bottom, eyedropper.top, 0.01f)
-        assertEquals(properties.left, theme.left, 0.01f)
-        assertEquals(eyedropper.top, theme.top, 0.01f)
-        assertEquals(back.right, expandedEye.center.x, 0.01f)
-        assertEquals(back.bottom, expandedEye.center.y, 0.01f)
+        val actions = listOf(back, properties, expandedEye, eyedropper, theme)
+        actions.zipWithNext().forEach { (above, below) ->
+            org.junit.Assert.assertTrue("Buttons must have separate vertical touch areas", above.bottom < below.top)
+            assertEquals(above.center.x, below.center.x, 0.01f)
+        }
+        assertEquals((back.top + theme.bottom) / 2f, expandedEye.center.y, 0.01f)
 
         composeRule.onNodeWithContentDescription("Hide tools").performClick()
 
         composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Open properties").assertDoesNotExist()
         assertEquals(expandedEye, actionBounds("Show tools"))
+    }
+
+    @Test
+    fun capsuleGapsBlockSceneClicksButCollapsedEmptySpaceDoesNot() {
+        var sceneClicks = 0
+        composeRule.setContent {
+            var minimized by remember { mutableStateOf(false) }
+            ComposiumTheme(darkTheme = false) {
+                Box(Modifier.fillMaxSize().testTag("root")) {
+                    Box(Modifier.fillMaxSize().clickable { sceneClicks++ })
+                    SceneFloatingTools(
+                        controlsLayout = SceneInspectorLayoutMode.Closed,
+                        isMinimized = minimized,
+                        isDarkTheme = false,
+                        isEyedropperVisible = false,
+                        onBack = {},
+                        onToggleControls = {},
+                        onToggleEyedropper = {},
+                        onThemeChange = {},
+                        onMinimize = { minimized = true },
+                        onShow = { minimized = false },
+                    )
+                }
+            }
+        }
+        val back = actionBounds("Back")
+        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
+            click(Offset(center.x, height + 3f))
+        }
+        assertEquals("Visible capsule gaps must not activate the scene behind them", 0, sceneClicks)
+
+        composeRule.onNodeWithContentDescription("Hide tools").performClick()
+        composeRule.onNodeWithTag("root").performTouchInput { click(back.center) }
+        assertEquals("Collapsing must release the area previously occupied by actions", 1, sceneClicks)
     }
 
     @Test

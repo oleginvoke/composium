@@ -95,7 +95,7 @@ internal val tonalNestedPlayground by scene(
     name = "Nested playground",
     tools = SceneTools.Floating,
 ) { contentPadding ->
-    val title: String by param(options = listOf())
+    val title: String by param("Invite teammate")
     val enabled: Boolean by param(true)
     val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
         inferred.reversed()

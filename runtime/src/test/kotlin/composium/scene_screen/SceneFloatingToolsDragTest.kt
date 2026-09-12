@@ -53,7 +53,25 @@ class SceneFloatingToolsDragTest {
     }
 
     @Test
-    fun draggingBeyondTopLeftKeepsTheWholeGridInsideSafeBounds() {
+    fun holdingEyeBeforeDraggingKeepsMovementOneToOneWithFinger() {
+        renderScene()
+        val initialEye = eyeBounds("Hide tools")
+        composeRule.onNodeWithContentDescription("Hide tools").performTouchInput { down(center) }
+        composeRule.mainClock.advanceTimeBy(200)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription("Hide tools").performTouchInput {
+            moveBy(Offset(x = -60f, y = 80f))
+            up()
+        }
+
+        val movedEye = eyeBounds("Hide tools")
+        assertEquals(initialEye.left - 60f, movedEye.left, 1.1f)
+        assertEquals(initialEye.top + 80f, movedEye.top, 1.1f)
+    }
+
+    @Test
+    fun draggingBeyondTopLeftKeepsTheWholeCapsuleInsideSafeBounds() {
         renderScene()
 
         composeRule.onNodeWithContentDescription("Hide tools").performTouchInput {
@@ -64,8 +82,8 @@ class SceneFloatingToolsDragTest {
 
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
         val back = eyeBounds("Back")
-        assertEquals(screen.left + 7f + 12f, back.left, 1.1f)
-        assertEquals(screen.top + 24f + 12f, back.top, 1.1f)
+        assertEquals(screen.left + 7f + 12f + 8f, back.left, 1.1f)
+        assertEquals(screen.top + 24f + 12f + 8f, back.top, 1.1f)
     }
 
     @Test

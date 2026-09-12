@@ -27,16 +27,16 @@ internal data class SceneFloatingToolsPlacementBounds(
 
 internal fun calculateSceneFloatingToolsPlacementBounds(
     containerSize: IntSize,
-    toolsSizePx: Int,
+    toolsSizePx: IntSize,
     safeInsets: SceneFloatingToolsSafeInsets,
     marginPx: Int,
 ): SceneFloatingToolsPlacementBounds {
     val minX = (safeInsets.left + marginPx).toFloat()
     val minY = (safeInsets.top + marginPx).toFloat()
-    val maxX = (containerSize.width - safeInsets.right - marginPx - toolsSizePx)
+    val maxX = (containerSize.width - safeInsets.right - marginPx - toolsSizePx.width)
         .toFloat()
         .coerceAtLeast(minX)
-    val maxY = (containerSize.height - safeInsets.bottom - marginPx - toolsSizePx)
+    val maxY = (containerSize.height - safeInsets.bottom - marginPx - toolsSizePx.height)
         .toFloat()
         .coerceAtLeast(minY)
     return SceneFloatingToolsPlacementBounds(

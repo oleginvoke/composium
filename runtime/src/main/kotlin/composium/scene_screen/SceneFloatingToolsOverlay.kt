@@ -46,7 +46,9 @@ internal fun SceneFloatingToolsOverlay(
         )
         val placementBounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = constraints.maxWidth, height = constraints.maxHeight),
-            toolsSizePx = with(density) { SceneFloatingToolsSize.roundToPx() },
+            toolsSizePx = with(density) {
+                IntSize(SceneFloatingToolsWidth.roundToPx(), SceneFloatingToolsHeight.roundToPx())
+            },
             safeInsets = safeInsets,
             marginPx = with(density) { SceneFloatingToolsScreenMargin.roundToPx() },
         )

@@ -64,7 +64,7 @@ class ComposiumHostFloatingToolsPlacementTest {
 
         val host = composeRule.onNodeWithTag("host").fetchSemanticsNode().boundsInRoot
         val back = composeRule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
-        assertEquals(host.right - 20f - 12f - 104f, back.left, 1.1f)
-        assertEquals(host.top + 24f + 12f, back.top, 1.1f)
+        assertEquals(host.right - 20f - 12f - 64f + 8f, back.left, 1.1f)
+        assertEquals(host.top + 24f + 12f + 8f, back.top, 1.1f)
     }
 }

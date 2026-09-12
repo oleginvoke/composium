@@ -10,36 +10,36 @@ class SceneFloatingToolsDragLogicTest {
     fun placementUsesPhysicalSafeBoundsAndStartsAtTopRight() {
         val bounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = 400, height = 800),
-            toolsSizePx = 104,
+            toolsSizePx = IntSize(width = 64, height = 288),
             safeInsets = SceneFloatingToolsSafeInsets(left = 7, top = 24, right = 20, bottom = 30),
             marginPx = 12,
         )
 
         assertEquals(19f, bounds.minX)
         assertEquals(36f, bounds.minY)
-        assertEquals(264f, bounds.maxX)
-        assertEquals(654f, bounds.maxY)
-        assertEquals(Offset(x = 264f, y = 36f), bounds.topRightOffset)
+        assertEquals(304f, bounds.maxX)
+        assertEquals(470f, bounds.maxY)
+        assertEquals(Offset(x = 304f, y = 36f), bounds.topRightOffset)
     }
 
     @Test
-    fun placementClampsTheWholeGridToEveryScreenEdge() {
+    fun placementClampsTheWholeCapsuleToEveryScreenEdge() {
         val bounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = 400, height = 800),
-            toolsSizePx = 104,
+            toolsSizePx = IntSize(width = 64, height = 288),
             safeInsets = SceneFloatingToolsSafeInsets(left = 7, top = 24, right = 20, bottom = 30),
             marginPx = 12,
         )
 
         assertEquals(Offset(x = 19f, y = 36f), bounds.clamp(Offset(-500f, -500f)))
-        assertEquals(Offset(x = 264f, y = 654f), bounds.clamp(Offset(900f, 900f)))
+        assertEquals(Offset(x = 304f, y = 470f), bounds.clamp(Offset(900f, 900f)))
     }
 
     @Test
     fun placementStillHasOneValidPositionWhenViewportIsTooSmall() {
         val bounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = 80, height = 90),
-            toolsSizePx = 104,
+            toolsSizePx = IntSize(width = 64, height = 288),
             safeInsets = SceneFloatingToolsSafeInsets(left = 7, top = 8, right = 9, bottom = 10),
             marginPx = 12,
         )
