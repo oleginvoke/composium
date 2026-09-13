@@ -7,11 +7,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Current release: `1.2.3`
+Version: `1.3.0-alpha01` (pre-release)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.2.3`
-- `io.github.oleginvoke:composium-processor:1.2.3`
+- `io.github.oleginvoke:composium:1.3.0-alpha01`
+- `io.github.oleginvoke:composium-processor:1.3.0-alpha01`
 
 It is useful for:
 - design systems and component libraries;
@@ -30,7 +30,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/d246e248-bda4-461a-9f2e-1dccd84633a2">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
+    <img src="assets/composium-demo.gif" alt="Composium demo: scene catalog, live parameters, environment controls, floating tools, and eyedropper" width="400">
 </p>
 
 ## Why Composium
@@ -99,8 +99,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.2.3")
-    ksp("io.github.oleginvoke:composium-processor:1.2.3")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
+    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha01")
 }
 ```
 
@@ -114,7 +114,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.2.3")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
 }
 ```
 
@@ -869,14 +869,6 @@ Give QA a stable in-app surface where they can switch component states without h
 ### Local experimentation
 
 Use scenes as a fast sandbox for composing UI states that would be awkward to wire into production navigation.
-
-## Migration Notes
-
-When upgrading from the API with `enableEdgeToEdge` and `SceneScope.innerPadding`:
-
-- Remove `enableEdgeToEdge` and replace `innerPadding` reads with the scene lambda's `contentPadding` argument. Apply it to the root or relevant children, as shown in [Scene content padding and tools](#scene-content-padding-and-tools).
-- Remove explicit `thumbnail = null` if you want to keep automatic thumbnails. It now disables the preview instead of falling back to scene content.
-- Replace direct `SceneDelegate(...)` and `ParamProperty(...)` constructor calls with `scene(...)` and `param(...)`. The types remain public, so custom factories can still return them. Direct `Scene(...)` construction remains supported.
 
 ## Contributing
 
