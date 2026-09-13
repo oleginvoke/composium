@@ -3,10 +3,7 @@ package oleginvoke.com.composium
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -40,7 +37,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 fun ComposiumScreen(
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean? = null,
-    contentWindowInsets: WindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+    contentWindowInsets: WindowInsets = ComposiumDefaults.contentWindowInsets,
     onThemeChange: (isDarkTheme: Boolean) -> Unit = {}
 ) {
     ComposiumScreen(
@@ -74,7 +71,7 @@ fun ComposiumScreen(
 fun ComposiumScreen(
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean? = null,
-    contentWindowInsets: WindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+    contentWindowInsets: WindowInsets = ComposiumDefaults.contentWindowInsets,
     onThemeChange: (isDarkTheme: Boolean) -> Unit = {},
     scenePreviewDecorator: ScenePreviewDecorator,
 ) {

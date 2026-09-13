@@ -786,7 +786,8 @@ ComposiumScreen(
 )
 ```
 
-You can also supply custom `WindowInsets` to control which sides and inset types Composium handles.
+The default is available as `ComposiumDefaults.contentWindowInsets`. You can also supply custom
+`WindowInsets` to control which sides and inset types Composium handles.
 This configures content placement; it does not enable edge-to-edge on the activity's window.
 
 ## Theme Control
