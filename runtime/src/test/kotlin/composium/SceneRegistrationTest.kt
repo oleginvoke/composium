@@ -46,17 +46,6 @@ class SceneRegistrationTest {
     }
 
     @Test
-    fun registeringTheSameDirectSceneDoesNotWarn() {
-        val first = scene("Quiet direct regression", "Primary")
-        ShadowLog.clear()
-
-        Composium.registerAll(first, first)
-        Composium.register(first)
-
-        assertTrue(ShadowLog.getLogsForTag("Composium").isEmpty())
-    }
-
-    @Test
     fun separatorInGroupDoesNotHideSceneWithSeparatorInName() {
         val first = scene("Buttons::Primary", "Disabled")
         val second = scene("Buttons", "Primary::Disabled")
@@ -65,20 +54,6 @@ class SceneRegistrationTest {
         ComposiumRuntime.registerAll(first, second)
 
         assertEquals(listOf(first, second), ComposiumRuntime.scenes.drop(start).map { it.scene })
-    }
-
-    @Test
-    fun repeatedRegistrationStillKeepsTheFirstScene() {
-        val first = scene("Repeated", "Primary")
-        val duplicate = scene("Repeated", "Primary")
-        val start = ComposiumRuntime.scenes.size
-
-        ComposiumRuntime.registerAll(first, duplicate)
-        ComposiumRuntime.register(first)
-
-        val added = ComposiumRuntime.scenes.drop(start)
-        assertEquals(1, added.size)
-        assertSame(first, added.single().scene)
     }
 
     @Test

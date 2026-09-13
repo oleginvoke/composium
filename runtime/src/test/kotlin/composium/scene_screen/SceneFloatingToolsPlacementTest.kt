@@ -38,7 +38,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -53,10 +52,9 @@ class SceneFloatingToolsPlacementTest {
         renderScene(LayoutDirection.Ltr)
         val back = actionBounds("Back")
         val theme = actionBounds("Switch to dark theme")
-        drawScene("light-expanded").recycle()
         composeRule.onNodeWithContentDescription("Hide tools").performClick()
         val eye = actionBounds("Show tools")
-        val bitmap = drawScene("light-minimized")
+        val bitmap = drawScene()
         try {
             listOf(back.center, theme.center).forEach { point ->
                 assertEquals(Color.Blue.toArgb(), bitmap.getPixel(point.x.toInt(), point.y.toInt()))
@@ -73,7 +71,7 @@ class SceneFloatingToolsPlacementTest {
         composeRule.onNodeWithContentDescription("Open properties").performClick()
         val back = actionBounds("Back")
         val properties = actionBounds("Expand settings")
-        val bitmap = drawScene("light-active")
+        val bitmap = drawScene()
         try {
             assertNotEquals(
                 bitmap.getPixel(back.center.x.toInt(), back.top.toInt() + 6),
@@ -89,7 +87,7 @@ class SceneFloatingToolsPlacementTest {
         renderScene(LayoutDirection.Ltr, backgroundColor = Color.Black, darkTheme = true)
         val back = actionBounds("Back")
         val eye = actionBounds("Hide tools")
-        val bitmap = drawScene("dark-expanded")
+        val bitmap = drawScene()
         try {
             assertNotEquals(Color.Black.toArgb(), bitmap.getPixel(back.center.x.toInt(), back.top.toInt() - 3))
             assertNotEquals(
@@ -144,12 +142,9 @@ class SceneFloatingToolsPlacementTest {
     private fun actionBounds(description: String) = composeRule
         .onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
 
-    private fun drawScene(name: String): Bitmap = composeRule.runOnIdle {
+    private fun drawScene(): Bitmap = composeRule.runOnIdle {
         val bitmap = Bitmap.createBitmap(ownerView.width, ownerView.height, Bitmap.Config.ARGB_8888)
         ownerView.draw(Canvas(bitmap))
-        val evidence = File("build/reports/floating-tools/$name.png")
-        checkNotNull(evidence.parentFile).mkdirs()
-        evidence.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap
     }
 

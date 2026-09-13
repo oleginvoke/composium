@@ -7,6 +7,7 @@ import oleginvoke.com.composium.SceneKey
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SceneThumbnailQueueTest {
@@ -19,6 +20,7 @@ class SceneThumbnailQueueTest {
         assertFalse(next.isCompleted)
         queue.sync(listOf(key))
         runCurrent()
+        assertTrue(next.isCompleted, "Enqueue must wake the consumer without a polling delay")
         assertEquals(key, next.await())
         assertEquals(0L, testScheduler.currentTime)
     }
@@ -36,6 +38,7 @@ class SceneThumbnailQueueTest {
         queue.sync(listOf(first, second))
         queue.prioritize(listOf(second))
         runCurrent()
+        assertTrue(next.isCompleted)
         assertEquals(second, next.await())
         assertEquals(first, queue.awaitNext())
     }

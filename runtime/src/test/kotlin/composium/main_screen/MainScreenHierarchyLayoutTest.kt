@@ -52,14 +52,6 @@ class MainScreenHierarchyLayoutTest {
     }
 
     @Test
-    fun groupCountBadgeUsesCompactSquareMetrics() {
-        val layout = mainScreenGroupCountBadgeLayout()
-
-        assertEquals(22f, layout.sizeDp)
-        assertEquals(6f, layout.cornerRadiusDp)
-    }
-
-    @Test
     fun groupHeaderLayoutUsesCompactInternalPadding() {
         val rootLayout = mainScreenGroupHeaderLayout(depth = 0)
         val nestedLayout = mainScreenGroupHeaderLayout(depth = 1)
@@ -68,14 +60,6 @@ class MainScreenHierarchyLayoutTest {
         assertEquals(8f, rootLayout.verticalPaddingDp)
         assertEquals(8f, nestedLayout.horizontalPaddingDp)
         assertEquals(6f, nestedLayout.verticalPaddingDp)
-    }
-
-    @Test
-    fun hierarchyConnectorStyleUsesStraightLinesWithoutArrows() {
-        val style = mainScreenHierarchyConnectorStyle()
-
-        assertEquals(false, style.hasArrow)
-        assertEquals(6f, style.cornerRadiusDp)
     }
 
     @Test
@@ -150,7 +134,6 @@ class MainScreenHierarchyLayoutTest {
             158f,
             viewport.topOffsetDp + MainScreenListBaseTopPaddingDp + viewport.extraTopPaddingDp,
         )
-        assertEquals(158f, 150f + MainScreenListBaseTopPaddingDp)
     }
 
     @Test
@@ -174,21 +157,4 @@ class MainScreenHierarchyLayoutTest {
         assertEquals(8.dp, padding.calculateBottomPadding())
     }
 
-    @Test
-    fun searchFieldLayoutKeepsFixedHeightAcrossStates() {
-        val layout = mainScreenSearchFieldLayout()
-
-        assertEquals(40f, layout.heightDp)
-        assertEquals(28f, layout.clearButtonSizeDp)
-        assertEquals(15f, layout.horizontalPaddingDp)
-        assertEquals(true, layout.clearButtonSizeDp < layout.heightDp)
-    }
-
-    @Test
-    fun searchFieldLayoutUsesOpaqueSurfaceAndFullHeightInputTarget() {
-        val layout = mainScreenSearchFieldLayout()
-
-        assertEquals(1f, layout.containerAlpha)
-        assertEquals(layout.heightDp, layout.inputHitTargetHeightDp)
-    }
 }

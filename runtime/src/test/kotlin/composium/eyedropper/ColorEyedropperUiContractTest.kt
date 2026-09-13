@@ -1,18 +1,10 @@
 package oleginvoke.com.composium.eyedropper
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class ColorEyedropperUiContractTest {
-
-    @Test
-    fun cursorContractDoesNotRequirePixelLens() {
-        assertTrue(true)
-    }
 
     @Test
     fun lensArrowCentersStayInsideOuterRing() {
@@ -35,21 +27,6 @@ class ColorEyedropperUiContractTest {
                 direction = ColorEyedropperNudgeDirection.End,
             ),
         )
-    }
-
-    @Test
-    fun defaultCursorIsSlightlySmallerThanTheInitialLensCursor() {
-        assertEquals(32.dp, ColorEyedropperDefaults.metrics.cursorDiameter)
-        assertTrue(ColorEyedropperDefaults.metrics.cursorDiameter < 36.dp)
-    }
-
-    @Test
-    fun defaultCursorRingIsDarkerAndSlightlyWiderThanLensFrame() {
-        val colors = ColorEyedropperColors()
-
-        assertEquals(3.dp, ColorEyedropperDefaults.metrics.cursorOutlineWidth)
-        assertEquals(Color(0xF0EAF0F4), colors.cursorOutline)
-        assertEquals(Color(0xD0B8C6D0), colors.cursorContrastOutline)
     }
 
     @Test

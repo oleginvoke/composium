@@ -21,6 +21,20 @@ class SceneThumbnailRenderingTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun directSceneAutomaticThumbnailRendersContentWithZeroPadding() {
+        var receivedPadding: PaddingValues? = null
+        val automatic = Scene(null, "Direct fallback") { padding ->
+            SideEffect { receivedPadding = padding }
+            BasicText("Direct content")
+        }
+
+        render(automatic)
+
+        composeRule.onNodeWithText("Direct content").assertExists()
+        composeRule.runOnIdle { assertEquals(PaddingValues(0.dp), receivedPadding) }
+    }
+
+    @Test
     fun automaticThumbnailRendersContentWithZeroPadding() {
         var receivedPadding: PaddingValues? = null
         val automatic by scene { padding ->

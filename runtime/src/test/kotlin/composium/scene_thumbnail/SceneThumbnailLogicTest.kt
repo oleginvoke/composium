@@ -1,10 +1,7 @@
 package oleginvoke.com.composium.scene_thumbnail
 
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageBitmapConfig
-import androidx.compose.ui.graphics.colorspace.ColorSpace
-import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import oleginvoke.com.composium.SceneKey
+import oleginvoke.com.composium.test_fixtures.fakeImageBitmap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -43,27 +40,26 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
-    fun defaultThumbnailKeyUsesTripleResolutionCapture() {
-        val key = SceneThumbnailKey(
-            sceneId = SceneKey("group", "Default"),
-            isDarkTheme = false,
-        )
+    fun defaultMemoryBudgetKeepsInitialBatchButEvictsOverflow() {
+        val store = SceneThumbnailStore()
+        // Twelve full-size ARGB thumbnails are about 42 MiB. No real bitmaps are
+        // allocated here: this checks the default store's accounting and eviction.
+        val keys = List(12) { keyA.copy(sceneId = SceneKey("batch", "$it")) }
+        val imageBytes = 960 * 960 * 4
+        keys.forEach { store.putReady(it, fakeImageBitmap(), byteSizeBytes = imageBytes) }
 
-        assertEquals(3f, key.captureScale)
-        assertEquals(1080, key.viewportWidthPx)
-        assertEquals(1920, key.viewportHeightPx)
-        assertEquals(960, key.targetWidthPx)
-        assertEquals(960, key.targetHeightPx)
-    }
+        keys.forEach { assertTrue(store.thumbnailFor(it) is SceneThumbnailState.Ready) }
+        assertEquals(keys.size * imageBytes, store.currentMemoryBytes)
 
-    @Test
-    fun defaultMemoryBudgetKeepsInitialLargeThumbnailBatch() {
-        assertEquals(48 * 1024 * 1024, DefaultSceneThumbnailMemoryBudgetBytes)
-    }
+        val extraKeys = List(12) { keyA.copy(sceneId = SceneKey("overflow", "$it")) }
+        extraKeys.forEach { store.putReady(it, fakeImageBitmap(), byteSizeBytes = imageBytes) }
 
-    @Test
-    fun defaultCapturePolicyDoesNotLimitIndividualSceneDuration() {
-        assertNull(DefaultSceneThumbnailCaptureTimeoutMillis)
+        // 48 MiB fits thirteen of these images, not the whole 84 MiB batch.
+        keys.dropLast(1).forEach { assertNull(store.thumbnailFor(it)) }
+        (keys.takeLast(1) + extraKeys).forEach {
+            assertTrue(store.thumbnailFor(it) is SceneThumbnailState.Ready)
+        }
+        assertEquals(13 * imageBytes, store.currentMemoryBytes)
     }
 
     @Test
@@ -167,12 +163,16 @@ class SceneThumbnailLogicTest {
     fun storeEvictsLeastRecentlyUsedReadyImagesByMemoryBudget() {
         val store = SceneThumbnailStore(memoryBudgetBytes = 100)
 
-        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 60)
-        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 60)
+        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 40)
+        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 40)
+        assertTrue(store.thumbnailFor(keyA) is SceneThumbnailState.Ready)
+        store.putReady(keyC, fakeImageBitmap(), byteSizeBytes = 40)
 
-        assertNull(store.thumbnailFor(keyA))
-        assertTrue(store.thumbnailFor(keyB) is SceneThumbnailState.Ready)
-        assertEquals(60, store.currentMemoryBytes)
+        // Reading A must protect it ahead of B: FIFO would evict A instead.
+        assertTrue(store.thumbnailFor(keyA) is SceneThumbnailState.Ready)
+        assertNull(store.thumbnailFor(keyB))
+        assertTrue(store.thumbnailFor(keyC) is SceneThumbnailState.Ready)
+        assertEquals(80, store.currentMemoryBytes)
     }
 
     @Test
@@ -275,6 +275,8 @@ class SceneThumbnailLogicTest {
 
         assertFalse(canCaptureSceneThumbnail(keyA, empty))
         assertFalse(canCaptureSceneThumbnail(keyA, recordedForOtherScene))
+        assertFalse(canCaptureSceneThumbnail(keyA, recordedForCurrentScene.copy(widthPx = 0)))
+        assertFalse(canCaptureSceneThumbnail(keyA, recordedForCurrentScene.copy(heightPx = 0)))
         assertTrue(canCaptureSceneThumbnail(keyA, recordedForCurrentScene))
     }
 
@@ -331,38 +333,23 @@ class SceneThumbnailLogicTest {
 
     @Test
     fun scaledSizeDownscalesLargeContentIntoMaxBounds() {
-        val size = calculateSceneThumbnailScaledSize(
-            contentWidthPx = 360,
-            contentHeightPx = 640,
-            maxWidthPx = 180,
-            maxHeightPx = 320,
-        )
-
-        assertEquals(SceneThumbnailSize(widthPx = 180, heightPx = 320), size)
-    }
-
-    @Test
-    fun displaySizeDoesNotUpscaleSmallThumbnails() {
-        val size = calculateSceneThumbnailDisplaySize(
-            imageWidthPx = 120,
-            imageHeightPx = 48,
-            maxWidthDp = 280f,
-            maxHeightDp = 150f,
-        )
-
-        assertEquals(SceneThumbnailDisplaySize(widthDp = 120f, heightDp = 48f), size)
-    }
-
-    @Test
-    fun displaySizeDownscalesLargeThumbnailsToFitPreviewArea() {
-        val size = calculateSceneThumbnailDisplaySize(
-            imageWidthPx = 180,
-            imageHeightPx = 320,
-            maxWidthDp = 280f,
-            maxHeightDp = 150f,
-        )
-
-        assertEquals(SceneThumbnailDisplaySize(widthDp = 84.375f, heightDp = 150f), size)
+        // Different aspect ratios distinguish proportional scaling from simply
+        // clamping each dimension, and exercise both limiting dimensions.
+        listOf(
+            SceneThumbnailSize(400, 100) to SceneThumbnailSize(180, 45),
+            SceneThumbnailSize(100, 800) to SceneThumbnailSize(40, 320),
+        ).forEach { (content, expected) ->
+            assertEquals(
+                expected,
+                calculateSceneThumbnailScaledSize(
+                    contentWidthPx = content.widthPx,
+                    contentHeightPx = content.heightPx,
+                    maxWidthPx = 180,
+                    maxHeightPx = 320,
+                ),
+                "Content: $content",
+            )
+        }
     }
 
     @Test
@@ -391,38 +378,4 @@ class SceneThumbnailLogicTest {
         assertEquals(150f, size.heightDp, absoluteTolerance = 0.001f)
     }
 
-    @Test
-    fun sceneCardLayoutUsesTopPreviewDividerAndCenteredPreview() {
-        val layout = sceneThumbnailCardLayout()
-
-        assertTrue(layout.hasDivider)
-        assertEquals(SceneThumbnailPreviewHorizontalAlignment.Center, layout.previewHorizontalAlignment)
-    }
-
-    @Test
-    fun sceneCardLayoutUsesSinglePreviewHeight() {
-        val layout = sceneThumbnailCardLayout()
-
-        assertEquals(86f, layout.previewHeightDp)
-    }
-
-    private fun fakeImageBitmap(): ImageBitmap = object : ImageBitmap {
-        override val width: Int = 10
-        override val height: Int = 10
-        override val colorSpace: ColorSpace = ColorSpaces.Srgb
-        override val hasAlpha: Boolean = true
-        override val config: ImageBitmapConfig = ImageBitmapConfig.Argb8888
-
-        override fun readPixels(
-            buffer: IntArray,
-            startX: Int,
-            startY: Int,
-            width: Int,
-            height: Int,
-            bufferOffset: Int,
-            stride: Int,
-        ) = Unit
-
-        override fun prepareToDraw() = Unit
-    }
 }

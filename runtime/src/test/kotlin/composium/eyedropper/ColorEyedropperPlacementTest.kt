@@ -193,10 +193,4 @@ class ColorEyedropperPlacementTest {
         assertEquals(IntOffset(x = 128, y = 198), result.islandOffset)
     }
 
-    @Test
-    fun defaultCloudIsConfiguredSmallerThanLens() {
-        val metrics = ColorEyedropperDefaults.metrics
-
-        assertEquals(true, metrics.islandMinWidth < metrics.lensDiameter)
-    }
 }

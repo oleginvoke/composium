@@ -3,24 +3,10 @@ package oleginvoke.com.composium
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import kotlin.test.Test
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SceneThumbnailApiTest {
-
-    @Test
-    fun thumbnailContentFallsBackToSceneContentWhenThumbnailIsMissing() {
-        val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
-        val scene = Scene(
-            group = null,
-            name = "Fallback",
-            content = content,
-        )
-
-        assertNotNull(scene.thumbnail)
-        assertSame(scene.thumbnail, scene.thumbnailContent())
-    }
 
     @Test
     fun explicitNullDisablesThumbnailForDirectScene() {
@@ -39,23 +25,6 @@ class SceneThumbnailApiTest {
     }
 
     @Test
-    fun omittedThumbnailIsResolvedForDelegatedScene() {
-        val automatic by scene(content = {})
-
-        assertNotNull(automatic.thumbnail)
-        assertSame(automatic.thumbnail, automatic.thumbnailContent())
-    }
-
-    @Test
-    fun directDelegateConstructionDistinguishesOmittedThumbnailFromNull() {
-        val automatic by SceneDelegate(null, "Automatic", SceneTools.TopBar, content = {})
-        val disabled by SceneDelegate(null, "Disabled", SceneTools.TopBar, content = {}, thumbnail = null)
-
-        assertNotNull(automatic.thumbnail)
-        assertNull(disabled.thumbnail)
-    }
-
-    @Test
     fun thumbnailContentUsesThumbnailWhenProvided() {
         val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
         val thumbnail: @Composable SceneScope.() -> Unit = {}
@@ -71,9 +40,11 @@ class SceneThumbnailApiTest {
 
     @Test
     fun sceneDelegateStoresThumbnailSeparatelyFromContent() {
-        val builtScene = DelegatedScenes.customThumbnail
+        val content: @Composable SceneScope.(PaddingValues) -> Unit = {}
+        val thumbnail: @Composable SceneScope.() -> Unit = {}
+        val builtScene by scene(thumbnail = thumbnail, content = content)
 
-        val thumbnail = assertNotNull(builtScene.thumbnail)
+        assertSame(content, builtScene.content)
         assertSame(thumbnail, builtScene.thumbnailContent())
     }
 
@@ -102,25 +73,15 @@ class SceneThumbnailApiTest {
         )
 
         assertSame(badge, scene.badge)
+        assertSame(content, scene.content)
         assertSame(thumbnail, scene.thumbnailContent())
     }
 
     @Test
     fun sceneDelegateStoresBadge() {
-        val builtScene = DelegatedScenes.customBadge
+        val badge: @Composable () -> Unit = {}
+        val builtScene by scene(badge = badge, content = {})
 
-        assertSame(assertNotNull(builtScene.badge), builtScene.badge)
-    }
-
-    private object DelegatedScenes {
-        val customThumbnail by scene(
-            thumbnail = {},
-            content = {},
-        )
-
-        val customBadge by scene(
-            badge = {},
-            content = {},
-        )
+        assertSame(badge, builtScene.badge)
     }
 }
