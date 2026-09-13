@@ -176,6 +176,77 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
+    fun backgroundCapturesDoNotEvictVisibleThumbnails() {
+        val store = SceneThumbnailStore(memoryBudgetBytes = 100)
+        store.setVisibleKeys(setOf(keyA))
+        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 60)
+        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 40)
+        store.putReady(keyC, fakeImageBitmap(), byteSizeBytes = 40)
+
+        assertTrue(store.thumbnailFor(keyA) is SceneThumbnailState.Ready)
+        assertNull(store.thumbnailFor(keyB))
+        assertTrue(store.thumbnailFor(keyC) is SceneThumbnailState.Ready)
+        assertEquals(100, store.currentMemoryBytes)
+    }
+
+    @Test
+    fun onlyVisibleThumbnailsMayExceedBudgetAndLeavingVisibilityTrimsImmediately() {
+        val store = SceneThumbnailStore(memoryBudgetBytes = 100)
+        store.setVisibleKeys(setOf(keyA, keyB))
+        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 70)
+        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 70)
+        store.putReady(keyC, fakeImageBitmap(), byteSizeBytes = 40)
+
+        assertTrue(store.thumbnailFor(keyA) is SceneThumbnailState.Ready)
+        assertTrue(store.thumbnailFor(keyB) is SceneThumbnailState.Ready)
+        assertNull(store.thumbnailFor(keyC))
+        assertEquals(140, store.currentMemoryBytes)
+
+        store.setVisibleKeys(setOf(keyB))
+
+        assertNull(store.thumbnailFor(keyA))
+        assertTrue(store.thumbnailFor(keyB) is SceneThumbnailState.Ready)
+        assertEquals(70, store.currentMemoryBytes)
+    }
+
+    @Test
+    fun evictedThumbnailCanBeCapturedAgainWhenItBecomesVisible() {
+        val store = SceneThumbnailStore(memoryBudgetBytes = 100)
+        store.setVisibleKeys(setOf(keyA))
+        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 70)
+        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 70)
+        assertTrue(store.needsCapture(keyB))
+
+        store.setVisibleKeys(setOf(keyB))
+        store.putCapturing(keyB)
+        store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 70)
+
+        assertNull(store.thumbnailFor(keyA))
+        assertTrue(store.thumbnailFor(keyB) is SceneThumbnailState.Ready)
+        assertEquals(70, store.currentMemoryBytes)
+    }
+
+    @Test
+    fun changingThemeReleasesProtectedImagesFromPreviousTheme() {
+        val store = SceneThumbnailStore(memoryBudgetBytes = 100)
+        store.setVisibleKeys(setOf(keyA))
+        store.putReady(keyA, fakeImageBitmap(), byteSizeBytes = 140)
+        val darkKey = keyA.copy(isDarkTheme = true)
+
+        store.retain(setOf(darkKey))
+        store.setVisibleKeys(setOf(darkKey))
+        store.putReady(darkKey, fakeImageBitmap(), byteSizeBytes = 140)
+
+        assertNull(store.thumbnailFor(keyA))
+        assertTrue(store.thumbnailFor(darkKey) is SceneThumbnailState.Ready)
+        assertEquals(140, store.currentMemoryBytes)
+
+        store.setVisibleKeys(emptySet())
+        assertNull(store.thumbnailFor(darkKey))
+        assertEquals(0, store.currentMemoryBytes)
+    }
+
+    @Test
     fun storeRetainsOnlyCurrentKeysAndDropsStaleMemory() {
         val store = SceneThumbnailStore(memoryBudgetBytes = 200)
 

@@ -359,6 +359,15 @@ internal class SceneThumbnailStore(
 ) {
     private val states = mutableStateMapOf<SceneThumbnailKey, SceneThumbnailState>()
     private val readyRecency = LinkedHashMap<SceneThumbnailKey, Int>(0, 0.75f, true)
+    private var visibleKeys: Set<SceneThumbnailKey> = emptySet()
+
+    fun setVisibleKeys(keys: Set<SceneThumbnailKey>) {
+        if (visibleKeys == keys) return
+        visibleKeys = keys.toSet()
+        // A visible working set may exceed the budget, but off-screen images must not.
+        // Reclaim that temporary excess immediately when visibility changes.
+        trimToBudget()
+    }
 
     var currentMemoryBytes by mutableIntStateOf(0)
         private set
@@ -436,10 +445,16 @@ internal class SceneThumbnailStore(
     }
 
     private fun trimToBudget() {
-        while (currentMemoryBytes > memoryBudgetBytes && readyRecency.isNotEmpty()) {
-            val eldestKey = readyRecency.entries.first().key
-            removeReadyMemory(eldestKey)
-            states.remove(eldestKey)
+        if (currentMemoryBytes <= memoryBudgetBytes) return
+        val entries = readyRecency.entries.iterator()
+        while (currentMemoryBytes > memoryBudgetBytes && entries.hasNext()) {
+            val entry = entries.next()
+            if (entry.key in visibleKeys) continue
+            val key = entry.key
+            val byteSize = entry.value
+            entries.remove()
+            currentMemoryBytes = (currentMemoryBytes - byteSize).coerceAtLeast(0)
+            states.remove(key)
         }
     }
 }

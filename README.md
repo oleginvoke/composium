@@ -72,10 +72,11 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Android `minSdk 24`
 - Consumer project `compileSdk 36`
 - JVM target `11`
-- Kotlin `2.0+`
+- Kotlin `2.3.21` or newer
 - `mavenCentral()` and `google()` in your consumer project
 
-If you use KSP, use a KSP plugin version that matches your Kotlin version. The library is tested with Kotlin `2.3.21` and KSP `2.3.9`.
+If you use KSP, choose a KSP2 plugin version compatible with your Kotlin and AGP versions.
+The baseline configuration uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `8.10.1`, and Gradle `8.11.1`.
 
 ## Installation
 

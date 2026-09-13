@@ -163,10 +163,13 @@ internal fun ComposiumHostScreen(
     LaunchedEffect(visibleSceneIds, thumbnailKeys) {
         val visibleSet = visibleSceneIds.toSet()
         val visibleKeys = thumbnailKeys.filter { key ->
-            key.sceneId in visibleSet && thumbnailStore.needsCapture(key)
+            key.sceneId in visibleSet
         }
-        visibleKeys.forEach(thumbnailStore::putPending)
-        thumbnailQueue.prioritize(visibleKeys)
+        // Protect ready images too, not just the visible scenes awaiting capture.
+        thumbnailStore.setVisibleKeys(visibleKeys.toSet())
+        val missingKeys = visibleKeys.filter(thumbnailStore::needsCapture)
+        missingKeys.forEach(thumbnailStore::putPending)
+        thumbnailQueue.prioritize(missingKeys)
     }
 
     LaunchedEffect(shouldPauseThumbnailCapture, currentCaptureKey) {
