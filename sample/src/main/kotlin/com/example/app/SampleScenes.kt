@@ -1,20 +1,29 @@
 package com.example.app
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumSceneCatalog
+import oleginvoke.com.composium.RenderPreview
+import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.scene
 
 @ComposiumScene
@@ -61,14 +70,18 @@ internal val SampleButton by sceneWithDecorator(
     )
 }
 
+@Preview()
+@Composable
+private fun SampleButtonScenePreview() {
+    SampleButton.RenderPreview()
+}
+
 @ComposiumScene
 internal val testList by sceneWithDecorator(
-    enableEdgeToEdge = false,
     scrollable = false,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = innerPadding,
     ) {
         items(50) {
             Text("$it")
@@ -80,18 +93,50 @@ internal val testList by sceneWithDecorator(
 internal val tonalNestedPlayground by scene(
     group = "Buttons/Secondary/Tonal",
     name = "Nested playground",
-) {
+    tools = SceneTools.Floating,
+) { contentPadding ->
     val title: String by param("Invite teammate")
     val enabled: Boolean by param(true)
     val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
         inferred.reversed()
     }
 
-    NestedButtonSceneContent(
-        title = title,
-        enabled = enabled,
-        size = size,
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            NestedButtonSceneContent(
+                title = title,
+                enabled = enabled,
+                size = size,
+            )
+        }
+    }
+}
+
+@ComposiumScene
+internal val noThumbnailDemo by scene(
+    group = "Thumbnails",
+    name = "No thumbnail",
+    thumbnail = null,
+) { contentPadding ->
+    val text: String by param("This scene opens normally, but has no catalog preview.")
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, style = MaterialTheme.typography.titleMedium)
+    }
 }
 
 @ComposiumSceneCatalog
@@ -100,7 +145,7 @@ internal object ParameterScenes {
     val namesAndNullable by scene(
         group = "Parameters/Custom options",
         name = "Names + nullable",
-    ) {
+    ) { contentPadding ->
         val role: UserRole by param(
             default = UserRole.Member,
         )
@@ -117,17 +162,24 @@ internal object ParameterScenes {
             name = "Subtitle",
         )
 
-        NullableNamesSceneContent(
-            role = role,
-            avatarSize = avatarSize,
-            subtitle = subtitle,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            NullableNamesSceneContent(
+                role = role,
+                avatarSize = avatarSize,
+                subtitle = subtitle,
+            )
+        }
     }
 
     val enumAndNumericOptions by scene(
         group = "Parameters/Automatic",
         name = "Enum + numeric options",
-    ) {
+    ) { contentPadding ->
         val tone: BannerTone by param(BannerTone.Success)
         val spacing: Int by param(
             default = 16,
@@ -139,11 +191,18 @@ internal object ParameterScenes {
         )
         val actionText: String by param("Retry")
 
-        EnumAndNumericOptionsSceneContent(
-            tone = tone,
-            spacing = spacing,
-            actionText = actionText,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            EnumAndNumericOptionsSceneContent(
+                tone = tone,
+                spacing = spacing,
+                actionText = actionText,
+            )
+        }
     }
 }
 
@@ -151,7 +210,7 @@ internal object ParameterScenes {
 internal val modalBottomSheetDemo by scene(
     group = "Layouts/Overlays/Bottom sheets",
     name = "Modal bottom sheet",
-) {
+) { contentPadding ->
     var opened: Boolean by param(
         default = false,
         name = "Opened",
@@ -162,11 +221,17 @@ internal val modalBottomSheetDemo by scene(
         name = "Supporting text",
     )
 
-    ModalBottomSheetSceneContent(
-        opened = opened,
-        title = title,
-        supportingText = supportingText,
-        onOpen = { opened = true },
-        onDismiss = { opened = false },
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+    ) {
+        ModalBottomSheetSceneContent(
+            opened = opened,
+            title = title,
+            supportingText = supportingText,
+            onOpen = { opened = true },
+            onDismiss = { opened = false },
+        )
+    }
 }

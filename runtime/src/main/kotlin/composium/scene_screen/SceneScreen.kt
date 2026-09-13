@@ -33,6 +33,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,8 +49,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Colorize
-import androidx.compose.material.icons.outlined.CropFree
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -66,10 +67,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -87,9 +88,10 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
 import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
-import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
+import oleginvoke.com.composium.onlyTopAndHorizontal
 import oleginvoke.com.composium.ui.components.ComposiumIcon
 import oleginvoke.com.composium.ui.components.ComposiumIconButton
 import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
@@ -100,9 +102,10 @@ import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 import kotlin.math.roundToInt
 
-private val SceneInspectorTabsHeight = 34.dp
+private val SceneInspectorTabsHeight = 40.dp
 private val SceneInspectorTabsTopGap = 2.dp
 private val SceneEyedropperOverlayTopPadding = 108.dp
+private val SceneTopBarContentHeight = 72.dp
 private val SceneTopBarItemSize = 48.dp
 private val SceneTopBarItemSpacing = 4.dp
 
@@ -114,19 +117,39 @@ internal fun SceneScreen(
     sceneEntry: SceneEntry,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
 ) {
     val themeController = LocalComposiumThemeController.current
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
     val store = rememberSceneScreenStore(sceneEntry.id)
     val state = store.state
+    val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
+    var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
+    val remainingInsets = remember(contentWindowInsets, consumedInsets) {
+        contentWindowInsets.exclude(consumedInsets)
+    }
     val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
     val callbacks = remember(store, onBack, themeController.onThemeChange) {
         object : SceneScreenCallbacks {
             override fun onBack() {
-                onBack.invoke()
+                val currentState = store.state
+                when {
+                    currentState.isEyedropperVisible -> onHideEyedropper()
+                    currentState.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded ->
+                        onNavigateBackFromExpandedControls()
+                    currentState.controlsSheet.isVisible -> onDismissControls()
+                    else -> onBack.invoke()
+                }
+            }
+
+            override fun onMinimizeFloatingTools() {
+                store.dispatch(SceneScreenIntent.MinimizeFloatingTools)
+            }
+
+            override fun onShowFloatingTools() {
+                store.dispatch(SceneScreenIntent.ShowFloatingTools)
             }
 
             override fun onToggleControls() {
@@ -184,11 +207,7 @@ internal fun SceneScreen(
 
     SceneScreenBackHandler(
         enabled = state.isEyedropperVisible || state.controlsSheet.isVisible,
-        onBack = when {
-            state.isEyedropperVisible -> callbacks::onHideEyedropper
-            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded -> callbacks::onNavigateBackFromExpandedControls
-            else -> callbacks::onDismissControls
-        },
+        onBack = callbacks::onBack,
     )
 
     val targetFraction = when (state.controlsSheet.layoutMode) {
@@ -243,6 +262,7 @@ internal fun SceneScreen(
 
     Box(
         modifier = modifier
+            .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize(),
     ) {
         ColorEyedropperHost(
@@ -265,7 +285,8 @@ internal fun SceneScreen(
                     isDarkTheme = themeController.isDarkTheme,
                     callbacks = callbacks,
                     paramsCallbacks = paramsCallbacks,
-                    contentWindowInsets = contentWindowInsets,
+                    // Raw getTop/getBottom reads do not account for parent consumption.
+                    contentWindowInsets = remainingInsets,
                     inspectorFractionProvider = inspectorFractionProvider,
                     isInspectorComposed = isInspectorComposed,
                     onInspectorDragUpdate = onInspectorDragUpdate,
@@ -283,15 +304,43 @@ internal fun SceneScreen(
             }
         }
 
-        SceneScreenTopBar(
-            sceneEntry = sceneEntry,
-            controlsSheet = state.controlsSheet,
-            isDarkTheme = themeController.isDarkTheme,
-            isEyedropperVisible = state.isEyedropperVisible,
-            callbacks = callbacks,
-            statusBarInsets = contentWindowInsets,
-            modifier = Modifier.align(Alignment.TopStart),
-        )
+        if (
+            sceneEntry.scene.tools == SceneTools.TopBar ||
+            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+        ) {
+            SceneScreenTopBar(
+                sceneEntry = sceneEntry,
+                controlsSheet = state.controlsSheet,
+                isDarkTheme = themeController.isDarkTheme,
+                isEyedropperVisible = state.isEyedropperVisible,
+                callbacks = callbacks,
+                statusBarInsets = contentWindowInsets,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        }
+
+        if (
+            shouldShowFloatingTools(
+                tools = sceneEntry.scene.tools,
+                inspectorLayoutMode = state.controlsSheet.layoutMode,
+            )
+        ) {
+            SceneFloatingToolsOverlay(
+                controlsLayout = state.controlsSheet.layoutMode,
+                isMinimized = state.isFloatingToolsMinimized,
+                isDarkTheme = themeController.isDarkTheme,
+                isEyedropperVisible = state.isEyedropperVisible,
+                onBack = callbacks::onBack,
+                onToggleControls = callbacks::onToggleControls,
+                onToggleEyedropper = callbacks::onToggleEyedropper,
+                onThemeChange = callbacks::onThemeChange,
+                onMinimize = callbacks::onMinimizeFloatingTools,
+                onShow = callbacks::onShowFloatingTools,
+                position = floatingToolsPosition,
+                contentWindowInsets = remainingInsets,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -302,7 +351,7 @@ private fun SceneScreenTopBar(
     isDarkTheme: Boolean,
     isEyedropperVisible: Boolean,
     callbacks: SceneScreenCallbacks,
-    statusBarInsets: WindowInsets? = null,
+    statusBarInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     val controlsLayout = controlsSheet.layoutMode
@@ -320,12 +369,7 @@ private fun SceneScreenTopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                statusBarInsets
-                    .onlyTopAndHorizontalOrNull()
-                    ?.let(Modifier::windowInsetsPadding)
-                    ?: Modifier,
-            )
+            .windowInsetsPadding(statusBarInsets.onlyTopAndHorizontal())
             .padding(horizontal = 12.dp)
             .padding(top = 10.dp, bottom = 12.dp),
     ) {
@@ -376,10 +420,10 @@ private fun SplitTopBarRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = if (isVisible) "Close settings" else "Back",
-            onClick = if (isVisible) callbacks::onDismissControls else callbacks::onBack,
+            onClick = callbacks::onBack,
             enabled = interactive,
         )
         SceneSceneTitleIsland(
@@ -391,7 +435,7 @@ private fun SplitTopBarRow(
             horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
         ) {
             if (controlsLayout != SceneInspectorLayoutMode.Expanded) {
-                SceneTopBarActionButton(
+                SceneToolActionButton(
                     imageVector = Icons.Outlined.Colorize,
                     contentDescription = eyedropperButtonState.contentDescription,
                     onClick = callbacks::onToggleEyedropper,
@@ -399,7 +443,7 @@ private fun SplitTopBarRow(
                     enabled = interactive,
                 )
             }
-            SceneTopBarActionButton(
+            SceneToolActionButton(
                 imageVector = settingsButtonState.icon.imageVector(),
                 contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
@@ -428,10 +472,10 @@ private fun ExpandedTopBarRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(SceneTopBarItemSpacing),
     ) {
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "Back to split layout",
-            onClick = callbacks::onNavigateBackFromExpandedControls,
+            onClick = callbacks::onBack,
             enabled = interactive,
         )
         SceneExpandedControlsTitleIsland(
@@ -439,7 +483,7 @@ private fun ExpandedTopBarRow(
             selectedTab = selectedTab,
             modifier = Modifier.weight(1f),
         )
-        SceneTopBarActionButton(
+        SceneToolActionButton(
             imageVector = Icons.Filled.Close,
             contentDescription = "Close settings",
             onClick = callbacks::onDismissControls,
@@ -583,38 +627,20 @@ private fun SceneScreenContent(
     onInspectorDragUpdate: (Float) -> Unit,
     onInspectorDragStop: (Float) -> Unit,
     liveDragFractionProvider: () -> Float,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val topInset = contentWindowInsets?.getTop(density)?.let { inset ->
-        with(density) { inset.toDp() }
-    } ?: 0.dp
-    val bottomInset = contentWindowInsets?.getBottom(density)?.let { inset ->
-        with(density) { inset.toDp() }
-    } ?: 0.dp
-    val contentTopPadding = topInset + 72.dp
-
-    // Tell the scene what insets the runtime is NOT applying for it.
-    // - enableEdgeToEdge = true  → runtime applies nothing; scene renders behind top bar /
-    //   nav bar and reads `innerPadding` to add the spacing it wants.
-    // - enableEdgeToEdge = false → runtime applies the same spacing itself, so the scene
-    //   sees PaddingValues(0) and just fills its visible area normally.
-    val sceneInnerPadding = if (sceneEntry.scene.enableEdgeToEdge) {
-        PaddingValues(
-            top = contentTopPadding,
-            bottom = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Closed) {
-                bottomInset
-            } else {
-                0.dp
-            },
-        )
-    } else {
-        androidx.compose.foundation.layout.PaddingValues(0.dp)
-    }
-    SideEffect {
-        sceneScope.internalInnerPadding = sceneInnerPadding
-    }
+    val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
+    val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
+    val contentTopPadding = topInset + SceneTopBarContentHeight
+    val sceneContentPadding = calculateSceneContentPadding(
+        tools = sceneEntry.scene.tools,
+        statusBarInset = topInset,
+        navigationBarInset = bottomInset,
+        topBarHeight = SceneTopBarContentHeight,
+        inspectorLayoutMode = controlsSheet.layoutMode,
+    )
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -638,10 +664,9 @@ private fun SceneScreenContent(
         label = "scene_split_boundary_shift",
     )
 
-    // BoxWithConstraints fills the full screen (no top padding). The preview pane's outer
-    // .layout decides the scene placement based on enableEdgeToEdge — either filling the
-    // pane edge-to-edge, or sitting inside the safe area below the top bar / above the nav
-    // bar. Inspector positioning is preserved by treating `availableHeightPx` as the
+    // BoxWithConstraints fills the full screen (no top padding). The preview pane fills the
+    // available area while the scene receives explicit content padding. Inspector positioning
+    // is preserved by treating `availableHeightPx` as the
     // safe-area height (= constraints.maxHeight − contentTopPaddingPx).
     BoxWithConstraints(
         modifier = modifier
@@ -663,11 +688,9 @@ private fun SceneScreenContent(
                 sceneScope = sceneScope,
                 availableHeightPx = availableHeightPx,
                 inspectorFractionProvider = inspectorFractionProvider,
-                layoutMode = controlsSheet.layoutMode,
                 splitBoundaryShift = splitBoundaryShift,
                 contentTopPadding = contentTopPadding,
-                bottomInset = bottomInset,
-                enableEdgeToEdge = sceneEntry.scene.enableEdgeToEdge,
+                sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
                 } else {
@@ -711,91 +734,14 @@ private fun SceneScreenContent(
 }
 
 @Composable
-private fun SceneTopBarActionButton(
-    imageVector: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    active: Boolean = false,
-    enabled: Boolean = true,
-) {
-    val containerColor by animateColorAsState(
-        // The light-theme primaryContainer token bakes in alpha 0.83 (0xD3B5D9E8). Override
-        // to fully opaque so the active settings button is solid like the other top bar
-        // elements rather than letting preview content bleed through.
-        targetValue = if (active) {
-            Tokens.colors.primaryContainer
-        } else {
-            Tokens.colors.surface
-        },
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_container",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (active) {
-            Color.Transparent
-        } else {
-            Tokens.colors.outlineVariant.copy(alpha = 0.8f)
-        },
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_border",
-    )
-    val tint by animateColorAsState(
-        targetValue = if (active) Tokens.colors.primary else Tokens.colors.onSurface,
-        animationSpec = Motion.tweenStandard(),
-        label = "scene_top_bar_button_tint",
-    )
-
-    Box(
-        modifier = modifier
-            .size(SceneTopBarItemSize)
-            .clip(Tokens.shapes.pill)
-            .background(containerColor)
-            .border(1.dp, borderColor, Tokens.shapes.pill),
-        contentAlignment = Alignment.Center,
-    ) {
-        ComposiumIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            size = SceneTopBarItemSize,
-        ) {
-            AnimatedContent(
-                targetState = imageVector,
-                transitionSpec = {
-                    fadeIn(animationSpec = Motion.tweenStandard()) togetherWith
-                        fadeOut(animationSpec = Motion.tweenStandard())
-                },
-                label = "scene_top_bar_button_icon",
-            ) { targetIcon ->
-                ComposiumIcon(
-                    imageVector = targetIcon,
-                    contentDescription = contentDescription,
-                    tint = tint,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-    }
-}
-
-private fun SceneSettingsButtonIcon.imageVector(): ImageVector {
-    return when (this) {
-        SceneSettingsButtonIcon.Settings -> Icons.Outlined.Tune
-        SceneSettingsButtonIcon.Expand -> Icons.Outlined.CropFree
-    }
-}
-
-@Composable
 private fun ScenePreviewPane(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
     availableHeightPx: Int,
     inspectorFractionProvider: () -> Float,
-    layoutMode: SceneInspectorLayoutMode,
     splitBoundaryShift: Dp,
     contentTopPadding: Dp,
-    bottomInset: Dp,
-    enableEdgeToEdge: Boolean,
+    sceneContentPadding: PaddingValues,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -803,15 +749,8 @@ private fun ScenePreviewPane(
 
     // The preview pane visually occupies [Y=0, Y=paneHeight] in its parent. The pane height
     // covers everything from the top of the screen down to either the inspector boundary
-    // (Split / Expanded) or the screen bottom (Closed). What changes between edge-to-edge
-    // and not is only the placement of the SCENE inside this pane:
-    //
-    //   - enableEdgeToEdge = true  → scene fills the entire pane, including behind the top
-    //     bar and (in Closed mode) behind the system nav bar. The scene receives both insets
-    //     via SceneScope.innerPadding so it can apply them where appropriate.
-    //   - enableEdgeToEdge = false → scene is offset down by contentTopPadding (so it sits
-    //     below the top bar) and (in Closed mode) shortened by bottomInset (so it sits above
-    //     the nav bar). SceneScope.innerPadding is reported as zero.
+    // (Split / Expanded) or the screen bottom (Closed). The scene always fills this pane and
+    // owns placement of its content through the explicit padding passed to it.
     //
     // Constraints passed to the scene are FULLY BOUNDED (minH = maxH = sceneHeight) so any
     // vertical scrollables inside the scene (LazyColumn / Modifier.verticalScroll) measure
@@ -825,9 +764,6 @@ private fun ScenePreviewPane(
                 val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
                 val shiftPx = splitBoundaryShift.toPx()
                 val topPaddingPx = contentTopPadding.toPx()
-                val applyBottomInset = !enableEdgeToEdge &&
-                    layoutMode == SceneInspectorLayoutMode.Closed
-                val bottomPaddingPx = if (applyBottomInset) bottomInset.toPx() else 0f
                 val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
 
                 val visibleAreaPx = (1f - fraction) * availableHeightPx + shiftPx
@@ -835,8 +771,8 @@ private fun ScenePreviewPane(
                     .roundToInt()
                     .coerceIn(1, ceiling)
 
-                val sceneTopPx = if (enableEdgeToEdge) 0 else topPaddingPx.roundToInt()
-                val sceneBottomPx = bottomPaddingPx.roundToInt()
+                val sceneTopPx = 0
+                val sceneBottomPx = 0
                 val sceneHeight = (paneHeight - sceneTopPx - sceneBottomPx).coerceAtLeast(0)
 
                 val placeable = measurable.measure(
@@ -872,6 +808,7 @@ private fun ScenePreviewPane(
         ScenePreviewContent(
             sceneEntry = sceneEntry,
             sceneScope = sceneScope,
+            contentPadding = sceneContentPadding,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -1146,7 +1083,7 @@ private fun SceneInspectorTabs(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(indicatorWidth)
-                    .height(28.dp)
+                    .height(SceneInspectorTabsHeight - inset * 2)
                     .align(Alignment.CenterStart)
                     .clip(Tokens.shapes.pill)
                     .background(Tokens.colors.primaryContainer.copy(alpha = 0.6f)),
@@ -1373,6 +1310,7 @@ private fun SceneInspectorEmptyState(
 private fun ScenePreviewContent(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
+    contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val settings = sceneScope.preview
@@ -1382,6 +1320,16 @@ private fun ScenePreviewContent(
     val resolvedDensityValue = settings.displayScaleOverride?.let { stableDensity * it } ?: baseDensity.density
     val resolvedFontScale = settings.fontScaleOverride ?: baseDensity.fontScale
     val layoutDirection = if (settings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    // Insets and Composium chrome were measured in host dp. Preserve their physical bounds
+    // when scene content applies this padding with its overridden density and direction.
+    val paddingDensityRatio = baseDensity.density / resolvedDensityValue
+    val hostLayoutDirection = LocalLayoutDirection.current
+    val previewContentPadding = PaddingValues.Absolute(
+        left = contentPadding.calculateLeftPadding(hostLayoutDirection) * paddingDensityRatio,
+        top = contentPadding.calculateTopPadding() * paddingDensityRatio,
+        right = contentPadding.calculateRightPadding(hostLayoutDirection) * paddingDensityRatio,
+        bottom = contentPadding.calculateBottomPadding() * paddingDensityRatio,
+    )
 
     CompositionLocalProvider(
         LocalLayoutDirection provides layoutDirection,
@@ -1400,7 +1348,7 @@ private fun ScenePreviewContent(
             propagateMinConstraints = true,
         ) {
             LocalScenePreviewContainer.current.Decoration {
-                sceneEntry.scene.content(sceneScope)
+                sceneEntry.scene.content(sceneScope, previewContentPadding)
             }
         }
     }

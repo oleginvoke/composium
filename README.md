@@ -7,11 +7,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Current release: `1.2.3`
+Version: `1.3.0-alpha01` (pre-release)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.2.3`
-- `io.github.oleginvoke:composium-processor:1.2.3`
+- `io.github.oleginvoke:composium:1.3.0-alpha01`
+- `io.github.oleginvoke:composium-processor:1.3.0-alpha01`
 
 It is useful for:
 - design systems and component libraries;
@@ -30,7 +30,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/d246e248-bda4-461a-9f2e-1dccd84633a2">
 </p>
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/f22d482a-9893-4883-aed8-4dc401d02b35">
+    <img src="assets/composium-demo.gif" alt="Composium demo: scene catalog, live parameters, environment controls, floating tools, and eyedropper" width="400">
 </p>
 
 ## Why Composium
@@ -72,10 +72,11 @@ The library is meant to help you explore UI, not constrain how you structure it.
 - Android `minSdk 24`
 - Consumer project `compileSdk 36`
 - JVM target `11`
-- Kotlin `2.0+`
+- Kotlin `2.3.21` or newer
 - `mavenCentral()` and `google()` in your consumer project
 
-If you use KSP, use a KSP plugin version that matches your Kotlin version. The library is tested with Kotlin `2.3.21` and KSP `2.3.9`.
+If you use KSP, choose a KSP2 plugin version compatible with your Kotlin and AGP versions.
+The baseline configuration uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `8.10.1`, and Gradle `8.11.1`.
 
 ## Installation
 
@@ -98,18 +99,22 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.2.3")
-    ksp("io.github.oleginvoke:composium-processor:1.2.3")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
+    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha01")
 }
 ```
 
 Use this mode when you want automatic scene collection.
 
+In a multi-module project, keep all scene declarations and the Composium KSP processor in a single showcase module, such as `:sample` or `:catalog`. That module depends on the modules containing the UI components and declares scenes for those components. It can run as a standalone sample app or expose a public composable entry point for a host app to display the showcase.
+
+Automatic discovery collects scenes declared in that showcase module; it does not collect annotated scenes from compiled dependencies. Do not configure the Composium processor in multiple scene-containing modules included in the same app: each generates the same registry class, causing a duplicate-class build error. The runtime dependency itself can be used in multiple modules; this restriction applies to scene discovery and registry generation.
+
 ### Optional: without KSP
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.2.3")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
 }
 ```
 
@@ -133,7 +138,10 @@ You do not need to use both at the same time. Pick the style that matches how yo
 Use this style when you want flat, explicit scene declarations and prefer to mark each scene directly.
 
 ```kotlin
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import oleginvoke.com.composium.ComposiumScene
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
@@ -154,18 +162,20 @@ sealed interface ButtonSize {
 internal val primaryButton by scene(
     group = "Buttons/Primary",
     name = "Filled",
-) {
+) { contentPadding ->
     val enabled: Boolean by param(true)
     val text: String by param("Continue")
     val variant: ButtonVariant by param(ButtonVariant.Primary)
     val size: ButtonSize by param(ButtonSize.Medium)
 
-    AppButton(
-        text = text,
-        enabled = enabled,
-        variant = variant,
-        size = size,
-    )
+    Box(Modifier.padding(contentPadding)) {
+        AppButton(
+            text = text,
+            enabled = enabled,
+            variant = variant,
+            size = size,
+        )
+    }
 }
 @Composable
 fun DebugCatalog() {
@@ -178,19 +188,26 @@ fun DebugCatalog() {
 Use this style when you want to keep several related scenes together inside one object and let KSP collect all non-private `Scene` properties from it.
 
 ```kotlin
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import oleginvoke.com.composium.ComposiumSceneCatalog
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
 
 @ComposiumSceneCatalog
 internal object FormScenes {
-    val loginDefault by scene(group = "Forms/Auth", name = "Login / default") {
-        LoginForm()
+    val loginDefault by scene(group = "Forms/Auth", name = "Login / default") { contentPadding ->
+        Box(Modifier.padding(contentPadding)) {
+            LoginForm()
+        }
     }
 
-    val loginLoading by scene(group = "Forms/Auth", name = "Login / loading") {
-        LoginForm(isLoading = true)
+    val loginLoading by scene(group = "Forms/Auth", name = "Login / loading") { contentPadding ->
+        Box(Modifier.padding(contentPadding)) {
+            LoginForm(isLoading = true)
+        }
     }
 }
 
@@ -211,19 +228,26 @@ These are two independent discovery styles, not a required pair of annotations o
 Manual mode uses the same `scene {}` API, but skips both KSP and annotations.
 
 ```kotlin
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
 import oleginvoke.com.composium.Composium
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.scene
 
-internal val primaryButton by scene(group = "Buttons/Primary", name = "Filled") {
-    AppButton(text = "Continue")
+internal val primaryButton by scene(group = "Buttons/Primary", name = "Filled") { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        AppButton(text = "Continue")
+    }
 }
 
 internal object FormScenes {
-    val loginDefault by scene(group = "Forms/Auth", name = "Login / default") {
-        LoginForm()
+    val loginDefault by scene(group = "Forms/Auth", name = "Login / default") { contentPadding ->
+        Box(Modifier.padding(contentPadding)) {
+            LoginForm()
+        }
     }
 }
 
@@ -241,9 +265,15 @@ fun DebugCatalog() {
 ```
 
 Notes:
-- manual registration is deduplicated by scene id (`group + name`);
+- manual registration identifies scenes by their group and name;
 - scenes still use the same runtime API as KSP mode;
 - annotations are not needed in manual mode.
+
+For both automatic and manual registration, scene names must be unique within a group. Registering the same `Scene` instance again is safe. If a different scene uses the same group and name, the first scene is kept and Composium logs a warning with the `Composium` tag.
+
+Repeated reads of a property declared with `val MyScene by scene { ... }` return the same `Scene` instance. Reading the property does not render its content.
+
+When constructing `Scene(...)` directly, keep and reuse the instance for repeated registration.
 
 ## Organizing Scenes
 
@@ -254,8 +284,10 @@ Composium does not force a single scene structure.
 Scenes without a `group` stay at the root level:
 
 ```kotlin
-internal val typographyTokens by scene {
-    TypographyShowcase()
+internal val typographyTokens by scene { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        TypographyShowcase()
+    }
 }
 ```
 
@@ -264,16 +296,22 @@ internal val typographyTokens by scene {
 Use slash-separated paths to build nested groups:
 
 ```kotlin
-internal val primaryFilled by scene(group = "Buttons/Primary/Filled") {
-    PrimaryFilledButton()
+internal val primaryFilled by scene(group = "Buttons/Primary/Filled") { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        PrimaryFilledButton()
+    }
 }
 
-internal val primaryOutlined by scene(group = "Buttons/Primary/Outlined") {
-    PrimaryOutlinedButton()
+internal val primaryOutlined by scene(group = "Buttons/Primary/Outlined") { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        PrimaryOutlinedButton()
+    }
 }
 
-internal val dangerFilled by scene(group = "Buttons/Danger/Filled") {
-    DangerButton()
+internal val dangerFilled by scene(group = "Buttons/Danger/Filled") { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        DangerButton()
+    }
 }
 ```
 
@@ -284,30 +322,41 @@ That means you can:
 - group them with `group = "..."`;
 - or combine that with `@ComposiumSceneCatalog` objects for code organization.
 
-### Edge-to-edge scenes
+### Scene content padding and tools
 
-By default, Composium keeps scene content below its own top bar and above the system navigation bar:
+Every scene receives the full preview bounds and an explicit `contentPadding`. For regular content, apply it to the root so content stays clear of system bars and the default Composium top bar:
 
 ```kotlin
-internal val regularScene by scene(group = "Layout") {
-    Content()
+val RegularScene by scene { contentPadding ->
+    Box(Modifier.fillMaxSize().padding(contentPadding)) {
+        Content()
+    }
+}
+
+val FullScreenScene by scene(
+    tools = SceneTools.Floating,
+) { contentPadding ->
+    Box(Modifier.fillMaxSize()) {
+        FullScreenBackground()
+        Actions(Modifier.padding(contentPadding))
+    }
 }
 ```
 
-Use `enableEdgeToEdge = true` when a scene should own this spacing itself, for example for full-screen layouts, lists, maps, or custom surfaces that need to render behind Composium chrome.
+For edge-to-edge content, apply `contentPadding` only to the children that must remain unobscured. `SceneTools.TopBar` is the default. Use `SceneTools.Floating` to replace the top bar with a compact overlay containing Back, Properties, Eyedropper, and Theme controls.
+
+The overlay starts at the top-right, below the status bar. Tap its eye button to hide or show the tools, or drag the eye to reposition them. Properties opens the controls panel; tapping it again expands the panel. Floating tools do not contribute to `contentPadding` or appear in eyedropper samples.
+
+The bundled lint check reports an error when scene content does not reference its padding. For intentional full-bleed content, suppress that one issue explicitly:
 
 ```kotlin
-internal val edgeToEdgeFeed by scene(
-    group = "Layout",
-    enableEdgeToEdge = true,
-) {
-    Feed(
-        contentPadding = innerPadding,
-    )
+@Suppress("UnusedComposiumContentPaddingParameter")
+val BackgroundScene by scene {
+    FullScreenBackground()
 }
 ```
 
-When `enableEdgeToEdge` is `true`, Composium lets the scene fill the preview area and exposes the top and bottom insets through `innerPadding`. Apply that padding where it matches the component layout. When it is `false`, Composium applies the spacing for you and `innerPadding` is zero.
+Naming the lambda argument `_` still reports an error. The rule checks for an explicit reference or an explicit suppression; it does not try to prove where the padding was applied.
 
 ### Scene thumbnails
 
@@ -316,8 +365,10 @@ The main catalog screen automatically creates thumbnails for scenes. By default,
 This keeps the catalog visual without requiring extra setup for every scene:
 
 ```kotlin
-internal val primaryButton by scene(group = "Buttons") {
-    PrimaryButton(text = "Continue", onClick = {})
+internal val primaryButton by scene(group = "Buttons") { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        PrimaryButton(text = "Continue", onClick = {})
+    }
 }
 ```
 
@@ -329,16 +380,32 @@ internal val paymentForm by scene(
     thumbnail = {
         PaymentFormPreview()
     },
-) {
-    PaymentForm()
+) { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        PaymentForm()
+    }
 }
 ```
 
 Use custom thumbnails for cases where the catalog should show a simplified, stable, or intentionally framed version of the component while keeping the real scene interactive and complete.
 
+Omitting `thumbnail` captures the scene's `content`. Passing `thumbnail = null` explicitly disables capture for that scene and removes the entire preview area from its catalog card, without a placeholder or reserved space:
+
+```kotlin
+internal val paymentScreen by scene(thumbnail = null) { contentPadding ->
+    PaymentScreen(Modifier.padding(contentPadding))
+}
+```
+
+The card remains clickable and opens the scene normally. If a `badge` is provided, it appears beside the card title instead of over a preview. These defaults also apply to scenes created directly through `Scene`.
+
+A nullable thumbnail variable that evaluates to `null` also disables capture.
+
+Thumbnail capture runs a real composition: effects in the captured content can start requests, subscriptions, or analytics before the scene is opened. Use a custom thumbnail with static sample data, or disable capture, for scenes with such effects. A custom `thumbnail` is also ordinary composable content and does not automatically suppress effects.
+
 ### Scene card badges
 
-Use `badge` when a scene needs an extra marker inside its catalog card. Composium renders it in the top-end corner of the thumbnail area and only adds a small outer padding; the badge content controls its own size, shape, colors, and behavior.
+Use `badge` when a scene needs an extra marker inside its catalog card. Composium renders it in the top-end corner of the thumbnail area, or beside the title when `thumbnail = null`; the badge content controls its own size, shape, colors, and behavior.
 
 This is useful for lightweight per-scene metadata that should be visible before opening the scene, for example:
 
@@ -371,8 +438,10 @@ internal val paymentButton by scene(
                 .background(Color(0xFF2E7D32)),
         )
     },
-) {
-    PaymentButton()
+) { contentPadding ->
+    Box(Modifier.padding(contentPadding)) {
+        PaymentButton()
+    }
 }
 ```
 
@@ -381,21 +450,34 @@ internal val paymentButton by scene(
 Scene parameters are declared inside the scene body with delegated properties:
 
 ```kotlin
-internal val buttonPlayground by scene(group = "Buttons") {
+internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
     val enabled: Boolean by param(true)
     var title: String by param("Continue")
 
-    AppButton(
-        text = title,
-        enabled = enabled,
-        onClick = {
-            title = if (title == "Continue") "Saved" else "Continue"
-        },
-    )
+    Box(Modifier.padding(contentPadding)) {
+        AppButton(
+            text = title,
+            enabled = enabled,
+            onClick = {
+                title = if (title == "Continue") "Saved" else "Continue"
+            },
+        )
+    }
 }
 ```
 
 `param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
+
+### Parameter names must be unique
+
+Parameter names must be unique within a scene, including parameters declared by helper composables. By default, the name matches the delegated property; pass `name` to set a different label:
+
+```kotlin
+val title: String by param("Hello", name = "Title")
+val subtitle: String by param("World", name = "Subtitle")
+```
+
+Duplicate names throw `IllegalStateException` identifying the conflict. This also applies when changing `name` dynamically. Different scenes can use the same parameter names.
 
 ### How Composium renders parameter controls
 
@@ -427,16 +509,18 @@ sealed interface ButtonSize {
     object Large : ButtonSize
 }
 
-internal val buttonPlayground by scene(group = "Buttons") {
+internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
     val enabled: Boolean by param(true)
     val variant: ButtonVariant by param(ButtonVariant.Primary)
     val size: ButtonSize by param(ButtonSize.Medium)
 
-    AppButton(
-        enabled = enabled,
-        variant = variant,
-        size = size,
-    )
+    Box(Modifier.padding(contentPadding)) {
+        AppButton(
+            enabled = enabled,
+            variant = variant,
+            size = size,
+        )
+    }
 }
 ```
 
@@ -454,7 +538,7 @@ Inside `scene {}` you can convert raw values to `List<ParamOption<T>>` with `toP
 If the parameter type is nullable, pass only the non-null choices. Composium handles the `null` state through the checkbox automatically.
 
 ```kotlin
-internal val spacingPlayground by scene(group = "Spacing") {
+internal val spacingPlayground by scene(group = "Spacing") { contentPadding ->
     val elevation: Int by param(
         default = 0 named "None",
         options = listOf(
@@ -470,10 +554,12 @@ internal val spacingPlayground by scene(group = "Spacing") {
         options = listOf(0.25f, 0.5f, 0.75f, 1f).toParamOptions(),
     )
 
-    ExampleCard(
-        elevation = elevation,
-        alpha = alpha,
-    )
+    Box(Modifier.padding(contentPadding)) {
+        ExampleCard(
+            elevation = elevation,
+            alpha = alpha,
+        )
+    }
 }
 ```
 
@@ -542,7 +628,7 @@ If explicit option names collide inside the same parameter, Composium will appen
 Nullable parameters get an extra checkbox that controls whether the value is currently `null`.
 
 ```kotlin
-internal val cardPlayground by scene(group = "Cards") {
+internal val cardPlayground by scene(group = "Cards") { contentPadding ->
     val maxLines: Int? by param(
         default = null,
         options = listOf(
@@ -558,11 +644,13 @@ internal val cardPlayground by scene(group = "Cards") {
 
     val subtitle: String? by param(null)
 
-    ExampleCard(
-        maxLines = maxLines,
-        leadingIcon = leadingIcon,
-        subtitle = subtitle,
-    )
+    Box(Modifier.padding(contentPadding)) {
+        ExampleCard(
+            maxLines = maxLines,
+            leadingIcon = leadingIcon,
+            subtitle = subtitle,
+        )
+    }
 }
 ```
 
@@ -587,6 +675,25 @@ val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
 }
 ```
 
+## Android Studio Previews
+
+A scene can be rendered from a regular Android Studio `@Preview` through the
+`RenderPreview` extension:
+
+```kotlin
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
+import oleginvoke.com.composium.RenderPreview
+
+@Preview(showBackground = true, widthDp = 420, heightDp = 720)
+@Composable
+private fun PrimaryButtonPreview() {
+    PrimaryButtonScene.RenderPreview()
+}
+```
+
+Every preview owns an independent scene scope and uses the scene's default parameter values.
+
 ## Custom Scene Wrappers
 
 If several scenes need the same preview chrome, create a small project-local helper around `scene(...)`.
@@ -594,6 +701,7 @@ If several scenes need the same preview chrome, create a small project-local hel
 ```kotlin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -612,10 +720,11 @@ fun sceneWithFrame(
 ): SceneDelegate = scene(
     group = group,
     name = name,
-) {
+) { contentPadding ->
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(contentPadding)
             .background(Color(0xFFF7F7F7))
             .padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -625,6 +734,22 @@ fun sceneWithFrame(
 }
 ```
 
+This wrapper consumes `contentPadding` in its own frame before invoking the caller's content, like the sample app's `sceneWithDecorator`. Alternatively, a wrapper can expose and forward the padding-aware content signature directly:
+
+```kotlin
+fun sceneForwardingPadding(
+    group: String? = null,
+    name: String? = null,
+    content: @Composable SceneScope.(PaddingValues) -> Unit,
+): SceneDelegate = scene(
+    group = group,
+    name = name,
+    content = content,
+)
+```
+
+Wrappers that expose `SceneScope.(PaddingValues) -> Unit` are checked by the same bundled lint detector, so their callers must apply or forward the argument, or use the intentional full-bleed suppression.
+
 Use that helper for scenes that should share the same frame:
 
 ```kotlin
@@ -632,6 +757,39 @@ val PrimaryButtonScene by sceneWithFrame(group = "Buttons") {
     PrimaryButton(text = "Save", onClick = {})
 }
 ```
+
+## Window Insets
+
+`ComposiumScreen()` accounts for system bars and display cutouts by default. It keeps the background
+edge-to-edge while positioning its own UI and providing the appropriate `contentPadding` to scenes.
+Floating tools do not contribute to scene padding. Keyboard handling is separate from these default insets.
+
+When embedding Composium inside a `Scaffold`, apply **and consume** the outer padding:
+
+```kotlin
+Scaffold { innerPadding ->
+    ComposiumScreen(
+        modifier = Modifier
+            .padding(innerPadding)
+            .consumeWindowInsets(innerPadding),
+    )
+}
+```
+
+Composium excludes insets already consumed by its parents. A plain `Modifier.padding(...)` does not
+mark insets as consumed. If your container handles all system padding itself, disable Composium's
+insets explicitly:
+
+```kotlin
+ComposiumScreen(
+    modifier = Modifier.padding(innerPadding),
+    contentWindowInsets = WindowInsets(0),
+)
+```
+
+The default is available as `ComposiumDefaults.contentWindowInsets`. You can also supply custom
+`WindowInsets` to control which sides and inset types Composium handles.
+This configures content placement; it does not enable edge-to-edge on the activity's window.
 
 ## Theme Control
 
@@ -723,6 +881,7 @@ Composium is a runtime scene browser for Compose that aims to stay out of your w
 - skip KSP when you want manual registration;
 - keep scenes flat or organize them into deep nested groups;
 - use automatic controls where possible and explicit options where needed;
+- choose the default top bar or compact floating scene tools and apply `contentPadding` where content must remain unobscured;
 - let Composium own theme state or plug it into your own;
 - create scene helper wrappers for shared preview chrome;
 - inspect components under different preview system settings.

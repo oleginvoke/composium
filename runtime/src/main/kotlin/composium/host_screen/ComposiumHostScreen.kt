@@ -40,9 +40,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import oleginvoke.com.composium.ComposiumRuntime
+import oleginvoke.com.composium.SceneKey
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailCaptureHost
@@ -61,7 +60,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 @Composable
 internal fun ComposiumHostScreen(
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0),
 ) {
     val scenes = ComposiumRuntime.scenes
     val themeController = LocalComposiumThemeController.current
@@ -73,10 +72,10 @@ internal fun ComposiumHostScreen(
         derivedStateOf { scenes.map { entry -> entry.id } }
     }
     val mainScreenInsets = remember(contentWindowInsets) {
-        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
+        contentWindowInsets.only(WindowInsetsSides.Horizontal)
     }
     val sceneOverlayInsets = remember(contentWindowInsets) {
-        contentWindowInsets?.only(WindowInsetsSides.Horizontal)
+        contentWindowInsets.only(WindowInsetsSides.Horizontal)
     }
     val transitionScaleSpec = remember {
         spring<Float>(
@@ -90,7 +89,7 @@ internal fun ComposiumHostScreen(
     val thumbnailStore = remember { SceneThumbnailStore() }
     val thumbnailQueue = remember { SceneThumbnailQueue() }
     val thumbnailRetryTracker = remember { SceneThumbnailFailureRetryTracker() }
-    var visibleSceneIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var visibleSceneIds by remember { mutableStateOf<List<SceneKey>>(emptyList()) }
     var isMainListScrollInProgress by remember { mutableStateOf(false) }
     var currentCaptureKey by remember { mutableStateOf<SceneThumbnailKey?>(null) }
 
@@ -98,7 +97,7 @@ internal fun ComposiumHostScreen(
     val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
     val blocksMainScreenInput = shouldBlockMainScreenInput(state)
     val thumbnailKeys = remember(sceneIds, themeController.isDarkTheme) {
-        scenes.map { entry ->
+        scenes.filter { it.scene.thumbnail != null }.map { entry ->
             SceneThumbnailKey(
                 sceneId = entry.id,
                 isDarkTheme = themeController.isDarkTheme,
@@ -120,7 +119,7 @@ internal fun ComposiumHostScreen(
         }
     val thumbnailStatesBySceneId = thumbnailStore.statesBySceneId()
 
-    fun openScene(sceneId: String) {
+    fun openScene(sceneId: SceneKey) {
         state = reduceComposiumHostScreen(
             state = state,
             intent = ComposiumHostScreenIntent.SceneSelected(sceneId),
@@ -164,10 +163,13 @@ internal fun ComposiumHostScreen(
     LaunchedEffect(visibleSceneIds, thumbnailKeys) {
         val visibleSet = visibleSceneIds.toSet()
         val visibleKeys = thumbnailKeys.filter { key ->
-            key.sceneId in visibleSet && thumbnailStore.needsCapture(key)
+            key.sceneId in visibleSet
         }
-        visibleKeys.forEach(thumbnailStore::putPending)
-        thumbnailQueue.prioritize(visibleKeys)
+        // Protect ready images too, not just the visible scenes awaiting capture.
+        thumbnailStore.setVisibleKeys(visibleKeys.toSet())
+        val missingKeys = visibleKeys.filter(thumbnailStore::needsCapture)
+        missingKeys.forEach(thumbnailStore::putPending)
+        thumbnailQueue.prioritize(missingKeys)
     }
 
     LaunchedEffect(shouldPauseThumbnailCapture, currentCaptureKey) {
@@ -179,29 +181,20 @@ internal fun ComposiumHostScreen(
         }
     }
 
-    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture) {
-        while (isActive) {
-            if (shouldPauseThumbnailCapture || currentCaptureKey != null) {
-                delay(50)
-                continue
-            }
-
-            var nextKey = thumbnailQueue.next()
-            while (nextKey != null && !thumbnailStore.needsCapture(nextKey)) {
-                nextKey = thumbnailQueue.next()
-            }
-
-            if (nextKey == null) {
-                delay(120)
-            } else {
-                thumbnailStore.putCapturing(nextKey)
-                currentCaptureKey = nextKey
-            }
+    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture, currentCaptureKey) {
+        if (shouldPauseThumbnailCapture || currentCaptureKey != null) return@LaunchedEffect
+        var nextKey = thumbnailQueue.awaitNext()
+        while (!thumbnailStore.needsCapture(nextKey)) {
+            nextKey = thumbnailQueue.awaitNext()
         }
+        thumbnailStore.putCapturing(nextKey)
+        currentCaptureKey = nextKey
     }
 
-    LaunchedEffect(currentCaptureKey, currentCaptureEntry, thumbnailKeySet) {
-        val captureKey = currentCaptureKey ?: return@LaunchedEffect
+    // Keep the key and entry from the same composition, even if an earlier effect starts work.
+    val captureEntryKey = currentCaptureKey
+    LaunchedEffect(captureEntryKey, currentCaptureEntry, thumbnailKeySet) {
+        val captureKey = captureEntryKey ?: return@LaunchedEffect
         if (currentCaptureEntry == null) {
             when (
                 resolveSceneThumbnailUnavailableDecision(
@@ -305,13 +298,7 @@ internal fun ComposiumHostScreen(
                 onSceneSelected = ::openScene,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (mainScreenInsets != null) {
-                            Modifier.windowInsetsPadding(mainScreenInsets)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .windowInsetsPadding(mainScreenInsets),
                 contentWindowInsets = contentWindowInsets,
                 thumbnailStates = thumbnailStatesBySceneId,
                 onVisibleSceneIdsChanged = { ids -> visibleSceneIds = ids },
@@ -346,16 +333,12 @@ internal fun ComposiumHostScreen(
                     ),
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (sceneOverlayInsets != null) {
-                            Modifier.windowInsetsPadding(sceneOverlayInsets)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .windowInsetsPadding(sceneOverlayInsets),
                 label = "scene_overlay",
             ) {
-                saveableStateHolder.SaveableStateProvider("route_scene_$renderedSceneId") {
+                saveableStateHolder.SaveableStateProvider(
+                    "route_scene_${renderedSceneEntry.id.toSaveableKey()}",
+                ) {
                     key(renderedSceneId) {
                         SceneScreen(
                             sceneEntry = renderedSceneEntry,

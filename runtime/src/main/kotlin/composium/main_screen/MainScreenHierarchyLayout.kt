@@ -154,16 +154,13 @@ internal fun mainScreenListViewportLayout(
 }
 
 internal fun mainScreenListContentPadding(
-    contentWindowInsets: WindowInsets?,
+    contentWindowInsets: WindowInsets,
     density: Density,
     extraTopPaddingDp: Float = 0f,
 ): PaddingValues {
     require(extraTopPaddingDp >= 0f) { "extraTopPaddingDp must be >= 0" }
 
-    val bottomInset = contentWindowInsets
-        ?.getBottom(density)
-        ?.let { insetPx -> with(density) { insetPx.toDp() } }
-        ?: 0.dp
+    val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
 
     return PaddingValues(
         start = MainScreenListHorizontalPaddingDp.dp,

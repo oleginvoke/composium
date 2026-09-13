@@ -2,7 +2,6 @@
 package oleginvoke.com.composium
 
 import androidx.annotation.Size
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -12,10 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.filterNotNull
 import oleginvoke.com.composium.scene_screen.SceneParamsCallbacks
 import oleginvoke.com.composium.scene_screen.SceneParamsState
@@ -27,30 +24,16 @@ import kotlin.reflect.KType
  * Scope available inside [Scene.content].
  *
  * Provides parameter declaration helpers used by Composium controls UI.
+ * Parameter names must be unique among active declarations within this scope.
+ * Registering a different parameter with an occupied name throws [IllegalStateException].
  */
 class SceneScope internal constructor() {
 
     internal val params: SnapshotStateList<ParamDescriptor> = mutableStateListOf()
     internal val preview: SceneSystemSettings = SceneSystemSettings()
 
-    // Set by the runtime each composition. When the scene declares enableEdgeToEdge=true the
-    // runtime fills this with the top-bar / system-nav-bar insets that the scene is allowed to
-    // render behind; otherwise the runtime applies those insets itself and reports zero here.
-    internal var internalInnerPadding: PaddingValues by mutableStateOf(PaddingValues(0.dp))
-
-    /**
-     * Insets the scene should apply to its own content for a polished edge-to-edge layout.
-     *
-     * - When [Scene.enableEdgeToEdge] is `false` (default), the runtime already keeps scene
-     *   content out of the top bar / system bars, and this returns [PaddingValues] of zero.
-     * - When [Scene.enableEdgeToEdge] is `true`, the scene renders behind the top bar and the
-     *   system navigation bar; the corresponding `top` and `bottom` insets are reported here so
-     *   the scene author can apply them where appropriate (e.g. `Modifier.padding(innerPadding)`
-     *   on a list, or as `LazyColumn(contentPadding = innerPadding)`).
-     */
-    val innerPadding: PaddingValues get() = internalInnerPadding
-
     private val paramBindings: MutableMap<String, ParamBinding> = hashMapOf()
+    private val paramBindingOwners: MutableMap<String, ParamProperty<*>> = hashMapOf()
     private val paramDescriptorIndexes: MutableMap<String, Int> = hashMapOf()
     private val paramStateSnapshots: MutableMap<String, ParamStateSnapshot> = hashMapOf()
 
@@ -456,13 +439,27 @@ class SceneScope internal constructor() {
         }
     }
 
-    private fun registerBinding(binding: ParamBinding) {
+    private fun registerBinding(binding: ParamBinding, owner: ParamProperty<*>) {
+        val existingOwner = paramBindingOwners[binding.name]
+        check(existingOwner == null || existingOwner === owner) {
+            "Duplicate scene parameter name \"${binding.name}\". " +
+                "Parameter names must be unique within a scene. " +
+                "Use a different property name or pass a unique name to param()."
+        }
+
+        // Validate the new name before releasing the previous registration.
+        owner.lastRegisteredName?.takeIf { it != binding.name }?.let { previousName ->
+            unregisterBinding(previousName, owner)
+        }
+        paramBindingOwners[binding.name] = owner
         paramBindings[binding.name] = binding
         paramStateSnapshots[binding.name] = binding.snapshot()
         upsertDescriptor(binding.toDescriptor())
     }
 
-    private fun unregisterBinding(paramName: String) {
+    private fun unregisterBinding(paramName: String, owner: ParamProperty<*>) {
+        if (paramBindingOwners[paramName] !== owner) return
+        paramBindingOwners.remove(paramName)
         val removed = paramBindings.remove(paramName) ?: return
         paramStateSnapshots.remove(paramName)
         removeDescriptor(removed.name)
@@ -539,9 +536,11 @@ class SceneScope internal constructor() {
             }
         }
 
-        DisposableEffect(property) {
+        // Release renamed bindings during disposal, before any SideEffect registers
+        // this composition's names. This also allows two declarations to swap names.
+        DisposableEffect(property, name) {
             onDispose {
-                property.lastRegisteredName?.let(::unregisterBinding)
+                property.lastRegisteredName?.let { unregisterBinding(it, property) }
                 property.lastRegisteredName = null
                 property.bindingSignature = null
             }
@@ -550,11 +549,14 @@ class SceneScope internal constructor() {
         LaunchedEffect(property) {
             snapshotFlow {
                 val registeredName = property.lastRegisteredName ?: return@snapshotFlow null
+                if (paramBindingOwners[registeredName] !== property) return@snapshotFlow null
                 paramBindings[registeredName]?.snapshot()?.let { registeredName to it }
             }
                 .filterNotNull()
                 .collect { (registeredName, _) ->
-                    refreshDescriptorIfStateChanged(registeredName)
+                    if (paramBindingOwners[registeredName] === property) {
+                        refreshDescriptorIfStateChanged(registeredName)
+                    }
                 }
         }
 
@@ -585,10 +587,6 @@ class SceneScope internal constructor() {
             if (property.bindingSignature == signature && previousName == resolvedName) {
                 refreshDescriptorIfStateChanged(resolvedName)
                 return@SideEffect
-            }
-
-            if (previousName != null && previousName != resolvedName) {
-                unregisterBinding(previousName)
             }
 
             val optionItems: List<ParamOption<T>>? = explicitOptionItems
@@ -817,7 +815,7 @@ class SceneScope internal constructor() {
                 }
             }
 
-            registerBinding(binding)
+            registerBinding(binding, property)
             property.bindingSignature = signature
             property.lastRegisteredName = resolvedName
         }

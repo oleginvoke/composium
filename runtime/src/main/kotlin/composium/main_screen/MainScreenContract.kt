@@ -1,6 +1,7 @@
 package oleginvoke.com.composium.main_screen
 
 import oleginvoke.com.composium.SceneEntry
+import oleginvoke.com.composium.SceneKey
 
 internal data class MainScreenState(
     val query: String = "",
@@ -21,7 +22,7 @@ internal sealed interface MainScreenIntent {
 
 internal interface MainScreenCallbacks {
     fun onQueryChange(query: String)
-    fun onSceneSelected(sceneId: String)
+    fun onSceneSelected(sceneId: SceneKey)
     fun onGroupToggled(group: String)
     fun onThemeChange(isDarkTheme: Boolean)
 }

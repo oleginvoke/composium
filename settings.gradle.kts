@@ -24,5 +24,6 @@ rootProject.name = "composium"
 include(":sample")
 include(":processor")
 include(":runtime")
+include(":lint")
 include(":macrobenchmark")
  

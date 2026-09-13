@@ -1,51 +1,57 @@
 package oleginvoke.com.composium
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 
 /**
  * Composium scene definition.
  *
  * @param group Optional group path for scene categorization. `null` or blank means top-level scene.
  * @param name Scene display name.
- * @param enableEdgeToEdge Controls how Composium handles top-bar and system navigation-bar
- * insets for this scene.
- *
- * When `false` (default), Composium keeps the scene content below its top bar and above the
- * navigation bar. [SceneScope.innerPadding] is reported as zero because the runtime has already
- * applied the required spacing.
- *
- * When `true`, Composium lets the scene fill the whole preview area, including the area behind
- * the top bar and navigation bar. The corresponding top and bottom padding is exposed through
- * [SceneScope.innerPadding], and the scene is responsible for applying it where it makes sense
- * for its own layout.
+ * @param tools Selects how Composium presents scene tools.
  * @param thumbnail Optional lightweight content used only for catalog thumbnail capture.
- * If `null`, the runtime captures [content].
+ * When omitted, the runtime captures [content]. Explicit `null` disables thumbnail capture
+ * and removes the preview area from the catalog card.
  * @param badge Optional content rendered over the catalog card thumbnail area. The runtime
- * positions it in the top-end corner and does not constrain its size.
+ * positions it in the top-end corner, or beside the title when thumbnails are disabled.
  * @param content Scene content rendered inside [SceneScope].
  */
 class Scene(
     val group: String?,
     val name: String,
-    val enableEdgeToEdge: Boolean = false,
-    val thumbnail: (@Composable SceneScope.() -> Unit)? = null,
+    val tools: SceneTools = SceneTools.TopBar,
+    thumbnail: (@Composable SceneScope.() -> Unit)? = DefaultSceneThumbnail,
     val badge: (@Composable () -> Unit)? = null,
-    val content: @Composable SceneScope.() -> Unit,
+    val content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
 ) {
+    /** Resolved capture content, or `null` when the catalog card has no preview. */
+    val thumbnail: (@Composable SceneScope.() -> Unit)? =
+        if (thumbnail === DefaultSceneThumbnail) {
+            { content(PaddingValues(0.dp)) }
+        } else {
+            thumbnail
+        }
+
     constructor(
         group: String?,
         name: String,
-        enableEdgeToEdge: Boolean = false,
-        content: @Composable SceneScope.() -> Unit,
+        tools: SceneTools = SceneTools.TopBar,
+        content: @Composable SceneScope.(contentPadding: PaddingValues) -> Unit,
     ) : this(
         group = group,
         name = name,
-        enableEdgeToEdge = enableEdgeToEdge,
-        thumbnail = null,
+        tools = tools,
+        thumbnail = DefaultSceneThumbnail,
         badge = null,
         content = content,
     )
 }
 
-internal fun Scene.thumbnailContent(): @Composable SceneScope.() -> Unit =
-    thumbnail ?: content
+// Distinguishes an omitted argument from explicit null. Resolved once by Scene;
+// this sentinel must never enter composition or escape through Scene.thumbnail.
+internal val DefaultSceneThumbnail: @Composable SceneScope.() -> Unit = {
+    error("Default thumbnail must be resolved to scene content before rendering")
+}
+
+internal fun Scene.thumbnailContent(): (@Composable SceneScope.() -> Unit)? = thumbnail

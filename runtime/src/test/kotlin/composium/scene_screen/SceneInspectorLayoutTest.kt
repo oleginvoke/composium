@@ -10,21 +10,21 @@ class SceneInspectorLayoutTest {
     fun splitInspectorContentClipsAtTabsMiddle() {
         val offset = calculateSceneInspectorContentClipOffset(
             layoutMode = SceneInspectorLayoutMode.Split,
-            tabsHeight = 34.dp,
+            tabsHeight = 40.dp,
             tabsTopPadding = 2.dp,
         )
 
-        assertEquals(19.dp, offset)
+        assertEquals(22.dp, offset)
     }
 
     @Test
     fun expandedInspectorContentClipsAtTabsMiddle() {
         val offset = calculateSceneInspectorContentClipOffset(
             layoutMode = SceneInspectorLayoutMode.Expanded,
-            tabsHeight = 34.dp,
+            tabsHeight = 40.dp,
             tabsTopPadding = 8.dp,
         )
 
-        assertEquals(25.dp, offset)
+        assertEquals(28.dp, offset)
     }
 }

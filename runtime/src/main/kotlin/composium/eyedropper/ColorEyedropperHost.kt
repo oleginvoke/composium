@@ -2,7 +2,6 @@ package oleginvoke.com.composium.eyedropper
 
 import android.content.ClipData
 import android.content.Context
-import android.graphics.Canvas
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -19,11 +18,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -34,16 +35,14 @@ import androidx.compose.ui.unit.dp
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
-import androidx.core.graphics.createBitmap
 
 private const val CaptureRetryCount = 4
 
 /**
  * Wraps arbitrary Compose content and provides an opt-in color eyedropper overlay.
  *
- * The default Android implementation samples the already-rendered app pixels covered by this
- * host's bounds. The overlay is hidden while the snapshot is captured, so the crosshair and
- * floating island do not affect sampled colors.
+ * Only [content] is recorded in the capture layer. Sibling app chrome and the eyedropper overlay
+ * are outside that layer, so neither can contaminate current or cached sampled colors.
  *
  * @param visible Whether the eyedropper overlay is currently visible.
  * @param onVisibleChange Callback reserved for integrations that want to close or toggle the tool.
@@ -68,10 +67,10 @@ internal fun ColorEyedropperHost(
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val ownerView = LocalView.current
+    val contentLayer = rememberGraphicsLayer()
     val metrics = ColorEyedropperDefaults.metrics
     val colors = ColorEyedropperDefaults.colors()
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var hostTopLeft by remember { mutableStateOf(IntOffset.Zero) }
     var islandSize by remember { mutableStateOf(IntSize.Zero) }
     var snapshot by remember { mutableStateOf<ColorEyedropperSnapshot?>(null) }
 
@@ -93,7 +92,7 @@ internal fun ColorEyedropperHost(
         )
     }
 
-    LaunchedEffect(visible, containerSize, hostTopLeft, ownerView) {
+    LaunchedEffect(visible, containerSize, contentLayer, ownerView) {
         if (!visible) {
             snapshot = null
             state.updateColor(null)
@@ -105,13 +104,10 @@ internal fun ColorEyedropperHost(
         state.updateColor(null)
 
         repeat(CaptureRetryCount) {
-            // The overlay is hidden while snapshot is null. Waiting for the next draw lets the
-            // root View render the plain app surface first, so the cached bitmap does not include
-            // the crosshair or island.
+            // Wait until the content layer has recorded the current scene at its measured size.
             awaitColorEyedropperDraw(ownerView)
 
-            val nextSnapshot = ownerView.captureColorEyedropperSnapshot(
-                hostTopLeft = hostTopLeft,
+            val nextSnapshot = contentLayer.captureColorEyedropperSnapshot(
                 containerSize = containerSize,
             )
             if (nextSnapshot != null) {
@@ -134,16 +130,16 @@ internal fun ColorEyedropperHost(
 
     Box(
         modifier = modifier
-            .onGloballyPositioned { coordinates ->
-                containerSize = coordinates.size
-                val position = coordinates.positionInRoot()
-                hostTopLeft = IntOffset(
-                    x = position.x.roundToInt(),
-                    y = position.y.roundToInt(),
-                )
-            },
+            .onSizeChanged { containerSize = it },
     ) {
-        Box {
+        Box(
+            modifier = Modifier.drawWithContent {
+                contentLayer.record {
+                    this@drawWithContent.drawContent()
+                }
+                drawLayer(contentLayer)
+            },
+        ) {
             content()
         }
 
@@ -323,35 +319,19 @@ private suspend fun awaitColorEyedropperDraw(view: View) {
     }
 }
 
-private fun View.captureColorEyedropperSnapshot(
-    hostTopLeft: IntOffset,
+private suspend fun GraphicsLayer.captureColorEyedropperSnapshot(
     containerSize: IntSize,
 ): ColorEyedropperSnapshot? {
-    if (width <= 0 || height <= 0) return null
+    if (size.width <= 0 || size.height <= 0) return null
 
-    val bitmap = createBitmap(width, height)
-    try {
-        draw(Canvas(bitmap))
-
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(
-            pixels,
-            0,
-            width,
-            0,
-            0,
-            width,
-            height,
-        )
-        return createColorEyedropperSnapshotFromRootPixels(
-            rootPixels = pixels,
-            rootSize = IntSize(width = width, height = height),
-            hostTopLeft = hostTopLeft,
-            containerSize = containerSize,
-        )
-    } finally {
-        bitmap.recycle()
-    }
+    val bitmap = toImageBitmap()
+    val pixels = IntArray(bitmap.width * bitmap.height)
+    bitmap.readPixels(pixels)
+    return createColorEyedropperSnapshot(
+        pixels = pixels,
+        bitmapSize = IntSize(bitmap.width, bitmap.height),
+        containerSize = containerSize,
+    )
 }
 
 private fun Context.copyColorEyedropperText(text: String) {

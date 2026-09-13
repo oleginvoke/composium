@@ -25,6 +25,10 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -93,7 +97,19 @@ mavenPublishing {
     }
 }
 dependencies {
-    implementation(platform(libs.compose.bom))
+    lintChecks(project(":lint")) {
+        isTransitive = false
+    }
+    lintPublish(project(":lint")) {
+        isTransitive = false
+    }
+
+    // Types from these artifacts are part of Composium's public API.
+    api(platform(libs.compose.bom))
+    api(libs.compose.runtime)
+    api(libs.compose.ui)
+    api(libs.compose.foundation.layout)
+
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
     implementation(libs.androidx.activity)
@@ -104,6 +120,10 @@ dependencies {
     // Previews live in the debug source-set.
     debugImplementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(kotlin("test-junit"))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.material3)
+    testImplementation(libs.robolectric)
 }

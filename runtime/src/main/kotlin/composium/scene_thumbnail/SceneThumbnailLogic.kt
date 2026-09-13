@@ -5,7 +5,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
+import oleginvoke.com.composium.SceneKey
 import kotlin.math.roundToInt
+import kotlinx.coroutines.channels.Channel
 
 internal val DefaultSceneThumbnailCaptureTimeoutMillis: Long? = null
 internal const val DefaultSceneThumbnailMemoryBudgetBytes: Int = 48 * 1024 * 1024
@@ -17,7 +19,7 @@ internal const val DefaultSceneThumbnailTargetHeightPx: Int = 960
 internal const val DefaultSceneThumbnailFailureRetryCount: Int = 1
 
 internal data class SceneThumbnailKey(
-    val sceneId: String,
+    val sceneId: SceneKey,
     val isDarkTheme: Boolean,
     val captureScale: Float = DefaultSceneThumbnailCaptureScale,
     val viewportWidthPx: Int = DefaultSceneThumbnailViewportWidthPx,
@@ -297,6 +299,14 @@ internal fun sceneThumbnailCardLayout(): SceneThumbnailCardLayout =
 internal class SceneThumbnailQueue {
     private val pendingKeys = ArrayDeque<SceneThumbnailKey>()
     private val pendingSet = linkedSetOf<SceneThumbnailKey>()
+    private val workAvailable = Channel<Unit>(Channel.CONFLATED)
+
+    suspend fun awaitNext(): SceneThumbnailKey {
+        while (true) {
+            next()?.let { return it }
+            workAvailable.receive()
+        }
+    }
 
     fun sync(keys: List<SceneThumbnailKey>) {
         keys.forEach(::enqueueBack)
@@ -332,12 +342,14 @@ internal class SceneThumbnailQueue {
     private fun enqueueBack(key: SceneThumbnailKey) {
         if (pendingSet.add(key)) {
             pendingKeys.addLast(key)
+            workAvailable.trySend(Unit)
         }
     }
 
     private fun enqueueFront(key: SceneThumbnailKey) {
         if (pendingSet.add(key)) {
             pendingKeys.addFirst(key)
+            workAvailable.trySend(Unit)
         }
     }
 }
@@ -347,6 +359,15 @@ internal class SceneThumbnailStore(
 ) {
     private val states = mutableStateMapOf<SceneThumbnailKey, SceneThumbnailState>()
     private val readyRecency = LinkedHashMap<SceneThumbnailKey, Int>(0, 0.75f, true)
+    private var visibleKeys: Set<SceneThumbnailKey> = emptySet()
+
+    fun setVisibleKeys(keys: Set<SceneThumbnailKey>) {
+        if (visibleKeys == keys) return
+        visibleKeys = keys.toSet()
+        // A visible working set may exceed the budget, but off-screen images must not.
+        // Reclaim that temporary excess immediately when visibility changes.
+        trimToBudget()
+    }
 
     var currentMemoryBytes by mutableIntStateOf(0)
         private set
@@ -356,7 +377,7 @@ internal class SceneThumbnailStore(
         return states[key]
     }
 
-    fun statesBySceneId(): Map<String, SceneThumbnailState> =
+    fun statesBySceneId(): Map<SceneKey, SceneThumbnailState> =
         states.entries.associate { (key, state) -> key.sceneId to state }
 
     fun needsCapture(key: SceneThumbnailKey): Boolean =
@@ -424,10 +445,16 @@ internal class SceneThumbnailStore(
     }
 
     private fun trimToBudget() {
-        while (currentMemoryBytes > memoryBudgetBytes && readyRecency.isNotEmpty()) {
-            val eldestKey = readyRecency.entries.first().key
-            removeReadyMemory(eldestKey)
-            states.remove(eldestKey)
+        if (currentMemoryBytes <= memoryBudgetBytes) return
+        val entries = readyRecency.entries.iterator()
+        while (currentMemoryBytes > memoryBudgetBytes && entries.hasNext()) {
+            val entry = entries.next()
+            if (entry.key in visibleKeys) continue
+            val key = entry.key
+            val byteSize = entry.value
+            entries.remove()
+            currentMemoryBytes = (currentMemoryBytes - byteSize).coerceAtLeast(0)
+            states.remove(key)
         }
     }
 }

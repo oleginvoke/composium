@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,7 +69,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import oleginvoke.com.composium.R
 import oleginvoke.com.composium.SceneEntry
-import oleginvoke.com.composium.onlyTopAndHorizontalOrNull
+import oleginvoke.com.composium.SceneKey
+import oleginvoke.com.composium.onlyTopAndHorizontal
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailState
 import oleginvoke.com.composium.ui.components.ComposiumButton
 import oleginvoke.com.composium.ui.components.ComposiumIcon
@@ -83,11 +86,11 @@ import oleginvoke.com.composium.ui.theme.Tokens
 @Composable
 internal fun MainScreen(
     scenes: List<SceneEntry>,
-    onSceneSelected: (sceneId: String) -> Unit,
+    onSceneSelected: (sceneId: SceneKey) -> Unit,
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
-    thumbnailStates: Map<String, SceneThumbnailState> = emptyMap(),
-    onVisibleSceneIdsChanged: (List<String>) -> Unit = {},
+    contentWindowInsets: WindowInsets = WindowInsets(0),
+    thumbnailStates: Map<SceneKey, SceneThumbnailState> = emptyMap(),
+    onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit = {},
     onListScrollInProgressChanged: (Boolean) -> Unit = {},
 ) {
     val themeController = LocalComposiumThemeController.current
@@ -98,11 +101,13 @@ internal fun MainScreen(
     val store = rememberMainScreenStore()
     val state = store.state
     var topBarHeightDp by remember { mutableStateOf(0f) }
+    var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
+    val remainingInsets = remember(contentWindowInsets, consumedInsets) {
+        contentWindowInsets.exclude(consumedInsets)
+    }
     val scenesContentKey by remember(scenes) {
         derivedStateOf {
-            scenes.map { entry ->
-                "${entry.id}|${entry.scene.group.orEmpty()}|${entry.scene.name}"
-            }
+            scenes.map { entry -> entry.id }
         }
     }
     val sceneSearchIndex = remember(scenesContentKey) {
@@ -142,7 +147,7 @@ internal fun MainScreen(
                 )
             }
 
-            override fun onSceneSelected(sceneId: String) {
+            override fun onSceneSelected(sceneId: SceneKey) {
                 val inputDismissal = calculateSceneSelectionInputDismissal()
                 if (inputDismissal.clearFocus) {
                     focusManager.clearFocus()
@@ -168,6 +173,7 @@ internal fun MainScreen(
 
     Box(
         modifier = modifier
+            .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize()
             .background(Tokens.colors.surface)
             .clickable(
@@ -184,7 +190,8 @@ internal fun MainScreen(
             expandedGroups = state.expandedGroups,
             catalogStatus = catalogStatus,
             callbacks = callbacks,
-            contentWindowInsets = contentWindowInsets,
+            // Manual padding reads need exclusion; the top bar's windowInsetsPadding does it itself.
+            contentWindowInsets = remainingInsets,
             thumbnailStates = thumbnailStates,
             onVisibleSceneIdsChanged = onVisibleSceneIdsChanged,
             onListScrollInProgressChanged = onListScrollInProgressChanged,
@@ -210,18 +217,13 @@ private fun MainScreenTopBar(
     query: String,
     isDarkTheme: Boolean,
     callbacks: MainScreenCallbacks,
-    statusBarInsets: WindowInsets? = null,
+    statusBarInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                statusBarInsets
-                    .onlyTopAndHorizontalOrNull()
-                    ?.let(Modifier::windowInsetsPadding)
-                    ?: Modifier,
-            )
+            .windowInsetsPadding(statusBarInsets.onlyTopAndHorizontal())
             .padding(
                 start = 16.dp,
                 end = 16.dp,
@@ -270,9 +272,9 @@ private fun MainScreenContent(
     expandedGroups: Set<String>,
     catalogStatus: MainScreenCatalogStatus,
     callbacks: MainScreenCallbacks,
-    contentWindowInsets: WindowInsets?,
-    thumbnailStates: Map<String, SceneThumbnailState>,
-    onVisibleSceneIdsChanged: (List<String>) -> Unit,
+    contentWindowInsets: WindowInsets,
+    thumbnailStates: Map<SceneKey, SceneThumbnailState>,
+    onVisibleSceneIdsChanged: (List<SceneKey>) -> Unit,
     onListScrollInProgressChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     extraTopPaddingDp: Float = 0f,
@@ -296,13 +298,16 @@ private fun MainScreenContent(
         )
     }
 
-    LaunchedEffect(listState, listItems, onVisibleSceneIdsChanged) {
+    val sceneIdsByItemKey = remember(listItems) {
+        listItems.filterIsInstance<MainScreenListItem.SceneItem>()
+            .associate { item -> item.key to item.entry.id }
+    }
+
+    LaunchedEffect(listState, sceneIdsByItemKey, onVisibleSceneIdsChanged) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo
                 .mapNotNull { visibleItem ->
-                    (listItems.getOrNull(visibleItem.index) as? MainScreenListItem.SceneItem)
-                        ?.entry
-                        ?.id
+                    sceneIdsByItemKey[visibleItem.key]
                 }
                 .distinct()
         }.collect(onVisibleSceneIdsChanged)
@@ -361,6 +366,7 @@ private fun MainScreenContent(
                             name = item.entry.scene.name,
                             group = item.entry.scene.group,
                             thumbnailState = thumbnailStates[item.entry.id],
+                            hasThumbnail = item.entry.scene.thumbnail != null,
                             badge = item.entry.scene.badge,
                             onClick = { callbacks.onSceneSelected(item.entry.id) },
                         )
@@ -763,7 +769,7 @@ private sealed interface MainScreenListItem {
         val depth: Int,
         val connectorContinuations: List<Boolean>,
     ) : MainScreenListItem {
-        override val key: String = "scene_${entry.id}"
+        override val key: String = "scene_${entry.id.toSaveableKey()}"
     }
 }
 

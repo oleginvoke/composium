@@ -27,8 +27,9 @@ import oleginvoke.com.composium.ui.theme.Tokens
  *
  * @param modifier Modifier for the screen.
  * @param isDarkTheme Optional dark theme override. If not provided, the internal state is used.
- * @param contentWindowInsets Optional window insets for the content area. Use `WindowInsets.systemBars` for edge-to-edge
- * or apply padding manually if you are not using edge-to-edge.
+ * @param contentWindowInsets Insets for system bars and display cutouts by default. Insets consumed by
+ * parent layouts are excluded. Pass `WindowInsets(0)` to let the parent own all system padding. When applying a
+ * parent Scaffold's padding, also use `Modifier.consumeWindowInsets(padding)` to avoid double insets.
  * @param onThemeChange Callback for theme change.
  */
 @Suppress("DEPRECATION")
@@ -36,7 +37,7 @@ import oleginvoke.com.composium.ui.theme.Tokens
 fun ComposiumScreen(
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean? = null,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = ComposiumDefaults.contentWindowInsets,
     onThemeChange: (isDarkTheme: Boolean) -> Unit = {}
 ) {
     ComposiumScreen(
@@ -56,8 +57,9 @@ fun ComposiumScreen(
  *
  * @param modifier Modifier for the screen.
  * @param isDarkTheme Optional dark theme override. If not provided, the internal state is used.
- * @param contentWindowInsets Optional window insets for the content area. Use `WindowInsets.systemBars` for edge-to-edge
- * or apply padding manually if you are not using edge-to-edge.
+ * @param contentWindowInsets Insets for system bars and display cutouts by default. Insets consumed by
+ * parent layouts are excluded. Pass `WindowInsets(0)` to let the parent own all system padding. When applying a
+ * parent Scaffold's padding, also use `Modifier.consumeWindowInsets(padding)` to avoid double insets.
  * @param onThemeChange Callback for theme change.
  * @param scenePreviewDecorator Deprecated. Custom preview decoration is no longer supported through
  * [ComposiumScreen]. Use wrapper helpers based on [scene] instead.
@@ -69,7 +71,7 @@ fun ComposiumScreen(
 fun ComposiumScreen(
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean? = null,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = ComposiumDefaults.contentWindowInsets,
     onThemeChange: (isDarkTheme: Boolean) -> Unit = {},
     scenePreviewDecorator: ScenePreviewDecorator,
 ) {

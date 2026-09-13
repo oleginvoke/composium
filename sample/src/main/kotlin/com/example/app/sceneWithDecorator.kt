@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,7 +41,6 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,9 +56,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app.theme.ComposiumTheme
 import com.example.app.theme.SampleColorTheme
+import oleginvoke.com.composium.ComposiumDefaults
 import oleginvoke.com.composium.ComposiumScreen
 import oleginvoke.com.composium.SceneDelegate
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.scene
 
 enum class SamplePreviewTheme {
@@ -73,7 +73,7 @@ private val LocalPreviewIsDarkTheme = compositionLocalOf { false }
 @Composable
 fun ComposiumPreviewScreen(
     modifier: Modifier = Modifier,
-    contentWindowInsets: WindowInsets? = null,
+    contentWindowInsets: WindowInsets = ComposiumDefaults.contentWindowInsets,
     isDarkTheme: Boolean? = null,
     onThemeChange: (Boolean) -> Unit = {},
 ) {
@@ -96,7 +96,7 @@ private var previewThemeCache = SamplePreviewTheme.Emerald
 internal fun sceneWithDecorator(
     group: String? = null,
     name: String? = null,
-    enableEdgeToEdge: Boolean = true,
+    tools: SceneTools = SceneTools.TopBar,
     scrollable: Boolean = true,
     backgroundColorLight: Color = Color.White,
     backgroundColorDark: Color = Color(0xFF4A4949),
@@ -108,10 +108,10 @@ internal fun sceneWithDecorator(
     return scene(
         group = group,
         name = name,
-        enableEdgeToEdge = enableEdgeToEdge,
+        tools = tools,
         thumbnail = previewContent,
         badge = badge,
-        content = {
+        content = { contentPadding ->
             var showContentBounds by remember { mutableStateOf(false) }
             var previewTheme by remember { mutableStateOf(previewThemeCache) }
             SamplePreviewTheme(
@@ -130,7 +130,7 @@ internal fun sceneWithDecorator(
                         ),
                 ) {
                     val isDarkTheme = LocalPreviewIsDarkTheme.current
-                    Spacer(Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
+                    Spacer(Modifier.height(contentPadding.calculateTopPadding() + 16.dp))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -212,7 +212,7 @@ internal fun sceneWithDecorator(
                             Spacer(Modifier.height(16.dp))
                         }
                     }
-                    Spacer(Modifier.height(innerPadding.calculateBottomPadding() + 16.dp))
+                    Spacer(Modifier.height(contentPadding.calculateBottomPadding() + 16.dp))
                 }
             }
         }
