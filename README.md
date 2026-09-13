@@ -30,7 +30,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/d246e248-bda4-461a-9f2e-1dccd84633a2">
 </p>
 <p align="center">
-    <img src="assets/composium-demo.gif" alt="Composium demo: scene catalog, live parameters, environment controls, floating tools, and eyedropper" width="400">
+    <img src="assets/composium-demo.gif" alt="Composium demo: scene catalog, live parameters, environment controls, floating tools, and eyedropper" width="300">
 </p>
 
 ## Why Composium
