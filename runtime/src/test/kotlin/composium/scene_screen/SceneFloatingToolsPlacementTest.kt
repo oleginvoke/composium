@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import oleginvoke.com.composium.FloatingToolsPosition
 import oleginvoke.com.composium.Scene
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneTools
@@ -48,12 +49,12 @@ class SceneFloatingToolsPlacementTest {
     private lateinit var ownerView: View
 
     @Test
-    fun collapsedCapsuleRevealsSceneWhereActionsWere() {
+    fun collapsedFanRevealsSceneWhereActionsWere() {
         renderScene(LayoutDirection.Ltr)
         val back = actionBounds("Back")
         val theme = actionBounds("Switch to dark theme")
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-        val eye = actionBounds("Show tools")
+        composeRule.onNodeWithContentDescription("Hide actions").performClick()
+        val eye = actionBounds("Show actions")
         val bitmap = drawScene()
         try {
             listOf(back.center, theme.center).forEach { point ->
@@ -66,11 +67,11 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun activeActionHasDistinctFillInsideCapsule() {
+    fun activeSettingsHaveDistinctFill() {
         renderScene(LayoutDirection.Ltr)
         composeRule.onNodeWithContentDescription("Open properties").performClick()
         val back = actionBounds("Back")
-        val properties = actionBounds("Expand settings")
+        val properties = actionBounds("Close properties")
         val bitmap = drawScene()
         try {
             assertNotEquals(
@@ -83,13 +84,13 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun darkCapsuleRemainsVisibleOverDarkScene() {
+    fun darkButtonsRemainVisibleOverDarkScene() {
         renderScene(LayoutDirection.Ltr, backgroundColor = Color.Black, darkTheme = true)
         val back = actionBounds("Back")
-        val eye = actionBounds("Hide tools")
+        val eye = actionBounds("Hide actions")
         val bitmap = drawScene()
         try {
-            assertNotEquals(Color.Black.toArgb(), bitmap.getPixel(back.center.x.toInt(), back.top.toInt() - 3))
+            assertNotEquals(Color.Black.toArgb(), bitmap.getPixel(back.center.x.toInt(), back.top.toInt() + 6))
             assertNotEquals(
                 bitmap.getPixel(back.center.x.toInt(), back.top.toInt() + 6),
                 bitmap.getPixel(eye.center.x.toInt(), eye.top.toInt() + 6),
@@ -110,33 +111,35 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun rtlHostKeepsActionsInVerticalOrder() {
+    fun rtlHostStillOpensFanToThePhysicalLeft() {
         renderScene(LayoutDirection.Rtl)
-        val actions = listOf("Back", "Open properties", "Hide tools", "Open eyedropper", "Switch to dark theme")
+        val more = actionBounds("Hide actions")
+        val actions = listOf("Open eyedropper", "Switch to dark theme", "Back")
             .map(::actionBounds)
         actions.zipWithNext().forEach { (above, below) ->
-            assertTrue(above.bottom < below.top)
-            assertEquals(above.center.x, below.center.x, 0.01f)
+            assertTrue(above.center.y < below.center.y)
         }
+        actions.take(2).forEach { assertTrue(it.center.x < more.center.x) }
+        assertEquals(more.center.x, actions.last().center.x, 0.01f)
     }
 
     private fun assertStablePhysicalAnchor(direction: LayoutDirection) {
         renderScene(direction)
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
-        val expandedEye = actionBounds("Hide tools")
-        val back = actionBounds("Back")
-        // 64 dp capsule, 8 dp internal padding, and physical right inset 20 + margin 12.
-        assertEquals(screen.right - 40f, expandedEye.right, 0.01f)
-        assertEquals(screen.top + 152f, expandedEye.top, 0.01f)
-        assertEquals(48f, expandedEye.width, 0.01f)
-        assertEquals(56f, expandedEye.height, 0.01f)
-        assertEquals(screen.top + 44f, back.top, 0.01f)
-        assertEquals(back.center.x, expandedEye.center.x, 0.01f)
+        val expandedEye = actionBounds("Hide actions")
+        val settings = actionBounds("Open properties")
+        // Centered 48/44 dp buttons separated by 8 dp; physical right inset 20 + margin 12.
+        assertEquals(screen.right - 34f, expandedEye.right, 0.01f)
+        assertEquals(screen.top + 92f, expandedEye.top, 0.01f)
+        assertEquals(44f, expandedEye.width, 0.01f)
+        assertEquals(44f, expandedEye.height, 0.01f)
+        assertEquals(screen.top + 36f, settings.top, 0.01f)
+        assertEquals(settings.center.x, expandedEye.center.x, 0.01f)
 
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-        assertEquals(expandedEye, actionBounds("Show tools"))
-        composeRule.onNodeWithContentDescription("Show tools").performClick()
-        assertEquals(expandedEye, actionBounds("Hide tools"))
+        composeRule.onNodeWithContentDescription("Hide actions").performClick()
+        assertEquals(expandedEye, actionBounds("Show actions"))
+        composeRule.onNodeWithContentDescription("Show actions").performClick()
+        assertEquals(expandedEye, actionBounds("Hide actions"))
     }
 
     private fun actionBounds(description: String) = composeRule
@@ -153,7 +156,7 @@ class SceneFloatingToolsPlacementTest {
         backgroundColor: Color = Color.Blue,
         darkTheme: Boolean = false,
     ) {
-        val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating) { padding ->
+        val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true)) { padding ->
             Box(Modifier.fillMaxSize().background(backgroundColor)) {
                 Box(Modifier.fillMaxSize().padding(padding))
             }

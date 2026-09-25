@@ -380,8 +380,8 @@ private fun DrawScope.drawLensDirectionMarkers(
     ringWidthPx: Float,
 ) {
     val markerColor = colors.lensArrow
-    val width = min(9.dp.toPx(), ringWidthPx * 0.76f).coerceAtLeast(5f)
-    val height = min(7.dp.toPx(), ringWidthPx * 0.54f).coerceAtLeast(4f)
+    val width = min(14.dp.toPx(), ringWidthPx * 0.76f).coerceAtLeast(5f)
+    val height = min(10.dp.toPx(), ringWidthPx * 0.54f).coerceAtLeast(4f)
     val strokeWidth = metrics.lensChevronStroke.toPx().coerceAtLeast(1f)
 
     ColorEyedropperNudgeDirection.entries.forEach { direction ->

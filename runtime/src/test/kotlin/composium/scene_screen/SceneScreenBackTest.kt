@@ -60,7 +60,7 @@ class SceneScreenBackTest {
         composeRule.onNodeWithContentDescription("Open eyedropper").performClick()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithContentDescription("Open eyedropper").assertExists()
-        composeRule.onNodeWithContentDescription("Expand settings").assertExists()
+        composeRule.onNodeWithContentDescription("Close properties").assertExists()
         assertEquals(0, closedScenes)
 
         composeRule.onNodeWithContentDescription("Back").performClick()
@@ -74,15 +74,15 @@ class SceneScreenBackTest {
     fun expandedInspectorBackRestoresSplitBeforeLeavingScene() {
         renderScene()
         composeRule.onNodeWithContentDescription("Open properties").performClick()
-        composeRule.onNodeWithContentDescription("Expand settings").performClick()
+        composeRule.expandInspectorByGesture()
         composeRule.onNodeWithContentDescription("Back to split layout").performClick()
 
-        composeRule.onNodeWithContentDescription("Expand settings").assertExists()
+        composeRule.onNodeWithContentDescription("Close properties").assertExists()
         assertEquals(0, closedScenes)
     }
 
     private fun renderScene() {
-        val entry = SceneEntry(Scene(group = null, name = "Back regression", tools = SceneTools.Floating) { padding ->
+        val entry = SceneEntry(Scene(group = null, name = "Back regression", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
             Box(Modifier.fillMaxSize().padding(padding))
         })
         composeRule.setContent {

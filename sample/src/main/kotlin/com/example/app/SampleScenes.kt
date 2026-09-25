@@ -93,7 +93,7 @@ internal val testList by sceneWithDecorator(
 internal val tonalNestedPlayground by scene(
     group = "Buttons/Secondary/Tonal",
     name = "Nested playground",
-    tools = SceneTools.Floating,
+    tools = SceneTools.Floating(),
 ) { contentPadding ->
     val title: String by param("Invite teammate")
     val enabled: Boolean by param(true)

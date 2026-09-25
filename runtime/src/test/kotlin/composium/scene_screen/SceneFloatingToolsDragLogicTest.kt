@@ -1,5 +1,7 @@
 package oleginvoke.com.composium.scene_screen
 
+import oleginvoke.com.composium.FloatingToolsPosition
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import kotlin.test.Test
@@ -19,7 +21,7 @@ class SceneFloatingToolsDragLogicTest {
         assertEquals(36f, bounds.minY)
         assertEquals(304f, bounds.maxX)
         assertEquals(470f, bounds.maxY)
-        assertEquals(Offset(x = 304f, y = 36f), bounds.topRightOffset)
+        assertEquals(Offset(x = 304f, y = 36f), bounds.initialOffset(FloatingToolsPosition.TopRight))
     }
 
     @Test
@@ -46,6 +48,6 @@ class SceneFloatingToolsDragLogicTest {
 
         assertEquals(bounds.minX, bounds.maxX)
         assertEquals(bounds.minY, bounds.maxY)
-        assertEquals(bounds.topRightOffset, bounds.clamp(Offset(500f, 500f)))
+        assertEquals(bounds.initialOffset(FloatingToolsPosition.TopRight), bounds.clamp(Offset(500f, 500f)))
     }
 }

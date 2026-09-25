@@ -9,9 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CropFree
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.ui.components.ComposiumIcon
@@ -42,9 +41,6 @@ internal fun SceneToolActionButton(
     showBorder: Boolean = true,
 ) {
     val containerColor by animateColorAsState(
-        // The light-theme primaryContainer token bakes in alpha 0.83 (0xD3B5D9E8). Override
-        // to fully opaque so the active settings button is solid like the other top bar
-        // elements rather than letting preview content bleed through.
         targetValue = if (active) {
             Tokens.colors.primaryContainer
         } else {
@@ -84,6 +80,7 @@ internal fun SceneToolActionButton(
     ) {
         ComposiumIconButton(
             onClick = onClick,
+            modifier = Modifier.semantics { selected = active },
             enabled = enabled,
             size = size,
         ) {
@@ -103,12 +100,5 @@ internal fun SceneToolActionButton(
                 )
             }
         }
-    }
-}
-
-internal fun SceneSettingsButtonIcon.imageVector(): ImageVector {
-    return when (this) {
-        SceneSettingsButtonIcon.Settings -> Icons.Outlined.Tune
-        SceneSettingsButtonIcon.Expand -> Icons.Outlined.CropFree
     }
 }

@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -29,14 +31,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 
 private const val CaptureRetryCount = 4
+private const val CaptureRefreshIntervalMillis = 100L
 
 /**
  * Wraps arbitrary Compose content and provides an opt-in color eyedropper overlay.
@@ -73,6 +80,22 @@ internal fun ColorEyedropperHost(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var islandSize by remember { mutableStateOf(IntSize.Zero) }
     var snapshot by remember { mutableStateOf<ColorEyedropperSnapshot?>(null) }
+    val captureRequests = remember { Channel<Unit>(Channel.CONFLATED) }
+
+    DisposableEffect(visible, ownerView) {
+        val observer = ownerView.viewTreeObserver
+        var active = visible
+        val listener = ViewTreeObserver.OnDrawListener {
+            // Descendant graphics layers may redraw without invoking our draw modifier.
+            // Post after drawing so capture never runs from inside an OnDraw callback.
+            ownerView.post { if (active) captureRequests.trySend(Unit) }
+        }
+        if (visible) observer.addOnDrawListener(listener)
+        onDispose {
+            active = false
+            if (visible && observer.isAlive) observer.removeOnDrawListener(listener)
+        }
+    }
 
     LaunchedEffect(visible, containerSize) {
         if (!visible || containerSize.width <= 0 || containerSize.height <= 0) return@LaunchedEffect
@@ -103,24 +126,31 @@ internal fun ColorEyedropperHost(
         snapshot = null
         state.updateColor(null)
 
-        repeat(CaptureRetryCount) {
-            // Wait until the content layer has recorded the current scene at its measured size.
-            awaitColorEyedropperDraw(ownerView)
-
-            val nextSnapshot = contentLayer.captureColorEyedropperSnapshot(
-                containerSize = containerSize,
-            )
-            if (nextSnapshot != null) {
-                snapshot = nextSnapshot
-                if (state.target.isSpecifiedForEyedropper) {
-                    state.updateColor(nextSnapshot.sample(state.target))
+        captureRequests.trySend(Unit)
+        var firstCapture = true
+        for (request in captureRequests) {
+            // Coalesce window redraws to at most ten refreshes per second.
+            // No timer runs while the window is idle. Snapshot equality prevents a
+            // capture -> overlay redraw -> capture feedback loop for unchanged pixels.
+            if (!firstCapture) delay(CaptureRefreshIntervalMillis)
+            captureRequests.tryReceive()
+            var nextSnapshot: ColorEyedropperSnapshot? = null
+            repeat(if (firstCapture) CaptureRetryCount else 1) {
+                // Later requests already follow a completed draw. Forcing another
+                // draw for them would enqueue another request indefinitely.
+                if (nextSnapshot == null) {
+                    if (firstCapture) awaitColorEyedropperDraw(ownerView)
+                    nextSnapshot = contentLayer.captureColorEyedropperSnapshot(containerSize)
                 }
-                return@LaunchedEffect
             }
+            nextSnapshot?.let { captured ->
+                snapshot = captured
+                if (state.target.isSpecifiedForEyedropper) {
+                    state.updateColor(captured.sample(state.target))
+                }
+            }
+            firstCapture = false
         }
-
-        snapshot = null
-        state.updateColor(null)
     }
 
     LaunchedEffect(visible, snapshot) {
@@ -130,7 +160,24 @@ internal fun ColorEyedropperHost(
 
     Box(
         modifier = modifier
-            .onSizeChanged { containerSize = it },
+            .onSizeChanged { containerSize = it }
+            .pointerInput(visible, containerSize, state) {
+                if (!visible) return@pointerInput
+                // As a parent, see gestures after the content: clicks remain clicks,
+                // and child scroll/drag handlers can consume movement before we do.
+                fun updateTarget(position: Offset) {
+                    val target = clampColorEyedropperTarget(position, containerSize)
+                    state.updateTarget(target)
+                    state.updateColor(snapshot?.sample(target))
+                }
+                detectDragGestures(
+                    onDragStart = { updateTarget(it) },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        updateTarget(change.position)
+                    },
+                )
+            },
     ) {
         Box(
             modifier = Modifier.drawWithContent {
@@ -242,31 +289,33 @@ private fun ColorEyedropperOverlay(
         )
     }
 
-    Box(
-        modifier = modifier.pointerInput(containerSize, snapshot) {
-            detectDragGestures(
-                onDragStart = { offset ->
-                    updateTarget(offset)
-                },
-                onDrag = { change, _ ->
-                    change.consume()
-                    updateTarget(change.position)
-                },
-            )
-        },
-    ) {
+    val currentUpdateTarget by rememberUpdatedState(::updateTarget)
+    // Both visible handles own their gestures; only drags outside them yield to content.
+    val dragTargetModifier = Modifier.pointerInput(state, containerSize) {
+        detectDragGestures { change, dragAmount ->
+            change.consume()
+            currentUpdateTarget(state.target + dragAmount)
+        }
+    }
+    Box(modifier = modifier) {
         lens?.let { pixelLens ->
             ColorEyedropperLens(
                 lens = pixelLens,
                 onNudge = ::nudgeTarget,
                 metrics = metrics,
                 colors = colors,
-                modifier = Modifier.offset { overlayPlacement.lensPlacement.offset },
+                modifier = Modifier
+                    .offset { overlayPlacement.lensPlacement.offset }
+                    .semantics { contentDescription = "Color eyedropper magnifier" }
+                    .then(dragTargetModifier),
             )
             ColorEyedropperCursor(
                 metrics = metrics,
                 colors = colors,
-                modifier = Modifier.offset { cursorOffset },
+                modifier = Modifier
+                    .offset { cursorOffset }
+                    .semantics { contentDescription = "Color eyedropper cursor" }
+                    .then(dragTargetModifier),
             )
         }
         if (state.color != null) {

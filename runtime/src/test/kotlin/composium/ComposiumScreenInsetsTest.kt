@@ -211,9 +211,9 @@ class ComposiumScreenInsetsTest {
 
     private fun assertFloatingAnchor(leftInset: Int, topInset: Int, rightInset: Int) {
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
-        val back = composeRule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
-        assertEquals(screen.right - rightInset - 12f - 64f + 8f, back.left, 1f)
-        assertEquals(screen.top + topInset + 12f + 8f, back.top, 1f)
+        val settings = composeRule.onNodeWithContentDescription("Open properties").fetchSemanticsNode().boundsInRoot
+        assertEquals(screen.right - rightInset - 12f - 48f, settings.left, 1f)
+        assertEquals(screen.top + topInset + 12f, settings.top, 1f)
         val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
         assertEquals(screen.left + leftInset, scene.left, 1f)
     }
@@ -278,7 +278,7 @@ class ComposiumScreenInsetsTest {
         useDefault: Boolean = false,
         inScaffold: Boolean = false,
         consumeParent: Boolean = true,
-        tools: SceneTools = SceneTools.Floating,
+        tools: SceneTools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true),
         direction: LayoutDirection = LayoutDirection.Ltr,
         legacy: Boolean = false,
     ) {

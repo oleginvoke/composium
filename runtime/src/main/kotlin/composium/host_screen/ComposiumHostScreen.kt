@@ -120,6 +120,8 @@ internal fun ComposiumHostScreen(
     val thumbnailStatesBySceneId = thumbnailStore.statesBySceneId()
 
     fun openScene(sceneId: SceneKey) {
+        // Also block accessibility activation of catalog items during the scene's exit.
+        if (state.renderedSceneId != null) return
         state = reduceComposiumHostScreen(
             state = state,
             intent = ComposiumHostScreenIntent.SceneSelected(sceneId),
@@ -342,7 +344,10 @@ internal fun ComposiumHostScreen(
                     key(renderedSceneId) {
                         SceneScreen(
                             sceneEntry = renderedSceneEntry,
-                            onBack = ::closeScene,
+                            onBack = {
+                                // An outgoing scene may still exist during its exit animation.
+                                if (state.selectedSceneId == renderedSceneEntry.id) closeScene()
+                            },
                             modifier = Modifier.fillMaxSize(),
                             contentWindowInsets = contentWindowInsets,
                         )

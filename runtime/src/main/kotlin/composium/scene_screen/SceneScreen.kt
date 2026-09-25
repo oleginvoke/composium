@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Colorize
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -89,6 +90,7 @@ import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.SceneTools
+import oleginvoke.com.composium.SceneToolStateBinding
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
 import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
 import oleginvoke.com.composium.onlyTopAndHorizontal
@@ -121,9 +123,10 @@ internal fun SceneScreen(
 ) {
     val themeController = LocalComposiumThemeController.current
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
-    val store = rememberSceneScreenStore(sceneEntry.id)
+    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.initiallyExpanded ?: false)
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
+    val floatingSettingsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
     val remainingInsets = remember(contentWindowInsets, consumedInsets) {
         contentWindowInsets.exclude(consumedInsets)
@@ -154,7 +157,7 @@ internal fun SceneScreen(
 
             override fun onToggleControls() {
                 val intent = calculateSceneSettingsButtonClickIntent(store.state.controlsSheet.layoutMode)
-                intent?.let(store::dispatch)
+                store.dispatch(intent)
             }
 
             override fun onDismissControls() {
@@ -200,6 +203,42 @@ internal fun SceneScreen(
             override fun onThemeChange(isDarkTheme: Boolean) {
                 themeController.onThemeChange.invoke(isDarkTheme)
             }
+        }
+    }
+
+    val currentCloseScene by rememberUpdatedState(onBack)
+    val currentCallbacks by rememberUpdatedState(callbacks)
+    val currentThemeController by rememberUpdatedState(themeController)
+    DisposableEffect(sceneScope, store) {
+        // Direct exit bypasses tools; onBack shares the built-in button's handler.
+        sceneScope.onCloseScene = { currentCloseScene() }
+        sceneScope.onBackAction = { currentCallbacks.onBack() }
+        sceneScope.controlsState.binding = SceneToolStateBinding(
+            read = { store.state.controlsSheet.isVisible },
+            change = { visible ->
+                store.dispatch(if (visible) SceneScreenIntent.ShowControls else SceneScreenIntent.HideControls)
+            },
+        )
+        sceneScope.eyedropperState.binding = SceneToolStateBinding(
+            read = { store.state.isEyedropperVisible },
+            change = { visible ->
+                if (!visible) {
+                    store.dispatch(SceneScreenIntent.HideEyedropper)
+                } else if (!store.state.isEyedropperVisible) {
+                    store.dispatch(SceneScreenIntent.ToggleEyedropper)
+                }
+            },
+        )
+        sceneScope.themeState.binding = SceneToolStateBinding(
+            read = { currentThemeController.isDarkTheme },
+            change = { currentThemeController.onThemeChange(it) },
+        )
+        onDispose {
+            sceneScope.onCloseScene = null
+            sceneScope.onBackAction = null
+            sceneScope.controlsState.binding = null
+            sceneScope.eyedropperState.binding = null
+            sceneScope.themeState.binding = null
         }
     }
 
@@ -305,8 +344,10 @@ internal fun SceneScreen(
         }
 
         if (
-            sceneEntry.scene.tools == SceneTools.TopBar ||
-            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+            sceneEntry.scene.tools != SceneTools.None && (
+                sceneEntry.scene.tools == SceneTools.TopBar ||
+                    state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+                )
         ) {
             SceneScreenTopBar(
                 sceneEntry = sceneEntry,
@@ -319,8 +360,9 @@ internal fun SceneScreen(
             )
         }
 
+        val floatingTools = sceneEntry.scene.tools as? SceneTools.Floating
         if (
-            shouldShowFloatingTools(
+            floatingTools != null && shouldShowFloatingTools(
                 tools = sceneEntry.scene.tools,
                 inspectorLayoutMode = state.controlsSheet.layoutMode,
             )
@@ -336,7 +378,9 @@ internal fun SceneScreen(
                 onThemeChange = callbacks::onThemeChange,
                 onMinimize = callbacks::onMinimizeFloatingTools,
                 onShow = callbacks::onShowFloatingTools,
-                position = floatingToolsPosition,
+                morePosition = floatingToolsPosition,
+                settingsPosition = floatingSettingsPosition,
+                initialPosition = floatingTools.initialPosition,
                 contentWindowInsets = remainingInsets,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -444,7 +488,7 @@ private fun SplitTopBarRow(
                 )
             }
             SceneToolActionButton(
-                imageVector = settingsButtonState.icon.imageVector(),
+                imageVector = Icons.Outlined.Tune,
                 contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
                 active = settingsButtonState.active,
@@ -633,7 +677,7 @@ private fun SceneScreenContent(
     val density = LocalDensity.current
     val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
     val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
-    val contentTopPadding = topInset + SceneTopBarContentHeight
+    val contentTopPadding = topInset + if (sceneEntry.scene.tools == SceneTools.None) 0.dp else SceneTopBarContentHeight
     val sceneContentPadding = calculateSceneContentPadding(
         tools = sceneEntry.scene.tools,
         statusBarInset = topInset,

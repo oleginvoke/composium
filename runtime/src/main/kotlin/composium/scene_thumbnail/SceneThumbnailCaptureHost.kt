@@ -3,6 +3,7 @@ package oleginvoke.com.composium.scene_thumbnail
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,6 +99,9 @@ internal fun SceneThumbnailCaptureHost(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                 isClickable = false
                 isFocusable = false
+                // isFocusable only covers this wrapper, not its AndroidComposeView child.
+                // A thumbnail's FocusRequester must not steal focus from catalog search.
+                descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             }
         },

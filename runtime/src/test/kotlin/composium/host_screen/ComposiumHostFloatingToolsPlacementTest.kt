@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import oleginvoke.com.composium.ComposiumRuntime
+import oleginvoke.com.composium.FloatingToolsPosition
 import oleginvoke.com.composium.Scene
 import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
@@ -39,7 +40,7 @@ class ComposiumHostFloatingToolsPlacementTest {
     fun hostConsumesHorizontalInsetsExactlyOnceForFloatingTools() {
         val sceneName = "Host inset placement regression"
         ComposiumRuntime.register(
-            Scene(group = null, name = sceneName, tools = SceneTools.Floating) {
+            Scene(group = null, name = sceneName, tools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true)) {
                 Box(Modifier.fillMaxSize().background(Color.Blue))
             },
         )
@@ -63,8 +64,8 @@ class ComposiumHostFloatingToolsPlacementTest {
         composeRule.onNodeWithText(sceneName).performClick()
 
         val host = composeRule.onNodeWithTag("host").fetchSemanticsNode().boundsInRoot
-        val back = composeRule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
-        assertEquals(host.right - 20f - 12f - 64f + 8f, back.left, 1.1f)
-        assertEquals(host.top + 24f + 12f + 8f, back.top, 1.1f)
+        val settings = composeRule.onNodeWithContentDescription("Open properties").fetchSemanticsNode().boundsInRoot
+        assertEquals(host.right - 20f - 12f - 48f, settings.left, 1.1f)
+        assertEquals(host.top + 24f + 12f, settings.top, 1.1f)
     }
 }

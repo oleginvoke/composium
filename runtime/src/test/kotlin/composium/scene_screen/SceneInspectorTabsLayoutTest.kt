@@ -42,7 +42,8 @@ class SceneInspectorTabsLayoutTest {
 
     private fun checkTabsLayout(density: Float) {
         val entry = SceneEntry(
-            Scene(null, "Tabs layout", tools = SceneTools.Floating, thumbnail = null) {
+            // Keep the fan collapsed so its overlay buttons don't cover the tab drag target.
+            Scene(null, "Tabs layout", tools = SceneTools.Floating(), thumbnail = null) {
                 Box(Modifier.fillMaxSize().testTag("preview"))
             },
         )
@@ -57,7 +58,7 @@ class SceneInspectorTabsLayoutTest {
         assertSplitBoundary(density)
         composeRule.onNodeWithText("Environment").performClick()
         assertSplitBoundary(density)
-        composeRule.onNodeWithContentDescription("Expand settings").performClick()
+        composeRule.expandInspectorByGesture()
         assertTabsHeight(density)
         composeRule.onNodeWithContentDescription("Back to split layout").performClick()
         assertSplitBoundary(density)

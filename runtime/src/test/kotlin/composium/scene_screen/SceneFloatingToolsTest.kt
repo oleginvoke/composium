@@ -7,17 +7,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,273 +32,117 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class SceneFloatingToolsTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun expandedToolsExposeAllFourActions() {
+    fun collapsedMenuKeepsSettingsAndBothAnchorsRemainFixedWhenOpening() {
+        renderTools()
+        val settings = bounds("Open properties")
+        val more = bounds("Show actions")
+        composeRule.onNodeWithContentDescription("Open properties")
+            .assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+        composeRule.onNodeWithContentDescription("Show actions")
+            .assertWidthIsEqualTo(44.dp).assertHeightIsEqualTo(44.dp)
+        assertTrue(settings.bottom < more.top)
+        assertEquals(settings.center.x, more.center.x, 0.1f)
+        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Show actions").performClick()
+        composeRule.onNodeWithContentDescription("Hide actions").assertIsSelected()
+        assertEquals(more, bounds("Hide actions"))
+        assertEquals(settings, bounds("Open properties"))
+        val fan = listOf("Open eyedropper", "Switch to dark theme", "Back").map(::bounds)
+        listOf("Open eyedropper", "Switch to dark theme", "Back").forEach { description ->
+            composeRule.onNodeWithContentDescription(description)
+                .assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+        }
+        fan.forEach {
+            assertEquals(with(composeRule.density) { 54.dp.toPx() }, (it.center - more.center).getDistance(), 1f)
+        }
+        fan.zipWithNext().forEach { (above, below) -> assertTrue(above.center.y < below.center.y) }
+        val buttons = fan + settings + more
+        buttons.forEachIndexed { index, button -> buttons.drop(index + 1).forEach {
+            assertTrue("Round buttons must not overlap", (button.center - it.center).getDistance() >= (button.width + it.width) / 2f)
+        } }
+        composeRule.onNodeWithContentDescription("Hide actions").performClick()
+        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
+        assertEquals(settings, bounds("Open properties"))
+        assertEquals(more, bounds("Show actions"))
+    }
+
+    @Test
+    fun toolActionsRemainOpenAndDispatchTheirOwnCallbacks() {
         var backClicks = 0
-        var propertiesClicks = 0
-        var eyedropperClicks = 0
-        var requestedDarkTheme: Boolean? = null
-
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = false,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = { backClicks++ },
-                    onToggleControls = { propertiesClicks++ },
-                    onToggleEyedropper = { eyedropperClicks++ },
-                    onThemeChange = { requestedDarkTheme = it },
-                    onMinimize = {},
-                    onShow = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Back").performClick()
+        renderTools(onBack = { backClicks++ })
         composeRule.onNodeWithContentDescription("Open properties").performClick()
+        composeRule.onNodeWithContentDescription("Close properties").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Show actions").performClick()
         composeRule.onNodeWithContentDescription("Open eyedropper").performClick()
+        composeRule.onNodeWithContentDescription("Close eyedropper").assertIsSelected().performClick()
         composeRule.onNodeWithContentDescription("Switch to dark theme").performClick()
-
+        composeRule.onNodeWithContentDescription("Switch to light theme").assertExists()
+        composeRule.onNodeWithContentDescription("Hide actions").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, backClicks)
-        assertEquals(1, propertiesClicks)
-        assertEquals(1, eyedropperClicks)
-        assertEquals(true, requestedDarkTheme)
     }
 
     @Test
-    fun minimizedToolsExposeOnlyTheRestoreHandle() {
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = true,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = {},
-                    onToggleControls = {},
-                    onToggleEyedropper = {},
-                    onThemeChange = {},
-                    onMinimize = {},
-                    onShow = {},
-                )
-            }
+    fun adjacentSettingsAndEyedropperReceiveTheirOwnPhysicalTaps() {
+        renderTools()
+        composeRule.onNodeWithContentDescription("Show actions").performClick()
+        val settings = bounds("Open properties")
+        val eyedropper = bounds("Open eyedropper")
+        val inset = with(composeRule.density) { 4.dp.toPx() }
+        composeRule.onNodeWithTag("root").performTouchInput {
+            click(Offset(settings.left + inset, settings.center.y))
         }
-
-        composeRule.onNodeWithContentDescription("Show tools").assertExists()
-        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Open properties").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Close properties").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Open eyedropper").assertExists()
+        composeRule.onNodeWithTag("root").performTouchInput {
+            click(Offset(eyedropper.right - inset, eyedropper.center.y))
+        }
+        composeRule.onNodeWithContentDescription("Close eyedropper").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Close properties").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Hide actions").assertIsSelected()
     }
 
     @Test
-    fun centeredEyeDispatchesHide() {
-        var minimizeClicks = 0
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = false,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = {},
-                    onToggleControls = {},
-                    onToggleEyedropper = {},
-                    onThemeChange = {},
-                    onMinimize = { minimizeClicks++ },
-                    onShow = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-        assertEquals(1, minimizeClicks)
-    }
-
-    @Test
-    fun bottomOfPropertiesButtonDoesNotToggleEye() {
-        var minimizeClicks = 0
-        var propertiesClicks = 0
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = false,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = {},
-                    onToggleControls = { propertiesClicks++ },
-                    onToggleEyedropper = {},
-                    onThemeChange = {},
-                    onMinimize = { minimizeClicks++ },
-                    onShow = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = center.x, y = height - 2f))
-        }
-
-        assertEquals(1, propertiesClicks)
-        assertEquals(0, minimizeClicks)
-    }
-
-    @Test
-    fun spaceBetweenPropertiesAndEyeDoesNotDispatchAnyAction() {
-        var minimizeClicks = 0
-        var propertiesClicks = 0
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = false,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = {},
-                    onToggleControls = { propertiesClicks++ },
-                    onToggleEyedropper = {},
-                    onThemeChange = {},
-                    onMinimize = { minimizeClicks++ },
-                    onShow = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(x = center.x, y = height + 3f))
-        }
-
-        assertEquals(0, propertiesClicks)
-        assertEquals(0, minimizeClicks)
-    }
-
-    @Test
-    fun verticalActionsDoNotOverlapEyeAndEyeStaysFixedWhenToolsCollapse() {
-        composeRule.setContent {
-            var minimized by remember { mutableStateOf(false) }
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = SceneInspectorLayoutMode.Closed,
-                    isMinimized = minimized,
-                    isDarkTheme = false,
-                    isEyedropperVisible = false,
-                    onBack = {},
-                    onToggleControls = {},
-                    onToggleEyedropper = {},
-                    onThemeChange = {},
-                    onMinimize = { minimized = true },
-                    onShow = { minimized = false },
-                )
-            }
-        }
-        val back = actionBounds("Back")
-        val properties = actionBounds("Open properties")
-        val eyedropper = actionBounds("Open eyedropper")
-        val theme = actionBounds("Switch to dark theme")
-        val expandedEye = actionBounds("Hide tools")
-
-        val actions = listOf(back, properties, expandedEye, eyedropper, theme)
-        actions.zipWithNext().forEach { (above, below) ->
-            org.junit.Assert.assertTrue("Buttons must have separate vertical touch areas", above.bottom < below.top)
-            assertEquals(above.center.x, below.center.x, 0.01f)
-        }
-        assertEquals((back.top + theme.bottom) / 2f, expandedEye.center.y, 0.01f)
-
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-
-        composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Open properties").assertDoesNotExist()
-        assertEquals(expandedEye, actionBounds("Show tools"))
-    }
-
-    @Test
-    fun capsuleGapsBlockSceneClicksButCollapsedEmptySpaceDoesNot() {
+    fun gapAndFormerFanAreaLetSceneReceiveClicks() {
         var sceneClicks = 0
+        renderTools(onSceneClick = { sceneClicks++ })
+        val settings = bounds("Open properties")
+        val more = bounds("Show actions")
+        composeRule.onNodeWithTag("root").performTouchInput {
+            click(Offset(settings.center.x, (settings.bottom + more.top) / 2f))
+        }
+        assertEquals(1, sceneClicks)
+        composeRule.onNodeWithContentDescription("Show actions").performClick()
+        val action = bounds("Back").center
+        composeRule.onNodeWithContentDescription("Hide actions").performClick()
+        composeRule.onNodeWithTag("root").performTouchInput { click(action) }
+        assertEquals(2, sceneClicks)
+    }
+
+    private fun renderTools(onBack: () -> Unit = {}, onSceneClick: () -> Unit = {}) {
         composeRule.setContent {
-            var minimized by remember { mutableStateOf(false) }
-            ComposiumTheme(darkTheme = false) {
+            var minimized by remember { mutableStateOf(true) }
+            var controls by remember { mutableStateOf(false) }
+            var eyedropper by remember { mutableStateOf(false) }
+            var dark by remember { mutableStateOf(false) }
+            ComposiumTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize().testTag("root")) {
-                    Box(Modifier.fillMaxSize().clickable { sceneClicks++ })
+                    Box(Modifier.fillMaxSize().clickable(onClick = onSceneClick))
                     SceneFloatingTools(
-                        controlsLayout = SceneInspectorLayoutMode.Closed,
-                        isMinimized = minimized,
-                        isDarkTheme = false,
-                        isEyedropperVisible = false,
-                        onBack = {},
-                        onToggleControls = {},
-                        onToggleEyedropper = {},
-                        onThemeChange = {},
-                        onMinimize = { minimized = true },
-                        onShow = { minimized = false },
+                        controlsLayout = if (controls) SceneInspectorLayoutMode.Split else SceneInspectorLayoutMode.Closed,
+                        isMinimized = minimized, isDarkTheme = dark, isEyedropperVisible = eyedropper,
+                        onBack = onBack, onToggleControls = { controls = !controls },
+                        onToggleEyedropper = { eyedropper = !eyedropper }, onThemeChange = { dark = it },
+                        onMinimize = { minimized = true }, onShow = { minimized = false },
                     )
                 }
             }
         }
-        val back = actionBounds("Back")
-        composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
-            click(Offset(center.x, height + 3f))
-        }
-        assertEquals("Visible capsule gaps must not activate the scene behind them", 0, sceneClicks)
-
-        composeRule.onNodeWithContentDescription("Hide tools").performClick()
-        composeRule.onNodeWithTag("root").performTouchInput { click(back.center) }
-        assertEquals("Collapsing must release the area previously occupied by actions", 1, sceneClicks)
     }
 
-    @Test
-    fun splitInspectorShowsExpandAction() {
-        var clicks = 0
-        renderTools(
-            controlsLayout = SceneInspectorLayoutMode.Split,
-            onToggleControls = { clicks++ },
-        )
-
-        composeRule.onNodeWithContentDescription("Expand settings").performClick()
-        assertEquals(1, clicks)
-    }
-
-    @Test
-    fun activeEyedropperShowsCloseAction() {
-        var clicks = 0
-        renderTools(
-            isEyedropperVisible = true,
-            onToggleEyedropper = { clicks++ },
-        )
-
-        composeRule.onNodeWithContentDescription("Close eyedropper").performClick()
-        assertEquals(1, clicks)
-    }
-
-    private fun renderTools(
-        controlsLayout: SceneInspectorLayoutMode = SceneInspectorLayoutMode.Closed,
-        isEyedropperVisible: Boolean = false,
-        onToggleControls: () -> Unit = {},
-        onToggleEyedropper: () -> Unit = {},
-    ) {
-        composeRule.setContent {
-            ComposiumTheme(darkTheme = false) {
-                SceneFloatingTools(
-                    controlsLayout = controlsLayout,
-                    isMinimized = false,
-                    isDarkTheme = false,
-                    isEyedropperVisible = isEyedropperVisible,
-                    onBack = {},
-                    onToggleControls = onToggleControls,
-                    onToggleEyedropper = onToggleEyedropper,
-                    onThemeChange = {},
-                    onMinimize = {},
-                    onShow = {},
-                )
-            }
-        }
-    }
-
-    private fun actionBounds(description: String) = composeRule
-        .onNodeWithContentDescription(description)
-        .fetchSemanticsNode()
-        .boundsInRoot
+    private fun bounds(description: String) = composeRule.onNodeWithContentDescription(description)
+        .fetchSemanticsNode().boundsInRoot
 }

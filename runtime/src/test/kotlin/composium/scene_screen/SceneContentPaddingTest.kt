@@ -23,7 +23,7 @@ class SceneContentPaddingTest {
     @Test
     fun floatingPaddingExcludesFloatingSurfaceAndTopBar() {
         val padding = calculateSceneContentPadding(
-            tools = SceneTools.Floating,
+            tools = SceneTools.Floating(initiallyExpanded = true),
             statusBarInset = 24.dp,
             navigationBarInset = 32.dp,
             topBarHeight = 72.dp,
