@@ -678,13 +678,6 @@ private fun SceneScreenContent(
     val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
     val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
     val contentTopPadding = topInset + if (sceneEntry.scene.tools == SceneTools.None) 0.dp else SceneTopBarContentHeight
-    val sceneContentPadding = calculateSceneContentPadding(
-        tools = sceneEntry.scene.tools,
-        statusBarInset = topInset,
-        navigationBarInset = bottomInset,
-        topBarHeight = SceneTopBarContentHeight,
-        inspectorLayoutMode = controlsSheet.layoutMode,
-    )
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -698,7 +691,7 @@ private fun SceneScreenContent(
     // half marks where preview content is fully clipped. In Expanded mode the boundary
     // doesn't exist — animate to zero for the transition.
     val isSplitLayout = controlsSheet.layoutMode == SceneInspectorLayoutMode.Split
-    val splitBoundaryShift by animateDpAsState(
+    val splitBoundaryShift = animateDpAsState(
         targetValue = if (isSplitLayout) {
             SceneInspectorTabsHeight / 2 + SceneInspectorTabsTopGap
         } else {
@@ -719,6 +712,34 @@ private fun SceneScreenContent(
     ) {
         val contentTopPaddingPx = with(density) { contentTopPadding.roundToPx() }
         val availableHeightPx = (constraints.maxHeight - contentTopPaddingPx).coerceAtLeast(0)
+        val maxHeightPx = constraints.maxHeight.coerceAtLeast(1)
+        // Share one animated boundary between measurement and padding. Read animation state
+        // lazily so frames that don't change the effective padding only invalidate layout.
+        val previewHeight = remember(
+            availableHeightPx, maxHeightPx, contentTopPadding, density,
+            inspectorFractionProvider, splitBoundaryShift,
+        ) {
+            derivedStateOf {
+                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+                val shiftPx = with(density) { splitBoundaryShift.value.toPx() }
+                val topPx = with(density) { contentTopPadding.toPx() }
+                ((1f - fraction) * availableHeightPx + shiftPx + topPx)
+                    .roundToInt().coerceIn(1, maxHeightPx)
+            }
+        }
+        val previewHeightProvider = remember(previewHeight) { { previewHeight.value } }
+        val tools = sceneEntry.scene.tools
+        val sceneContentPadding by remember(previewHeight, maxHeightPx, tools, topInset, bottomInset, density) {
+            derivedStateOf {
+                calculateSceneContentPadding(
+                    tools = tools,
+                    statusBarInset = topInset,
+                    navigationBarInset = bottomInset,
+                    topBarHeight = SceneTopBarContentHeight,
+                    spaceBelowPreview = with(density) { (maxHeightPx - previewHeight.value).toDp() },
+                )
+            }
+        }
         // The preview pane no longer manages its own scrolling, so there's no overflow to
         // signal to the inspector — divider stays hidden in this mode.
         val showSplitDivider = shouldShowSceneSplitDivider(
@@ -730,10 +751,7 @@ private fun SceneScreenContent(
             ScenePreviewPane(
                 sceneEntry = sceneEntry,
                 sceneScope = sceneScope,
-                availableHeightPx = availableHeightPx,
-                inspectorFractionProvider = inspectorFractionProvider,
-                splitBoundaryShift = splitBoundaryShift,
-                contentTopPadding = contentTopPadding,
+                previewHeightProvider = previewHeightProvider,
                 sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
@@ -781,10 +799,7 @@ private fun SceneScreenContent(
 private fun ScenePreviewPane(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
-    availableHeightPx: Int,
-    inspectorFractionProvider: () -> Float,
-    splitBoundaryShift: Dp,
-    contentTopPadding: Dp,
+    previewHeightProvider: () -> Int,
     sceneContentPadding: PaddingValues,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -805,15 +820,7 @@ private fun ScenePreviewPane(
         modifier = modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
-                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
-                val shiftPx = splitBoundaryShift.toPx()
-                val topPaddingPx = contentTopPadding.toPx()
-                val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
-
-                val visibleAreaPx = (1f - fraction) * availableHeightPx + shiftPx
-                val paneHeight = (visibleAreaPx + topPaddingPx)
-                    .roundToInt()
-                    .coerceIn(1, ceiling)
+                val paneHeight = previewHeightProvider()
 
                 val sceneTopPx = 0
                 val sceneBottomPx = 0
