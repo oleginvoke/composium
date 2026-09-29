@@ -29,6 +29,9 @@ import kotlin.reflect.KType
  */
 class SceneScope internal constructor() {
 
+    /** State and commands for the Composium UI hosting this scene. */
+    val host: SceneHost = SceneHost()
+
     internal val params: SnapshotStateList<ParamDescriptor> = mutableStateListOf()
     internal val preview: SceneSystemSettings = SceneSystemSettings()
 

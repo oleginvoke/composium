@@ -10,12 +10,9 @@ internal fun calculateSceneContentPadding(
     statusBarInset: Dp,
     navigationBarInset: Dp,
     topBarHeight: Dp,
-    inspectorLayoutMode: SceneInspectorLayoutMode,
+    spaceBelowPreview: Dp,
 ): PaddingValues = PaddingValues(
     top = statusBarInset + if (tools == SceneTools.TopBar) topBarHeight else 0.dp,
-    bottom = if (inspectorLayoutMode == SceneInspectorLayoutMode.Closed) {
-        navigationBarInset
-    } else {
-        0.dp
-    },
+    // Only the part of the system inset that intersects the actual preview needs padding.
+    bottom = (navigationBarInset - spaceBelowPreview).coerceIn(0.dp, navigationBarInset),
 )

@@ -32,15 +32,15 @@ class SceneFloatingToolsStateTest {
 
     @Test
     fun floatingToolsAreHiddenOnlyForTopBarScenesAndExpandedInspector() {
-        assertTrue(shouldShowFloatingTools(SceneTools.Floating, SceneInspectorLayoutMode.Closed))
-        assertTrue(shouldShowFloatingTools(SceneTools.Floating, SceneInspectorLayoutMode.Split))
-        assertFalse(shouldShowFloatingTools(SceneTools.Floating, SceneInspectorLayoutMode.Expanded))
+        assertTrue(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Closed))
+        assertTrue(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Split))
+        assertFalse(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Expanded))
         assertFalse(shouldShowFloatingTools(SceneTools.TopBar, SceneInspectorLayoutMode.Closed))
     }
 
     @Test
     fun toggleDescriptionsDescribeTheResultingAction() {
-        assertEquals("Hide tools", floatingToolsToggleContentDescription(isMinimized = false))
-        assertEquals("Show tools", floatingToolsToggleContentDescription(isMinimized = true))
+        assertEquals("Hide actions", floatingToolsToggleContentDescription(isMinimized = false))
+        assertEquals("Show actions", floatingToolsToggleContentDescription(isMinimized = true))
     }
 }

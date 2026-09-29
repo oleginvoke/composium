@@ -13,7 +13,7 @@ class SceneContentPaddingTest {
             statusBarInset = 24.dp,
             navigationBarInset = 32.dp,
             topBarHeight = 72.dp,
-            inspectorLayoutMode = SceneInspectorLayoutMode.Closed,
+            spaceBelowPreview = 0.dp,
         )
 
         assertEquals(96.dp, padding.calculateTopPadding())
@@ -23,11 +23,11 @@ class SceneContentPaddingTest {
     @Test
     fun floatingPaddingExcludesFloatingSurfaceAndTopBar() {
         val padding = calculateSceneContentPadding(
-            tools = SceneTools.Floating,
+            tools = SceneTools.Floating(actionsInitiallyExpanded = true),
             statusBarInset = 24.dp,
             navigationBarInset = 32.dp,
             topBarHeight = 72.dp,
-            inspectorLayoutMode = SceneInspectorLayoutMode.Closed,
+            spaceBelowPreview = 0.dp,
         )
 
         assertEquals(24.dp, padding.calculateTopPadding())
@@ -41,9 +41,21 @@ class SceneContentPaddingTest {
             statusBarInset = 24.dp,
             navigationBarInset = 32.dp,
             topBarHeight = 72.dp,
-            inspectorLayoutMode = SceneInspectorLayoutMode.Split,
+            spaceBelowPreview = 200.dp,
         )
 
         assertEquals(0.dp, padding.calculateBottomPadding())
+    }
+
+    @Test
+    fun previewPartiallyOverlappingNavigationAreaReceivesOnlyRemainingInset() {
+        val padding = calculateSceneContentPadding(
+            tools = SceneTools.None,
+            statusBarInset = 24.dp,
+            navigationBarInset = 32.dp,
+            topBarHeight = 72.dp,
+            spaceBelowPreview = 20.dp,
+        )
+        assertEquals(12.dp, padding.calculateBottomPadding())
     }
 }

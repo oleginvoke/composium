@@ -19,13 +19,14 @@ class SceneApiTest {
 
     @Test
     fun sceneStoresFloatingToolsPresentation() {
+        val tools = SceneTools.Floating(FloatingToolsPosition.CenterStart)
         val scene = Scene(
             group = null,
             name = "Fullscreen",
-            tools = SceneTools.Floating,
+            tools = tools,
             content = { padding -> padding.calculateBottomPadding() },
         )
 
-        assertEquals(SceneTools.Floating, scene.tools)
+        assertEquals(tools, scene.tools)
     }
 }

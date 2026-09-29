@@ -39,13 +39,7 @@ internal enum class SceneTitleIslandLayout {
     CenteredTitle,
 }
 
-internal enum class SceneSettingsButtonIcon {
-    Settings,
-    Expand,
-}
-
 internal data class SceneSettingsButtonState(
-    val icon: SceneSettingsButtonIcon,
     val contentDescription: String,
     val active: Boolean,
 )
@@ -68,34 +62,20 @@ internal fun calculateSceneTitleIslandLayout(
 internal fun calculateSceneSettingsButtonState(
     layoutMode: SceneInspectorLayoutMode,
 ): SceneSettingsButtonState {
-    return when (layoutMode) {
-        SceneInspectorLayoutMode.Closed -> SceneSettingsButtonState(
-            icon = SceneSettingsButtonIcon.Settings,
-            contentDescription = "Open properties",
-            active = false,
-        )
-
-        SceneInspectorLayoutMode.Split -> SceneSettingsButtonState(
-            icon = SceneSettingsButtonIcon.Expand,
-            contentDescription = "Expand settings",
-            active = true,
-        )
-
-        SceneInspectorLayoutMode.Expanded -> SceneSettingsButtonState(
-            icon = SceneSettingsButtonIcon.Expand,
-            contentDescription = "Expand settings",
-            active = true,
-        )
-    }
+    val active = layoutMode != SceneInspectorLayoutMode.Closed
+    return SceneSettingsButtonState(
+        contentDescription = if (active) "Close properties" else "Open properties",
+        active = active,
+    )
 }
 
 internal fun calculateSceneSettingsButtonClickIntent(
     layoutMode: SceneInspectorLayoutMode,
-): SceneScreenIntent? {
+): SceneScreenIntent {
     return when (layoutMode) {
         SceneInspectorLayoutMode.Closed -> SceneScreenIntent.ShowControls
-        SceneInspectorLayoutMode.Split -> SceneScreenIntent.ExpandControls
-        SceneInspectorLayoutMode.Expanded -> null
+        SceneInspectorLayoutMode.Split,
+        SceneInspectorLayoutMode.Expanded -> SceneScreenIntent.HideControls
     }
 }
 
@@ -193,11 +173,11 @@ internal fun calculateSceneInspectorContentClipOffset(
 internal fun shouldShowFloatingTools(
     tools: SceneTools,
     inspectorLayoutMode: SceneInspectorLayoutMode,
-): Boolean = tools == SceneTools.Floating &&
+): Boolean = tools is SceneTools.Floating &&
     inspectorLayoutMode != SceneInspectorLayoutMode.Expanded
 
 internal fun floatingToolsToggleContentDescription(isMinimized: Boolean): String =
-    if (isMinimized) "Show tools" else "Hide tools"
+    if (isMinimized) "Show actions" else "Hide actions"
 
 internal fun reduceSceneScreen(
     state: SceneScreenState,
@@ -399,8 +379,8 @@ internal class SceneScreenStore(
 }
 
 @Composable
-internal fun rememberSceneScreenStore(key: Any?): SceneScreenStore {
-    return remember(key) { SceneScreenStore() }
+internal fun rememberSceneScreenStore(key: Any?, actionsInitiallyExpanded: Boolean = false): SceneScreenStore {
+    return remember(key) { SceneScreenStore(SceneScreenState(isFloatingToolsMinimized = !actionsInitiallyExpanded)) }
 }
 
 private fun Float.clampDraggedSplitFraction(): Float {

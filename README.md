@@ -7,11 +7,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Version: `1.3.0-alpha01` (pre-release)
+Version: `1.3.0-alpha02` (pre-release)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.3.0-alpha01`
-- `io.github.oleginvoke:composium-processor:1.3.0-alpha01`
+- `io.github.oleginvoke:composium:1.3.0-alpha02`
+- `io.github.oleginvoke:composium-processor:1.3.0-alpha02`
 
 It is useful for:
 - design systems and component libraries;
@@ -99,8 +99,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
-    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha01")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha02")
+    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha02")
 }
 ```
 
@@ -114,7 +114,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha01")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha02")
 }
 ```
 
@@ -334,7 +334,7 @@ val RegularScene by scene { contentPadding ->
 }
 
 val FullScreenScene by scene(
-    tools = SceneTools.Floating,
+    tools = SceneTools.Floating(),
 ) { contentPadding ->
     Box(Modifier.fillMaxSize()) {
         FullScreenBackground()
@@ -343,9 +343,20 @@ val FullScreenScene by scene(
 }
 ```
 
-For edge-to-edge content, apply `contentPadding` only to the children that must remain unobscured. `SceneTools.TopBar` is the default. Use `SceneTools.Floating` to replace the top bar with a compact overlay containing Back, Properties, Eyedropper, and Theme controls.
+For edge-to-edge content, apply `contentPadding` only to the children that must remain unobscured. `SceneTools.TopBar` is the default. Use `SceneTools.Floating()` to replace the top bar with a compact overlay containing Back, Properties, Eyedropper, and Theme controls.
 
-The overlay starts at the top-right, below the status bar. Tap its eye button to hide or show the tools, or drag the eye to reposition them. Properties opens the controls panel; tapping it again expands the panel. Floating tools do not contribute to `contentPadding` or appear in eyedropper samples.
+Floating tools do not contribute to `contentPadding` or appear in eyedropper samples.
+
+Configure their initial position with `SceneTools.Floating(initialPosition = FloatingToolsPosition.CenterStart)`.
+Pass `actionsInitiallyExpanded = true` to show secondary actions when the scene opens (default: `false`).
+Available positions are `TopStart`, `CenterStart`, `BottomStart`, `TopEnd`,
+`CenterEnd` (default), and `BottomEnd`. Start and end follow the host's layout direction:
+start is left in LTR and right in RTL; end is the opposite.
+Positions respect system insets. The initial position applies until the user drags the toolbar;
+reopening the scene restores it.
+
+Use `SceneTools.None` to omit Composium's built-in toolbars and provide your own UI.
+System insets still contribute to `contentPadding`; no toolbar space is reserved.
 
 The bundled lint check reports an error when scene content does not reference its padding. For intentional full-bleed content, suppress that one issue explicitly:
 
@@ -357,6 +368,79 @@ val BackgroundScene by scene {
 ```
 
 Naming the lambda argument `_` still reports an error. The rule checks for an explicit reference or an explicit suppression; it does not try to prove where the padding was applied.
+
+### Custom scene tools
+
+`SceneScope.host` provides a `SceneHost` for controlling the Composium UI around your scene.
+Its observable tool states and navigation actions are available in every tools mode:
+
+| State | Read | Commands |
+| --- | --- | --- |
+| `host.controls` | `isVisible` | `show()`, `hide()`, `toggle()` |
+| `host.eyedropper` | `isVisible` | `show()`, `hide()`, `toggle()` |
+| `host.theme` | `isDark` | `setDark(Boolean)`, `toggle()` |
+
+```kotlin
+val ProfileScene by scene(tools = SceneTools.None) { contentPadding ->
+    Column(Modifier.padding(contentPadding)) {
+        MyTools(
+            settingsActive = host.controls.isVisible,
+            eyedropperActive = host.eyedropper.isVisible,
+            isDarkTheme = host.theme.isDark,
+            onSettingsClick = host.controls::toggle,
+            onEyedropperClick = host.eyedropper::toggle,
+            onThemeClick = host.theme::toggle,
+            onBack = host.onBack,
+        )
+        ProfileContent()
+    }
+}
+```
+
+Composium owns these objects; no additional `remember` or state copies are needed.
+They reflect the same state as the built-in tools, including changes from Back and gestures.
+`host.controls.show()` opens a closed panel in split mode and preserves an already open panel.
+The eyedropper cannot be opened while controls occupy the full screen.
+
+Theme commands use `ComposiumScreen`'s existing `onThemeChange` handling. If you supply
+`isDarkTheme` to `ComposiumScreen`, apply the requested value in the host; `host.theme.isDark`
+reflects the effective theme, not a pending request.
+
+Call commands from event handlers or effects, not directly during composition. Commands
+do nothing in thumbnails, `RenderPreview()`, or after the scene leaves composition;
+inactive state objects report `false`. `None` hides the toolbars, not the built-in
+Properties / Environment panel or eyedropper that these commands operate.
+
+### Closing a scene from your own UI
+
+Use `host.closeScene()` to connect your screen's own Back button to the catalog:
+
+```kotlin
+val ProfileScene by scene(tools = SceneTools.Floating()) { contentPadding ->
+    ProfileScreen(
+        modifier = Modifier.padding(contentPadding),
+        onBack = host::closeScene,
+    )
+}
+```
+
+`ProfileScreen` only needs an ordinary `onBack: () -> Unit` callback and does not need to depend on Composium.
+`host.closeScene()` returns directly to the catalog, even when Properties or the eyedropper is open. It does not change the tools-first behavior of Composium's own Back button or system Back.
+
+To match Composium's own Back button instead, pass the `host.onBack` callback directly:
+
+```kotlin
+val ProfileScene by scene(tools = SceneTools.Floating()) { contentPadding ->
+    ProfileScreen(
+        modifier = Modifier.padding(contentPadding),
+        onBack = host.onBack,
+    )
+}
+```
+
+Each call performs one step: close the eyedropper if open; otherwise restore expanded controls to split mode; otherwise hide the controls; otherwise return to the catalog.
+
+Invoke either action from an event handler or effect, not directly during composition. Both do nothing in thumbnails and `RenderPreview()`, or after their scene's screen leaves composition. Retained callbacks from an old opening cannot affect a later opening.
 
 ### Scene thumbnails
 

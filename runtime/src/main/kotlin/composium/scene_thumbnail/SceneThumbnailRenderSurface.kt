@@ -5,15 +5,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.awaitCancellation
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.thumbnailContent
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun SceneThumbnailRenderSurface(
     sceneEntry: SceneEntry,
@@ -27,16 +33,28 @@ internal fun SceneThumbnailRenderSurface(
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Ltr,
         androidx.compose.ui.platform.LocalDensity provides Density(density = captureScale, fontScale = 1f),
+        LocalSoftwareKeyboardController provides ThumbnailKeyboardController,
     ) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .clipToBounds(),
-            contentAlignment = Alignment.Center,
+        // Block automatic TextField input sessions as well as explicit controller calls.
+        // This boundary belongs to the capture composition, never to the catalog/search.
+        InterceptPlatformTextInput(
+            interceptor = { _, _ -> awaitCancellation() },
         ) {
-            with(sceneScope) {
-                thumbnail.invoke(this)
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+                contentAlignment = Alignment.Center,
+            ) {
+                with(sceneScope) {
+                    thumbnail.invoke(this)
+                }
             }
         }
     }
+}
+
+private object ThumbnailKeyboardController : SoftwareKeyboardController {
+    override fun show() = Unit
+    override fun hide() = Unit
 }

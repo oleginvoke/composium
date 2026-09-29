@@ -42,12 +42,12 @@ class SceneScreenPaddingDensityTest {
 
     @Test
     fun smallerPreviewDensityPreservesPhysicalFloatingSystemInsets() {
-        assertPhysicalPadding(SceneTools.Floating, previewDensity = 1f, expectedTopPx = 48f)
+        assertPhysicalPadding(SceneTools.Floating(actionsInitiallyExpanded = true), previewDensity = 1f, expectedTopPx = 48f)
     }
 
     @Test
     fun largerPreviewDensityPreservesPhysicalFloatingSystemInsets() {
-        assertPhysicalPadding(SceneTools.Floating, previewDensity = 4f, expectedTopPx = 48f)
+        assertPhysicalPadding(SceneTools.Floating(actionsInitiallyExpanded = true), previewDensity = 4f, expectedTopPx = 48f)
     }
 
     private fun assertPhysicalPadding(

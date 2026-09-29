@@ -72,11 +72,11 @@ internal data class ColorEyedropperMetrics(
     /** Stroke width for the cursor ring. */
     val cursorOutlineWidth: Dp = 3.dp,
     /** Diameter of the magnified pixel lens. */
-    val lensDiameter: Dp = 126.dp,
+    val lensDiameter: Dp = 144.dp,
     /** Width of the outer lens ring that separates controls from the magnified pixel grid. */
-    val lensInnerPadding: Dp = 16.dp,
+    val lensInnerPadding: Dp = 25.dp,
     /** Invisible touch target size for each pixel nudge arrow in the lens ring. */
-    val lensArrowTouchTarget: Dp = 30.dp,
+    val lensArrowTouchTarget: Dp = 48.dp,
     /** Number of source pixels sampled from the selected pixel to each lens edge. */
     val lensPixelRadius: Int = 5,
     /** Stroke width for the pixel grid inside the lens. */
@@ -88,7 +88,7 @@ internal data class ColorEyedropperMetrics(
     /** Stroke width for the inner border around magnified content. */
     val lensContentOutlineWidth: Dp = 1.dp,
     /** Stroke width for chevron nudge arrows inside the lens ring. */
-    val lensChevronStroke: Dp = 1.7.dp,
+    val lensChevronStroke: Dp = 2.dp,
 )
 
 /**

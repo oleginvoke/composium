@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Colorize
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -89,6 +90,7 @@ import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.SceneTools
+import oleginvoke.com.composium.SceneToolStateBinding
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
 import oleginvoke.com.composium.eyedropper.rememberColorEyedropperState
 import oleginvoke.com.composium.onlyTopAndHorizontal
@@ -121,9 +123,10 @@ internal fun SceneScreen(
 ) {
     val themeController = LocalComposiumThemeController.current
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
-    val store = rememberSceneScreenStore(sceneEntry.id)
+    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false)
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
+    val floatingSettingsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     var consumedInsets by remember { mutableStateOf(WindowInsets(0, 0, 0, 0)) }
     val remainingInsets = remember(contentWindowInsets, consumedInsets) {
         contentWindowInsets.exclude(consumedInsets)
@@ -154,7 +157,7 @@ internal fun SceneScreen(
 
             override fun onToggleControls() {
                 val intent = calculateSceneSettingsButtonClickIntent(store.state.controlsSheet.layoutMode)
-                intent?.let(store::dispatch)
+                store.dispatch(intent)
             }
 
             override fun onDismissControls() {
@@ -200,6 +203,43 @@ internal fun SceneScreen(
             override fun onThemeChange(isDarkTheme: Boolean) {
                 themeController.onThemeChange.invoke(isDarkTheme)
             }
+        }
+    }
+
+    val currentCloseScene by rememberUpdatedState(onBack)
+    val currentCallbacks by rememberUpdatedState(callbacks)
+    val currentThemeController by rememberUpdatedState(themeController)
+    DisposableEffect(sceneScope, store) {
+        val host = sceneScope.host
+        // Direct exit bypasses tools; onBack shares the built-in button's handler.
+        host.onCloseScene = { currentCloseScene() }
+        host.onBackAction = { currentCallbacks.onBack() }
+        host.controls.binding = SceneToolStateBinding(
+            read = { store.state.controlsSheet.isVisible },
+            change = { visible ->
+                store.dispatch(if (visible) SceneScreenIntent.ShowControls else SceneScreenIntent.HideControls)
+            },
+        )
+        host.eyedropper.binding = SceneToolStateBinding(
+            read = { store.state.isEyedropperVisible },
+            change = { visible ->
+                if (!visible) {
+                    store.dispatch(SceneScreenIntent.HideEyedropper)
+                } else if (!store.state.isEyedropperVisible) {
+                    store.dispatch(SceneScreenIntent.ToggleEyedropper)
+                }
+            },
+        )
+        host.theme.binding = SceneToolStateBinding(
+            read = { currentThemeController.isDarkTheme },
+            change = { currentThemeController.onThemeChange(it) },
+        )
+        onDispose {
+            host.onCloseScene = null
+            host.onBackAction = null
+            host.controls.binding = null
+            host.eyedropper.binding = null
+            host.theme.binding = null
         }
     }
 
@@ -305,8 +345,10 @@ internal fun SceneScreen(
         }
 
         if (
-            sceneEntry.scene.tools == SceneTools.TopBar ||
-            state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+            sceneEntry.scene.tools != SceneTools.None && (
+                sceneEntry.scene.tools == SceneTools.TopBar ||
+                    state.controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded
+                )
         ) {
             SceneScreenTopBar(
                 sceneEntry = sceneEntry,
@@ -319,8 +361,9 @@ internal fun SceneScreen(
             )
         }
 
+        val floatingTools = sceneEntry.scene.tools as? SceneTools.Floating
         if (
-            shouldShowFloatingTools(
+            floatingTools != null && shouldShowFloatingTools(
                 tools = sceneEntry.scene.tools,
                 inspectorLayoutMode = state.controlsSheet.layoutMode,
             )
@@ -336,7 +379,9 @@ internal fun SceneScreen(
                 onThemeChange = callbacks::onThemeChange,
                 onMinimize = callbacks::onMinimizeFloatingTools,
                 onShow = callbacks::onShowFloatingTools,
-                position = floatingToolsPosition,
+                morePosition = floatingToolsPosition,
+                settingsPosition = floatingSettingsPosition,
+                initialPosition = floatingTools.initialPosition,
                 contentWindowInsets = remainingInsets,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -444,7 +489,7 @@ private fun SplitTopBarRow(
                 )
             }
             SceneToolActionButton(
-                imageVector = settingsButtonState.icon.imageVector(),
+                imageVector = Icons.Outlined.Tune,
                 contentDescription = settingsButtonState.contentDescription,
                 onClick = callbacks::onToggleControls,
                 active = settingsButtonState.active,
@@ -633,14 +678,7 @@ private fun SceneScreenContent(
     val density = LocalDensity.current
     val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
     val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
-    val contentTopPadding = topInset + SceneTopBarContentHeight
-    val sceneContentPadding = calculateSceneContentPadding(
-        tools = sceneEntry.scene.tools,
-        statusBarInset = topInset,
-        navigationBarInset = bottomInset,
-        topBarHeight = SceneTopBarContentHeight,
-        inspectorLayoutMode = controlsSheet.layoutMode,
-    )
+    val contentTopPadding = topInset + if (sceneEntry.scene.tools == SceneTools.None) 0.dp else SceneTopBarContentHeight
 
     val previewAlpha = animateFloatAsState(
         targetValue = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Expanded) 0f else 1f,
@@ -654,7 +692,7 @@ private fun SceneScreenContent(
     // half marks where preview content is fully clipped. In Expanded mode the boundary
     // doesn't exist — animate to zero for the transition.
     val isSplitLayout = controlsSheet.layoutMode == SceneInspectorLayoutMode.Split
-    val splitBoundaryShift by animateDpAsState(
+    val splitBoundaryShift = animateDpAsState(
         targetValue = if (isSplitLayout) {
             SceneInspectorTabsHeight / 2 + SceneInspectorTabsTopGap
         } else {
@@ -675,6 +713,34 @@ private fun SceneScreenContent(
     ) {
         val contentTopPaddingPx = with(density) { contentTopPadding.roundToPx() }
         val availableHeightPx = (constraints.maxHeight - contentTopPaddingPx).coerceAtLeast(0)
+        val maxHeightPx = constraints.maxHeight.coerceAtLeast(1)
+        // Share one animated boundary between measurement and padding. Read animation state
+        // lazily so frames that don't change the effective padding only invalidate layout.
+        val previewHeight = remember(
+            availableHeightPx, maxHeightPx, contentTopPadding, density,
+            inspectorFractionProvider, splitBoundaryShift,
+        ) {
+            derivedStateOf {
+                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
+                val shiftPx = with(density) { splitBoundaryShift.value.toPx() }
+                val topPx = with(density) { contentTopPadding.toPx() }
+                ((1f - fraction) * availableHeightPx + shiftPx + topPx)
+                    .roundToInt().coerceIn(1, maxHeightPx)
+            }
+        }
+        val previewHeightProvider = remember(previewHeight) { { previewHeight.value } }
+        val tools = sceneEntry.scene.tools
+        val sceneContentPadding by remember(previewHeight, maxHeightPx, tools, topInset, bottomInset, density) {
+            derivedStateOf {
+                calculateSceneContentPadding(
+                    tools = tools,
+                    statusBarInset = topInset,
+                    navigationBarInset = bottomInset,
+                    topBarHeight = SceneTopBarContentHeight,
+                    spaceBelowPreview = with(density) { (maxHeightPx - previewHeight.value).toDp() },
+                )
+            }
+        }
         // The preview pane no longer manages its own scrolling, so there's no overflow to
         // signal to the inspector — divider stays hidden in this mode.
         val showSplitDivider = shouldShowSceneSplitDivider(
@@ -686,10 +752,7 @@ private fun SceneScreenContent(
             ScenePreviewPane(
                 sceneEntry = sceneEntry,
                 sceneScope = sceneScope,
-                availableHeightPx = availableHeightPx,
-                inspectorFractionProvider = inspectorFractionProvider,
-                splitBoundaryShift = splitBoundaryShift,
-                contentTopPadding = contentTopPadding,
+                previewHeightProvider = previewHeightProvider,
                 sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
                     callbacks::onPreviewPaneTapped
@@ -737,10 +800,7 @@ private fun SceneScreenContent(
 private fun ScenePreviewPane(
     sceneEntry: SceneEntry,
     sceneScope: SceneScope,
-    availableHeightPx: Int,
-    inspectorFractionProvider: () -> Float,
-    splitBoundaryShift: Dp,
-    contentTopPadding: Dp,
+    previewHeightProvider: () -> Int,
     sceneContentPadding: PaddingValues,
     onBackgroundTap: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -761,15 +821,7 @@ private fun ScenePreviewPane(
         modifier = modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
-                val fraction = inspectorFractionProvider().sanitizedInspectorFraction()
-                val shiftPx = splitBoundaryShift.toPx()
-                val topPaddingPx = contentTopPadding.toPx()
-                val ceiling = if (constraints.hasBoundedHeight) constraints.maxHeight else Int.MAX_VALUE
-
-                val visibleAreaPx = (1f - fraction) * availableHeightPx + shiftPx
-                val paneHeight = (visibleAreaPx + topPaddingPx)
-                    .roundToInt()
-                    .coerceIn(1, ceiling)
+                val paneHeight = previewHeightProvider()
 
                 val sceneTopPx = 0
                 val sceneBottomPx = 0

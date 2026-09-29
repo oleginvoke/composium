@@ -2,7 +2,6 @@ package oleginvoke.com.composium.scene_screen
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
@@ -10,10 +9,10 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
+import oleginvoke.com.composium.FloatingToolsPosition
 
 private val SceneFloatingToolsScreenMargin = 12.dp
 
@@ -29,11 +28,14 @@ internal fun SceneFloatingToolsOverlay(
     onThemeChange: (Boolean) -> Unit,
     onMinimize: () -> Unit,
     onShow: () -> Unit,
-    position: MutableState<Offset?>,
+    settingsPosition: MutableState<Offset?>,
+    morePosition: MutableState<Offset?>,
     contentWindowInsets: WindowInsets,
+    initialPosition: FloatingToolsPosition,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     BoxWithConstraints(
         modifier = modifier,
         contentAlignment = AbsoluteAlignment.TopLeft,
@@ -44,7 +46,7 @@ internal fun SceneFloatingToolsOverlay(
             top = contentWindowInsets.getTop(density),
             bottom = contentWindowInsets.getBottom(density),
         )
-        val placementBounds = calculateSceneFloatingToolsPlacementBounds(
+        val initialPairBounds = calculateSceneFloatingToolsPlacementBounds(
             containerSize = IntSize(width = constraints.maxWidth, height = constraints.maxHeight),
             toolsSizePx = with(density) {
                 IntSize(SceneFloatingToolsWidth.roundToPx(), SceneFloatingToolsHeight.roundToPx())
@@ -52,15 +54,31 @@ internal fun SceneFloatingToolsOverlay(
             safeInsets = safeInsets,
             marginPx = with(density) { SceneFloatingToolsScreenMargin.roundToPx() },
         )
-        val displayedPosition = placementBounds.clamp(
-            position.value ?: placementBounds.topRightOffset,
+        val settingsBounds = calculateSceneFloatingToolsPlacementBounds(
+            containerSize = IntSize(constraints.maxWidth, constraints.maxHeight),
+            toolsSizePx = with(density) { IntSize(SceneFloatingToolSize.roundToPx(), SceneFloatingToolSize.roundToPx()) },
+            safeInsets = safeInsets,
+            marginPx = with(density) { SceneFloatingToolsScreenMargin.roundToPx() },
         )
+        val moreBounds = calculateSceneFloatingToolsPlacementBounds(
+            containerSize = IntSize(constraints.maxWidth, constraints.maxHeight),
+            toolsSizePx = with(density) { IntSize(SceneFloatingMoreSize.roundToPx(), SceneFloatingMoreSize.roundToPx()) },
+            safeInsets = safeInsets,
+            marginPx = with(density) { SceneFloatingToolsScreenMargin.roundToPx() },
+        )
+        val initialSettings = initialPairBounds.initialOffset(initialPosition, layoutDirection)
+        val initialMore = initialSettings + Offset(with(density) {
+            (SceneFloatingToolSize - SceneFloatingMoreSize).toPx() / 2f
+        }, with(density) {
+            (SceneFloatingToolSize + SceneFloatingToolsGap).toPx()
+        })
+        val displayedSettings = settingsBounds.clamp(settingsPosition.value ?: initialSettings)
+        val displayedMore = moreBounds.clamp(morePosition.value ?: initialMore)
 
         SideEffect {
             // Until the user drags, keep following the default anchor as insets settle or change.
-            if (position.value != null && position.value != displayedPosition) {
-                position.value = displayedPosition
-            }
+            if (settingsPosition.value != null && settingsPosition.value != displayedSettings) settingsPosition.value = displayedSettings
+            if (morePosition.value != null && morePosition.value != displayedMore) morePosition.value = displayedMore
         }
 
         SceneFloatingTools(
@@ -74,18 +92,15 @@ internal fun SceneFloatingToolsOverlay(
             onThemeChange = onThemeChange,
             onMinimize = onMinimize,
             onShow = onShow,
-            onDrag = { dragAmount ->
-                val currentPosition = placementBounds.clamp(
-                    position.value ?: placementBounds.topRightOffset,
-                )
-                position.value = placementBounds.clamp(currentPosition + dragAmount)
+            settingsPosition = displayedSettings,
+            morePosition = displayedMore,
+            onSettingsDrag = { amount ->
+                settingsPosition.value = settingsBounds.clamp(settingsBounds.clamp(settingsPosition.value ?: initialSettings) + amount)
             },
-            modifier = Modifier.absoluteOffset {
-                IntOffset(
-                    x = displayedPosition.x.roundToInt(),
-                    y = displayedPosition.y.roundToInt(),
-                )
+            onMoreDrag = { amount ->
+                morePosition.value = moreBounds.clamp(moreBounds.clamp(morePosition.value ?: initialMore) + amount)
             },
+            modifier = Modifier,
         )
     }
 }
