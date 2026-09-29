@@ -33,7 +33,7 @@ import kotlin.math.sqrt
 
 internal val SceneFloatingToolSize = 48.dp
 internal val SceneFloatingMoreSize = 44.dp
-internal val SceneFloatingToolsGap = 8.dp
+internal val SceneFloatingToolsGap = 4.dp
 internal val SceneFloatingToolsWidth = SceneFloatingToolSize
 internal val SceneFloatingToolsHeight = SceneFloatingToolSize + SceneFloatingToolsGap + SceneFloatingMoreSize
 private val ActionSize = 48.dp

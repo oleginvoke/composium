@@ -101,18 +101,18 @@ class SceneFloatingToolsPlacementTest {
     }
 
     @Test
-    fun rtlHostKeepsPhysicalRightAnchorWhenMinimizingAndRestoring() {
-        assertStablePhysicalAnchor(LayoutDirection.Rtl)
+    fun rtlHostKeepsEndAnchorWhenMinimizingAndRestoring() {
+        assertStableEndAnchor(LayoutDirection.Rtl)
     }
 
     @Test
-    fun ltrHostKeepsPhysicalRightAnchorWhenMinimizingAndRestoring() {
-        assertStablePhysicalAnchor(LayoutDirection.Ltr)
+    fun ltrHostKeepsEndAnchorWhenMinimizingAndRestoring() {
+        assertStableEndAnchor(LayoutDirection.Ltr)
     }
 
     @Test
     fun rtlHostStillOpensFanToThePhysicalLeft() {
-        renderScene(LayoutDirection.Rtl)
+        renderScene(LayoutDirection.Rtl, initialPosition = FloatingToolsPosition.TopStart)
         val more = actionBounds("Hide actions")
         val actions = listOf("Open eyedropper", "Switch to dark theme", "Back")
             .map(::actionBounds)
@@ -123,14 +123,18 @@ class SceneFloatingToolsPlacementTest {
         assertEquals(more.center.x, actions.last().center.x, 0.01f)
     }
 
-    private fun assertStablePhysicalAnchor(direction: LayoutDirection) {
+    private fun assertStableEndAnchor(direction: LayoutDirection) {
         renderScene(direction)
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
         val expandedEye = actionBounds("Hide actions")
         val settings = actionBounds("Open properties")
-        // Centered 48/44 dp buttons separated by 8 dp; physical right inset 20 + margin 12.
-        assertEquals(screen.right - 34f, expandedEye.right, 0.01f)
-        assertEquals(screen.top + 92f, expandedEye.top, 0.01f)
+        // Centered 48/44 dp buttons separated by 4 dp; physical insets stay asymmetric.
+        if (direction == LayoutDirection.Ltr) {
+            assertEquals(screen.right - 34f, expandedEye.right, 0.01f)
+        } else {
+            assertEquals(screen.left + 21f, expandedEye.left, 0.01f)
+        }
+        assertEquals(screen.top + 88f, expandedEye.top, 0.01f)
         assertEquals(44f, expandedEye.width, 0.01f)
         assertEquals(44f, expandedEye.height, 0.01f)
         assertEquals(screen.top + 36f, settings.top, 0.01f)
@@ -155,8 +159,9 @@ class SceneFloatingToolsPlacementTest {
         direction: LayoutDirection,
         backgroundColor: Color = Color.Blue,
         darkTheme: Boolean = false,
+        initialPosition: FloatingToolsPosition = FloatingToolsPosition.TopEnd,
     ) {
-        val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true)) { padding ->
+        val entry = SceneEntry(Scene(group = null, name = "Placement regression", tools = SceneTools.Floating(initialPosition, actionsInitiallyExpanded = true)) { padding ->
             Box(Modifier.fillMaxSize().background(backgroundColor)) {
                 Box(Modifier.fillMaxSize().padding(padding))
             }

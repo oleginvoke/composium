@@ -40,7 +40,7 @@ class ComposiumHostFloatingToolsPlacementTest {
     fun hostConsumesHorizontalInsetsExactlyOnceForFloatingTools() {
         val sceneName = "Host inset placement regression"
         ComposiumRuntime.register(
-            Scene(group = null, name = sceneName, tools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true)) {
+            Scene(group = null, name = sceneName, tools = SceneTools.Floating(FloatingToolsPosition.TopEnd, actionsInitiallyExpanded = true)) {
                 Box(Modifier.fillMaxSize().background(Color.Blue))
             },
         )

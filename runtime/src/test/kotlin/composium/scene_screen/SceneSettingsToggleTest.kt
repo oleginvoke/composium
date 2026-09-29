@@ -31,7 +31,7 @@ class SceneSettingsToggleTest {
     fun topBarSettingsTogglePanelWithoutLeavingScene() = checkToggle(SceneTools.TopBar)
 
     @Test
-    fun floatingSettingsTogglePanelWithoutLeavingScene() = checkToggle(SceneTools.Floating(initiallyExpanded = true))
+    fun floatingSettingsTogglePanelWithoutLeavingScene() = checkToggle(SceneTools.Floating(actionsInitiallyExpanded = true))
 
     private fun checkToggle(tools: SceneTools) {
         var closed = 0

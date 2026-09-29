@@ -379,8 +379,8 @@ internal class SceneScreenStore(
 }
 
 @Composable
-internal fun rememberSceneScreenStore(key: Any?, initiallyExpanded: Boolean = false): SceneScreenStore {
-    return remember(key) { SceneScreenStore(SceneScreenState(isFloatingToolsMinimized = !initiallyExpanded)) }
+internal fun rememberSceneScreenStore(key: Any?, actionsInitiallyExpanded: Boolean = false): SceneScreenStore {
+    return remember(key) { SceneScreenStore(SceneScreenState(isFloatingToolsMinimized = !actionsInitiallyExpanded)) }
 }
 
 private fun Float.clampDraggedSplitFraction(): Float {

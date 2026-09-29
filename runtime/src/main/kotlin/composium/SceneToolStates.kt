@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * Observable state and actions for the Properties / Environment panel.
- * Owned by [SceneScope]; do not create or remember a separate instance.
+ * Owned by [SceneHost]; do not create or remember a separate instance.
  * Commands are for event handlers or effects, not composition, and do nothing in
  * thumbnails, [Scene.RenderPreview], or after the owning scene leaves composition.
  */
@@ -29,7 +29,7 @@ class SceneControlsState internal constructor() {
 }
 
 /**
- * Observable state and actions for the scene's eyedropper, owned by [SceneScope].
+ * Observable state and actions for the scene's eyedropper, owned by [SceneHost].
  * Commands are for event handlers or effects, not composition, and do nothing in
  * thumbnails, [Scene.RenderPreview], or after the owning scene leaves composition.
  */
@@ -51,7 +51,7 @@ class SceneEyedropperState internal constructor() {
 }
 
 /**
- * Observable effective Composium theme and theme change requests, owned by [SceneScope].
+ * Observable effective Composium theme and theme change requests, owned by [SceneHost].
  * Commands are for event handlers or effects, not composition, and do nothing in
  * thumbnails, [Scene.RenderPreview], or after the owning scene leaves composition.
  * An inactive state reports [isDark] as false.

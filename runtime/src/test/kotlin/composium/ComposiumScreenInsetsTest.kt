@@ -172,7 +172,7 @@ class ComposiumScreenInsetsTest {
         render(direction = LayoutDirection.Rtl)
         openScene()
         assertScenePadding(14, 18)
-        assertFloatingAnchor(leftInset = 7, topInset = 24, rightInset = 20)
+        assertFloatingAnchor(leftInset = 7, topInset = 24, rightInset = 20, direction = LayoutDirection.Rtl)
         val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
         assertEquals(screen.left + 7f, scene.left, 1f)
@@ -209,10 +209,20 @@ class ComposiumScreenInsetsTest {
         assertEquals(bottom.dp, checkNotNull(scenePadding).calculateBottomPadding())
     }
 
-    private fun assertFloatingAnchor(leftInset: Int, topInset: Int, rightInset: Int) {
+    private fun assertFloatingAnchor(
+        leftInset: Int,
+        topInset: Int,
+        rightInset: Int,
+        direction: LayoutDirection = LayoutDirection.Ltr,
+    ) {
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
         val settings = composeRule.onNodeWithContentDescription("Open properties").fetchSemanticsNode().boundsInRoot
-        assertEquals(screen.right - rightInset - 12f - 48f, settings.left, 1f)
+        val expectedLeft = if (direction == LayoutDirection.Ltr) {
+            screen.right - rightInset - 12f - 48f
+        } else {
+            screen.left + leftInset + 12f
+        }
+        assertEquals(expectedLeft, settings.left, 1f)
         assertEquals(screen.top + topInset + 12f, settings.top, 1f)
         val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
         assertEquals(screen.left + leftInset, scene.left, 1f)
@@ -278,7 +288,7 @@ class ComposiumScreenInsetsTest {
         useDefault: Boolean = false,
         inScaffold: Boolean = false,
         consumeParent: Boolean = true,
-        tools: SceneTools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true),
+        tools: SceneTools = SceneTools.Floating(FloatingToolsPosition.TopEnd, actionsInitiallyExpanded = true),
         direction: LayoutDirection = LayoutDirection.Ltr,
         legacy: Boolean = false,
     ) {

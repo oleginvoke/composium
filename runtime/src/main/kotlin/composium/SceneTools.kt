@@ -13,22 +13,22 @@ sealed class SceneTools private constructor() {
 
     /**
      * Independently movable settings and actions buttons, initially placed as a vertical pair.
-     * [initialPosition] and [initiallyExpanded] apply when the scene opens. Reopening the scene
+     * [initialPosition] and [actionsInitiallyExpanded] apply when the scene opens. Reopening the scene
      * restores these defaults; collapsing the actions does not reset either button's position.
      */
     class Floating(
-        val initialPosition: FloatingToolsPosition = FloatingToolsPosition.CenterRight,
+        val initialPosition: FloatingToolsPosition = FloatingToolsPosition.CenterEnd,
         /** Whether secondary actions start expanded when the scene opens. */
-        val initiallyExpanded: Boolean = false,
+        val actionsInitiallyExpanded: Boolean = false,
     ) : SceneTools()
 }
 
-/** Initial anchor inside the safe screen area. Left/right are physical, including in RTL. */
+/** Initial anchor inside the safe screen area. Start/end follow the host's layout direction. */
 enum class FloatingToolsPosition {
-    TopLeft,
-    CenterLeft,
-    BottomLeft,
-    TopRight,
-    CenterRight,
-    BottomRight,
+    TopStart,
+    CenterStart,
+    BottomStart,
+    TopEnd,
+    CenterEnd,
+    BottomEnd,
 }

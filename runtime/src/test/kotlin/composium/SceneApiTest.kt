@@ -19,7 +19,7 @@ class SceneApiTest {
 
     @Test
     fun sceneStoresFloatingToolsPresentation() {
-        val tools = SceneTools.Floating(FloatingToolsPosition.CenterLeft)
+        val tools = SceneTools.Floating(FloatingToolsPosition.CenterStart)
         val scene = Scene(
             group = null,
             name = "Fullscreen",

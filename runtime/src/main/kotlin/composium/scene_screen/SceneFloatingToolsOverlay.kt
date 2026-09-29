@@ -9,6 +9,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.FloatingToolsPosition
@@ -34,6 +35,7 @@ internal fun SceneFloatingToolsOverlay(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     BoxWithConstraints(
         modifier = modifier,
         contentAlignment = AbsoluteAlignment.TopLeft,
@@ -64,7 +66,7 @@ internal fun SceneFloatingToolsOverlay(
             safeInsets = safeInsets,
             marginPx = with(density) { SceneFloatingToolsScreenMargin.roundToPx() },
         )
-        val initialSettings = initialPairBounds.initialOffset(initialPosition)
+        val initialSettings = initialPairBounds.initialOffset(initialPosition, layoutDirection)
         val initialMore = initialSettings + Offset(with(density) {
             (SceneFloatingToolSize - SceneFloatingMoreSize).toPx() / 2f
         }, with(density) {

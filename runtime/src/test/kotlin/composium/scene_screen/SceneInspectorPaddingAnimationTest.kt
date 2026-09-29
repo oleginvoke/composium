@@ -80,7 +80,7 @@ class SceneInspectorPaddingAnimationTest {
         checkPadding()
         rule.mainClock.autoAdvance = false
         var previousY = bounds("card").top
-        rule.runOnIdle { scope.controlsState.show() }
+        rule.runOnIdle { scope.host.controls.show() }
         repeat(if (interrupt) 7 else 30) {
             rule.mainClock.advanceTimeByFrame()
             val y = bounds("card").top
@@ -101,7 +101,7 @@ class SceneInspectorPaddingAnimationTest {
             checkPadding()
             previousY = bounds("card").top
         }
-        rule.runOnIdle { scope.onBack() }
+        rule.runOnIdle { scope.host.onBack() }
         repeat(30) {
             rule.mainClock.advanceTimeByFrame()
             val y = bounds("card").top

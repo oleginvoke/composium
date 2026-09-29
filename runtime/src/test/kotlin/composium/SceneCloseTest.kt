@@ -43,8 +43,8 @@ class SceneCloseTest {
     fun closeSceneBypassesControlsAndEyedropper() {
         var close: () -> Unit = {}
         var closed = 0
-        val entry = SceneEntry(Scene(null, "Direct close", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
-            SideEffect { close = ::closeScene }
+        val entry = SceneEntry(Scene(null, "Direct close", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
+            SideEffect { close = host::closeScene }
             Box(Modifier.padding(padding)) { BasicText("Scene content") }
         })
         composeRule.setContent {
@@ -64,8 +64,8 @@ class SceneCloseTest {
     fun closeSceneBypassesExpandedControls() {
         var close: () -> Unit = {}
         var closed = 0
-        val entry = SceneEntry(Scene(null, "Expanded close", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
-            SideEffect { close = ::closeScene }
+        val entry = SceneEntry(Scene(null, "Expanded close", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
+            SideEffect { close = host::closeScene }
             Box(Modifier.padding(padding)) { BasicText("Scene content") }
         })
         composeRule.setContent {
@@ -89,7 +89,7 @@ class SceneCloseTest {
         var newHandlerCalls = 0
         var close: () -> Unit = {}
         val entry = SceneEntry(Scene(null, "Lifetime") { padding ->
-            SideEffect { close = ::closeScene }
+            SideEffect { close = host::closeScene }
             Box(Modifier.padding(padding)) { BasicText("Mounted scene") }
         })
         composeRule.setContent {
@@ -130,19 +130,19 @@ class SceneCloseTest {
         var isolatedEffects = 0
         val isolated = Scene(null, "Isolated") { padding ->
             LaunchedEffect(Unit) {
-                closeScene()
-                onBack()
-                controlsState.show()
-                controlsState.toggle()
-                controlsState.hide()
-                eyedropperState.show()
-                eyedropperState.toggle()
-                eyedropperState.hide()
-                themeState.setDark(true)
-                themeState.toggle()
-                assertEquals(false, controlsState.isVisible)
-                assertEquals(false, eyedropperState.isVisible)
-                assertEquals(false, themeState.isDark)
+                host.closeScene()
+                host.onBack()
+                host.controls.show()
+                host.controls.toggle()
+                host.controls.hide()
+                host.eyedropper.show()
+                host.eyedropper.toggle()
+                host.eyedropper.hide()
+                host.theme.setDark(true)
+                host.theme.toggle()
+                assertEquals(false, host.controls.isVisible)
+                assertEquals(false, host.eyedropper.isVisible)
+                assertEquals(false, host.theme.isDark)
                 isolatedEffects++
             }
             Box(Modifier.padding(padding)) { BasicText("Isolated content") }
@@ -173,10 +173,10 @@ class SceneCloseTest {
         var back: () -> Unit = {}
         val scene = Scene(null, "Custom back example", thumbnail = null) { padding ->
             SideEffect {
-                close = ::closeScene
-                back = onBack
+                close = host::closeScene
+                back = host.onBack
             }
-            BasicText("My back button", Modifier.padding(padding).clickable { closeScene() })
+            BasicText("My back button", Modifier.padding(padding).clickable { host.closeScene() })
         }
         ComposiumRuntime.registerAll(scene)
         composeRule.setContent {

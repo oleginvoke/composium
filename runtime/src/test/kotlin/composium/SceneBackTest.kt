@@ -33,8 +33,8 @@ class SceneBackTest {
     fun backClosesEyedropperBeforeControlsAndThenScene() {
         var back: () -> Unit = {}
         var closed = 0
-        val entry = SceneEntry(Scene(null, "Back order", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
-            SideEffect { back = onBack }
+        val entry = SceneEntry(Scene(null, "Back order", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
+            SideEffect { back = host.onBack }
             Box(Modifier.padding(padding)) { BasicText("Scene content") }
         })
         composeRule.setContent {
@@ -62,8 +62,8 @@ class SceneBackTest {
     fun backRestoresSplitControlsBeforeClosingThem() {
         var back: () -> Unit = {}
         var closed = 0
-        val entry = SceneEntry(Scene(null, "Expanded back", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
-            SideEffect { back = onBack }
+        val entry = SceneEntry(Scene(null, "Expanded back", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
+            SideEffect { back = host.onBack }
             Box(Modifier.padding(padding)) { BasicText("Scene content") }
         })
         composeRule.setContent {
@@ -92,8 +92,8 @@ class SceneBackTest {
         var oldCalls = 0
         var newCalls = 0
         var back: () -> Unit = {}
-        val entry = SceneEntry(Scene(null, "Back lifetime", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
-            SideEffect { back = onBack }
+        val entry = SceneEntry(Scene(null, "Back lifetime", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
+            SideEffect { back = host.onBack }
             Box(Modifier.padding(padding)) { BasicText("Scene content") }
         })
         composeRule.setContent {

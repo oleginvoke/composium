@@ -29,40 +29,8 @@ import kotlin.reflect.KType
  */
 class SceneScope internal constructor() {
 
-    /** State and commands for the built-in Properties / Environment panel. */
-    val controlsState: SceneControlsState = SceneControlsState()
-
-    /** State and commands for the built-in eyedropper. */
-    val eyedropperState: SceneEyedropperState = SceneEyedropperState()
-
-    /** Effective Composium theme and theme change requests. */
-    val themeState: SceneThemeState = SceneThemeState()
-
-    internal var onCloseScene: (() -> Unit)? = null
-    internal var onBackAction: (() -> Unit)? = null
-
-    /**
-     * Performs one step of Composium's Back behavior: hides the eyedropper, restores
-     * expanded controls to split mode, hides controls, or returns to the catalog.
-     * Use [closeScene] to return directly to the catalog instead.
-     *
-     * This callback keeps its identity for this scope's lifetime. Invoke it from a UI
-     * event or effect, not directly during composition. It does nothing in thumbnails,
-     * [Scene.RenderPreview], or after this scene's screen has left composition.
-     */
-    val onBack: () -> Unit = { onBackAction?.invoke() }
-
-    /**
-     * Closes this scene and returns to the catalog, even when scene tools are open.
-     * Call from a UI event or effect, not directly during composition.
-     *
-     * Does nothing in catalog thumbnails, [Scene.RenderPreview], or after this scene's
-     * screen has left composition. A callback retained from an old opening cannot close
-     * a subsequently opened scene.
-     */
-    fun closeScene() {
-        onCloseScene?.invoke()
-    }
+    /** State and commands for the Composium UI hosting this scene. */
+    val host: SceneHost = SceneHost()
 
     internal val params: SnapshotStateList<ParamDescriptor> = mutableStateListOf()
     internal val preview: SceneSystemSettings = SceneSystemSettings()

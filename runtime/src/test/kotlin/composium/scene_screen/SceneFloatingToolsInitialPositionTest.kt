@@ -41,8 +41,8 @@ class SceneFloatingToolsInitialPositionTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun sixPhysicalAnchorsRespectInsetsInBothLayoutDirections() {
-        var position by mutableStateOf(FloatingToolsPosition.TopLeft)
+    fun sixLogicalAnchorsRespectInsetsInBothLayoutDirections() {
+        var position by mutableStateOf(FloatingToolsPosition.TopStart)
         var direction by mutableStateOf(LayoutDirection.Ltr)
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f), LocalLayoutDirection provides direction) {
@@ -50,7 +50,7 @@ class SceneFloatingToolsInitialPositionTest {
                     val insets = WindowInsets(left = 7, top = 24, right = 20, bottom = 30)
                     Box(Modifier.fillMaxSize().testTag("screen")) {
                         SceneScreen(
-                            SceneEntry(Scene(null, "Initial position", tools = SceneTools.Floating(position, initiallyExpanded = true)) { padding ->
+                            SceneEntry(Scene(null, "Initial position", tools = SceneTools.Floating(position, actionsInitiallyExpanded = true)) { padding ->
                                 Box(Modifier.fillMaxSize().padding(padding))
                             }),
                             onBack = {},
@@ -62,21 +62,23 @@ class SceneFloatingToolsInitialPositionTest {
             }
         }
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
-        // Initial pair is 48 x 100 dp; the fan does not participate in placement bounds.
+        // Initial pair is 48 x 96 dp; the fan does not participate in placement bounds.
         val left = screen.left + 7f + 12f
         val right = screen.right - 20f - 12f - 48f
         val top = screen.top + 24f + 12f
-        val bottom = screen.bottom - 30f - 12f - 100f
+        val bottom = screen.bottom - 30f - 12f - 96f
         val center = (top + bottom) / 2f
-        val cases = listOf(
-            FloatingToolsPosition.TopLeft to Offset(left, top),
-            FloatingToolsPosition.CenterLeft to Offset(left, center),
-            FloatingToolsPosition.BottomLeft to Offset(left, bottom),
-            FloatingToolsPosition.TopRight to Offset(right, top),
-            FloatingToolsPosition.CenterRight to Offset(right, center),
-            FloatingToolsPosition.BottomRight to Offset(right, bottom),
-        )
         for (layoutDirection in listOf(LayoutDirection.Ltr, LayoutDirection.Rtl)) {
+            val start = if (layoutDirection == LayoutDirection.Ltr) left else right
+            val end = if (layoutDirection == LayoutDirection.Ltr) right else left
+            val cases = listOf(
+                FloatingToolsPosition.TopStart to Offset(start, top),
+                FloatingToolsPosition.CenterStart to Offset(start, center),
+                FloatingToolsPosition.BottomStart to Offset(start, bottom),
+                FloatingToolsPosition.TopEnd to Offset(end, top),
+                FloatingToolsPosition.CenterEnd to Offset(end, center),
+                FloatingToolsPosition.BottomEnd to Offset(end, bottom),
+            )
             cases.forEach { (anchor, expected) ->
                 composeRule.runOnIdle { direction = layoutDirection; position = anchor }
                 val back = bounds("Open properties")
@@ -92,15 +94,16 @@ class SceneFloatingToolsInitialPositionTest {
     }
 
     @Test
-    fun draggedPositionSurvivesRecompositionButReopeningUsesConfiguredAnchor() {
+    fun draggedPositionSurvivesLayoutDirectionChangesButReopeningUsesConfiguredAnchor() {
         var mounted by mutableStateOf(true)
         var revision by mutableStateOf(0)
+        var direction by mutableStateOf(LayoutDirection.Ltr)
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+            CompositionLocalProvider(LocalDensity provides Density(1f), LocalLayoutDirection provides direction) {
                 ComposiumTheme(false) {
                     if (mounted) {
                         SceneScreen(
-                            SceneEntry(Scene(null, "Reopen", tools = SceneTools.Floating(FloatingToolsPosition.BottomLeft, initiallyExpanded = true)) { padding ->
+                            SceneEntry(Scene(null, "Reopen", tools = SceneTools.Floating(FloatingToolsPosition.BottomStart, actionsInitiallyExpanded = true)) { padding ->
                                 Box(Modifier.fillMaxSize().padding(padding).testTag("revision $revision"))
                             }),
                             onBack = {},
@@ -120,6 +123,10 @@ class SceneFloatingToolsInitialPositionTest {
         assertEquals(initial.top - 40f, moved.top, 1.1f)
         composeRule.runOnIdle { revision++ }
         assertEquals(moved, bounds("Hide actions"))
+        composeRule.runOnIdle { direction = LayoutDirection.Rtl }
+        assertEquals(moved, bounds("Hide actions"))
+        composeRule.runOnIdle { direction = LayoutDirection.Ltr }
+        assertEquals(moved, bounds("Hide actions"))
         composeRule.runOnIdle { mounted = false }
         composeRule.runOnIdle { mounted = true }
         assertEquals(initial, bounds("Hide actions"))
@@ -127,12 +134,12 @@ class SceneFloatingToolsInitialPositionTest {
 
     @Test
     fun expansionDefaultAppliesOnlyOnOpeningAndDoesNotOverrideUserState() {
-        var initiallyExpanded by mutableStateOf(false)
+        var actionsInitiallyExpanded by mutableStateOf(false)
         var mounted by mutableStateOf(true)
         composeRule.setContent {
             ComposiumTheme(false) {
                 if (mounted) SceneScreen(
-                    SceneEntry(Scene(null, "Expansion default", tools = SceneTools.Floating(initiallyExpanded = initiallyExpanded)) { padding ->
+                    SceneEntry(Scene(null, "Expansion default", tools = SceneTools.Floating(actionsInitiallyExpanded = actionsInitiallyExpanded)) { padding ->
                         Box(Modifier.fillMaxSize().padding(padding))
                     }), onBack = {},
                 )
@@ -140,12 +147,12 @@ class SceneFloatingToolsInitialPositionTest {
         }
         composeRule.onNodeWithContentDescription("Show actions").assertExists()
         composeRule.onNodeWithContentDescription("Open properties").assertExists()
-        composeRule.runOnIdle { initiallyExpanded = true }
+        composeRule.runOnIdle { actionsInitiallyExpanded = true }
         composeRule.onNodeWithContentDescription("Show actions").assertExists()
         composeRule.runOnIdle { mounted = false }
         composeRule.runOnIdle { mounted = true }
         composeRule.onNodeWithContentDescription("Hide actions").assertExists().performClick()
-        composeRule.runOnIdle { initiallyExpanded = false }
+        composeRule.runOnIdle { actionsInitiallyExpanded = false }
         composeRule.onNodeWithContentDescription("Show actions").assertExists()
     }
 

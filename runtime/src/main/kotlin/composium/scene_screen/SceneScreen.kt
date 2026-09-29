@@ -123,7 +123,7 @@ internal fun SceneScreen(
 ) {
     val themeController = LocalComposiumThemeController.current
     val sceneScope = remember(sceneEntry.id) { SceneScope() }
-    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.initiallyExpanded ?: false)
+    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false)
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     val floatingSettingsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
@@ -210,16 +210,17 @@ internal fun SceneScreen(
     val currentCallbacks by rememberUpdatedState(callbacks)
     val currentThemeController by rememberUpdatedState(themeController)
     DisposableEffect(sceneScope, store) {
+        val host = sceneScope.host
         // Direct exit bypasses tools; onBack shares the built-in button's handler.
-        sceneScope.onCloseScene = { currentCloseScene() }
-        sceneScope.onBackAction = { currentCallbacks.onBack() }
-        sceneScope.controlsState.binding = SceneToolStateBinding(
+        host.onCloseScene = { currentCloseScene() }
+        host.onBackAction = { currentCallbacks.onBack() }
+        host.controls.binding = SceneToolStateBinding(
             read = { store.state.controlsSheet.isVisible },
             change = { visible ->
                 store.dispatch(if (visible) SceneScreenIntent.ShowControls else SceneScreenIntent.HideControls)
             },
         )
-        sceneScope.eyedropperState.binding = SceneToolStateBinding(
+        host.eyedropper.binding = SceneToolStateBinding(
             read = { store.state.isEyedropperVisible },
             change = { visible ->
                 if (!visible) {
@@ -229,16 +230,16 @@ internal fun SceneScreen(
                 }
             },
         )
-        sceneScope.themeState.binding = SceneToolStateBinding(
+        host.theme.binding = SceneToolStateBinding(
             read = { currentThemeController.isDarkTheme },
             change = { currentThemeController.onThemeChange(it) },
         )
         onDispose {
-            sceneScope.onCloseScene = null
-            sceneScope.onBackAction = null
-            sceneScope.controlsState.binding = null
-            sceneScope.eyedropperState.binding = null
-            sceneScope.themeState.binding = null
+            host.onCloseScene = null
+            host.onBackAction = null
+            host.controls.binding = null
+            host.eyedropper.binding = null
+            host.theme.binding = null
         }
     }
 

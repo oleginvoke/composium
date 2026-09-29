@@ -58,20 +58,20 @@ internal val CustomToolsScene by scene(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        FilledTonalButton(onClick = onBack) { Text("Back") }
+                        FilledTonalButton(onClick = host.onBack) { Text("Back") }
                         Text("Custom toolbar", style = MaterialTheme.typography.titleMedium)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = controlsState::toggle,
+                            onClick = host.controls::toggle,
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                            colors = if (controlsState.isVisible) ButtonDefaults.buttonColors()
+                            colors = if (host.controls.isVisible) ButtonDefaults.buttonColors()
                                 else ButtonDefaults.filledTonalButtonColors(),
                         ) { Text("Properties") }
                         Button(
-                            onClick = eyedropperState::toggle,
+                            onClick = host.eyedropper::toggle,
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                            colors = if (eyedropperState.isVisible) ButtonDefaults.buttonColors()
+                            colors = if (host.eyedropper.isVisible) ButtonDefaults.buttonColors()
                                 else ButtonDefaults.filledTonalButtonColors(),
                         ) { Text("Eyedropper") }
                     }
@@ -79,15 +79,15 @@ internal val CustomToolsScene by scene(
                         modifier = Modifier
                             .fillMaxWidth()
                             .toggleable(
-                                value = themeState.isDark,
+                                value = host.theme.isDark,
                                 role = Role.Switch,
-                                onValueChange = themeState::setDark,
+                                onValueChange = host.theme::setDark,
                             )
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Dark theme", Modifier.weight(1f))
-                        Switch(checked = themeState.isDark, onCheckedChange = null)
+                        Switch(checked = host.theme.isDark, onCheckedChange = null)
                     }
                 }
             }

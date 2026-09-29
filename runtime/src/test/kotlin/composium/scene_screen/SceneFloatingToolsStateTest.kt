@@ -32,9 +32,9 @@ class SceneFloatingToolsStateTest {
 
     @Test
     fun floatingToolsAreHiddenOnlyForTopBarScenesAndExpandedInspector() {
-        assertTrue(shouldShowFloatingTools(SceneTools.Floating(initiallyExpanded = true), SceneInspectorLayoutMode.Closed))
-        assertTrue(shouldShowFloatingTools(SceneTools.Floating(initiallyExpanded = true), SceneInspectorLayoutMode.Split))
-        assertFalse(shouldShowFloatingTools(SceneTools.Floating(initiallyExpanded = true), SceneInspectorLayoutMode.Expanded))
+        assertTrue(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Closed))
+        assertTrue(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Split))
+        assertFalse(shouldShowFloatingTools(SceneTools.Floating(actionsInitiallyExpanded = true), SceneInspectorLayoutMode.Expanded))
         assertFalse(shouldShowFloatingTools(SceneTools.TopBar, SceneInspectorLayoutMode.Closed))
     }
 

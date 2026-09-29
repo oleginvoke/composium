@@ -82,7 +82,7 @@ class SceneScreenBackTest {
     }
 
     private fun renderScene() {
-        val entry = SceneEntry(Scene(group = null, name = "Back regression", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
+        val entry = SceneEntry(Scene(group = null, name = "Back regression", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
             Box(Modifier.fillMaxSize().padding(padding))
         })
         composeRule.setContent {

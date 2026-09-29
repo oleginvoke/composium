@@ -71,27 +71,27 @@ class SceneToolStatesTest {
         composeRule.onNodeWithContentDescription("Hide actions").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Back").assertDoesNotExist()
 
-        composeRule.runOnIdle { scope.controlsState.show() }
+        composeRule.runOnIdle { scope.host.controls.show() }
         val tabs = composeRule.onNode(hasText("Properties") and hasClickAction()).fetchSemanticsNode().boundsInRoot
         composeRule.onRoot().performTouchInput { swipe(tabs.center, Offset(tabs.center.x, 0f), 600) }
         composeRule.onNodeWithContentDescription("Back to split layout").assertDoesNotExist()
         val expandedTabs = composeRule.onNode(hasText("Properties") and hasClickAction()).fetchSemanticsNode().boundsInRoot
         assertTrue(expandedTabs.top < 60f, "Fullscreen controls must not reserve space for a hidden top bar")
         composeRule.runOnIdle {
-            scope.controlsState.show()
-            scope.eyedropperState.show()
-            assertFalse(scope.eyedropperState.isVisible)
+            scope.host.controls.show()
+            scope.host.eyedropper.show()
+            assertFalse(scope.host.eyedropper.isVisible)
         }
-        composeRule.runOnIdle { scope.onBack() }
+        composeRule.runOnIdle { scope.host.onBack() }
         composeRule.onNode(hasText("Properties") and hasClickAction()).assertExists()
         composeRule.runOnIdle {
-            assertTrue(scope.controlsState.isVisible)
+            assertTrue(scope.host.controls.isVisible)
             assertEquals(0, closed)
-            scope.onBack()
+            scope.host.onBack()
         }
         composeRule.onNode(hasText("Properties") and hasClickAction()).assertDoesNotExist()
         composeRule.runOnIdle {
-            scope.onBack()
+            scope.host.onBack()
             assertEquals(1, closed)
         }
     }
@@ -99,13 +99,14 @@ class SceneToolStatesTest {
     @Test
     fun commandsAndBuiltInButtonsShareObservableState() {
         lateinit var scope: SceneScope
-        val entry = SceneEntry(Scene(null, "Shared tools", tools = SceneTools.Floating(initiallyExpanded = true)) { padding ->
+        val entry = SceneEntry(Scene(null, "Shared tools", tools = SceneTools.Floating(actionsInitiallyExpanded = true)) { padding ->
             SideEffect { scope = this }
-            BasicText("controls=${controlsState.isVisible};eye=${eyedropperState.isVisible}", Modifier.padding(padding))
+            BasicText("controls=${host.controls.isVisible};eye=${host.eyedropper.isVisible}", Modifier.padding(padding))
         })
         composeRule.setContent { ComposiumTheme(false) { SceneScreen(entry, onBack = {}) } }
-        val controls = composeRule.runOnIdle { scope.controlsState }
-        val eyedropper = composeRule.runOnIdle { scope.eyedropperState }
+        val retainedHost = composeRule.runOnIdle { scope.host }
+        val controls = composeRule.runOnIdle { scope.host.controls }
+        val eyedropper = composeRule.runOnIdle { scope.host.eyedropper }
         composeRule.runOnIdle {
             controls.show()
             controls.show()
@@ -113,7 +114,7 @@ class SceneToolStatesTest {
             eyedropper.show()
         }
         composeRule.onNodeWithText("controls=true;eye=true").assertExists()
-        composeRule.runOnIdle { scope.onBack() }
+        composeRule.runOnIdle { scope.host.onBack() }
         composeRule.onNodeWithText("controls=true;eye=false").assertExists()
         composeRule.onNodeWithContentDescription("Close properties").performClick()
         composeRule.onNodeWithText("controls=false;eye=false").assertExists()
@@ -128,8 +129,9 @@ class SceneToolStatesTest {
             eyedropper.toggle()
             assertFalse(controls.isVisible)
             assertFalse(eyedropper.isVisible)
-            assertSame(controls, scope.controlsState)
-            assertSame(eyedropper, scope.eyedropperState)
+            assertSame(retainedHost, scope.host)
+            assertSame(controls, scope.host.controls)
+            assertSame(eyedropper, scope.host.eyedropper)
             controls.show()
         }
         composeRule.onNodeWithText("controls=true;eye=false").assertExists()
@@ -146,7 +148,7 @@ class SceneToolStatesTest {
         lateinit var scope: SceneScope
         val scene = Scene(null, "Controlled theme", tools = SceneTools.None, thumbnail = null) { padding ->
             SideEffect { scope = this }
-            BasicText("dark=${themeState.isDark}", Modifier.padding(padding))
+            BasicText("dark=${host.theme.isDark}", Modifier.padding(padding))
         }
         ComposiumRuntime.registerAll(scene)
         composeRule.setContent {
@@ -158,7 +160,7 @@ class SceneToolStatesTest {
         }
         composeRule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Controlled theme"))
         composeRule.onNodeWithText("Controlled theme").performClick()
-        val theme = composeRule.runOnIdle { scope.themeState }
+        val theme = composeRule.runOnIdle { scope.host.theme }
         composeRule.runOnIdle {
             theme.toggle()
             assertEquals(listOf(true), oldRequests)
@@ -168,7 +170,7 @@ class SceneToolStatesTest {
         }
         composeRule.onNodeWithText("dark=true").assertExists()
         composeRule.runOnIdle {
-            assertSame(theme, scope.themeState)
+            assertSame(theme, scope.host.theme)
             theme.toggle()
             theme.setDark(true)
             assertEquals(listOf(false, true), newRequests)
@@ -188,7 +190,7 @@ class SceneToolStatesTest {
             val requests = mutableListOf<Boolean>()
             val scene = Scene(null, "Internal theme", tools = SceneTools.None, thumbnail = null) { padding ->
                 SideEffect { scope = this }
-                BasicText("dark=${themeState.isDark}", Modifier.padding(padding))
+                BasicText("dark=${host.theme.isDark}", Modifier.padding(padding))
             }
             ComposiumRuntime.registerAll(scene)
             composeRule.setContent {
@@ -196,11 +198,11 @@ class SceneToolStatesTest {
             }
             composeRule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Internal theme"))
             composeRule.onNodeWithText("Internal theme").performClick()
-            composeRule.runOnIdle { scope.themeState.toggle() }
+            composeRule.runOnIdle { scope.host.theme.toggle() }
             composeRule.onNodeWithText("dark=true").assertExists()
             composeRule.runOnIdle {
                 assertEquals(listOf(true), requests)
-                scope.themeState.setDark(false)
+                scope.host.theme.setDark(false)
             }
             composeRule.onNodeWithText("dark=false").assertExists()
         } finally {
@@ -224,33 +226,33 @@ class SceneToolStatesTest {
                 }
             }
         }
-        val old = composeRule.runOnIdle { scope }
+        val old = composeRule.runOnIdle { scope.host }
         composeRule.runOnIdle {
-            old.controlsState.show()
-            old.eyedropperState.show()
+            old.controls.show()
+            old.eyedropper.show()
             mounted = false
         }
         composeRule.runOnIdle {
-            assertFalse(old.controlsState.isVisible)
-            assertFalse(old.eyedropperState.isVisible)
+            assertFalse(old.controls.isVisible)
+            assertFalse(old.eyedropper.isVisible)
             mounted = true
         }
         composeRule.runOnIdle {
-            old.controlsState.show()
-            old.controlsState.toggle()
-            old.eyedropperState.show()
-            old.eyedropperState.toggle()
-            old.themeState.setDark(true)
-            old.themeState.toggle()
-            assertFalse(scope.controlsState.isVisible)
-            assertFalse(scope.eyedropperState.isVisible)
+            old.controls.show()
+            old.controls.toggle()
+            old.eyedropper.show()
+            old.eyedropper.toggle()
+            old.theme.setDark(true)
+            old.theme.toggle()
+            assertFalse(scope.host.controls.isVisible)
+            assertFalse(scope.host.eyedropper.isVisible)
             assertEquals(0, themeRequests)
-            scope.controlsState.show()
-            scope.eyedropperState.show()
-            old.controlsState.hide()
-            old.eyedropperState.hide()
-            assertTrue(scope.controlsState.isVisible)
-            assertTrue(scope.eyedropperState.isVisible)
+            scope.host.controls.show()
+            scope.host.eyedropper.show()
+            old.controls.hide()
+            old.eyedropper.hide()
+            assertTrue(scope.host.controls.isVisible)
+            assertTrue(scope.host.eyedropper.isVisible)
         }
     }
 }

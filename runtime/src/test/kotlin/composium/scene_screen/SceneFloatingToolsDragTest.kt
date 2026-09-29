@@ -106,10 +106,11 @@ class SceneFloatingToolsDragTest {
     fun settingsCanOverlapMoreWithoutMovingItOrOpeningControls() {
         renderScene()
         val more = eyeBounds("Hide actions")
+        val settings = eyeBounds("Open properties")
         val theme = eyeBounds("Switch to dark theme")
         composeRule.onNodeWithContentDescription("Open properties").performTouchInput {
             down(center)
-            moveBy(Offset(0f, 54f))
+            moveBy(more.center - settings.center)
             up()
         }
         assertEquals(more.center, eyeBounds("Open properties").center)
@@ -170,7 +171,7 @@ class SceneFloatingToolsDragTest {
 
     private fun renderScene(height: Dp? = null) {
         val entry = SceneEntry(
-            Scene(group = null, name = "Draggable tools", tools = SceneTools.Floating(FloatingToolsPosition.TopRight, initiallyExpanded = true)) {
+            Scene(group = null, name = "Draggable tools", tools = SceneTools.Floating(FloatingToolsPosition.TopEnd, actionsInitiallyExpanded = true)) {
                 Box(Modifier.fillMaxSize().background(Color.Blue))
             },
         )
