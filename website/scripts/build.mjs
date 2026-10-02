@@ -64,6 +64,7 @@ function shell({ title, description, path = '', content, docs = false, noindex =
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)}</title><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#163d34">${noindex ? '<meta name="robots" content="noindex">' : ''}
+<meta name="google-site-verification" content="m8LUDa-PXHL-mkHHA3IkZeDu6Iyc7RbwyMSdY1kcYYg" />
 <link rel="canonical" href="${canonical}"><link rel="icon" type="image/svg+xml" href="${link('assets/favicon.svg')}"><link rel="stylesheet" href="${link('assets/style.css')}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Composium"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${canonical}">
 <meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escape(title)}"><meta name="twitter:description" content="${escape(description)}">
