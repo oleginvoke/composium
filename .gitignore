@@ -9,3 +9,8 @@ build/
 captures/
 local.properties
 /local.properties
+
+# Documentation website
+website/node_modules/
+website/dist/
+output/playwright/

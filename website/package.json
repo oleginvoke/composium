@@ -1,0 +1,17 @@
+{
+  "name": "composium-website",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test",
+    "check": "node scripts/check.mjs",
+    "dev": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "markdown-it": "15.0.2",
+    "prismjs": "1.30.0"
+  }
+}
