@@ -26,6 +26,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.CancellationException
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneToolStateBinding
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import androidx.core.graphics.createBitmap
@@ -53,7 +54,16 @@ internal fun SceneThumbnailCaptureHost(
     val context = LocalContext.current
     val density = LocalDensity.current
     val themeController = LocalComposiumThemeController.current
-    val sceneScope = remember(captureRequest.key) { SceneScope() }
+    val sceneScope = remember(captureRequest.key) {
+        val isDarkTheme = captureRequest.key.isDarkTheme
+        SceneScope().apply {
+            // Read the capture's theme without letting thumbnail effects control the host.
+            host.theme.binding = SceneToolStateBinding(
+                read = { isDarkTheme },
+                change = {},
+            )
+        }
+    }
     val installedContent = remember { SceneThumbnailInstalledContent() }
     var captureView by remember(captureRequest.key) { mutableStateOf<ComposeView?>(null) }
     var captureSurfaceState by remember(captureRequest.key) {
