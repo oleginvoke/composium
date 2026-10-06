@@ -54,7 +54,8 @@ class SceneEyedropperState internal constructor() {
  * Observable effective Composium theme and theme change requests, owned by [SceneHost].
  * Commands are for event handlers or effects, not composition, and do nothing in
  * thumbnails, [Scene.RenderPreview], or after the owning scene leaves composition.
- * An inactive state reports [isDark] as false.
+ * Thumbnails report their capture theme through [isDark], while commands remain inactive.
+ * In [Scene.RenderPreview] or after an opened scene leaves composition, [isDark] is false.
  */
 @Stable
 class SceneThemeState internal constructor() {
