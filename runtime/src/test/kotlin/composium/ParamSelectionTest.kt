@@ -161,15 +161,14 @@ class ParamSelectionTest {
     }
 
     @Test
-    fun assignmentReadOnlyInAChildCurrentlyLeavesTheInspectorDescriptorStale() {
+    fun assignmentReadOnlyInAChildRefreshesTheInspectorDescriptor() {
         val driver = ParamTestDriver<Int>(composeRule)
         driver.setContent {
             var choice: Int by param(listOf(8 named "Small", 24 named "Large"))
             driver.ObserveInChild({ choice }, { choice = it })
         }
         driver.assign(24)
-        // The child renders the new delegate value, while the declaration was skipped.
-        driver.assertObject(24, "Small", selectedValue = 8)
+        driver.assertObject(24, "Large")
         driver.select("Large")
         driver.assertObject(24, "Large")
     }

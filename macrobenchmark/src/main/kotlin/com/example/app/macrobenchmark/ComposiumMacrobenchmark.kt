@@ -151,6 +151,101 @@ class ComposiumMacrobenchmark {
         device.waitForIdle()
     }
 
+    @Test
+    fun reactiveParameterThemeSwitching() = benchmarkRule.measureRepeated(
+        packageName = TARGET_PACKAGE,
+        metrics = listOf(FrameTimingMetric()),
+        iterations = 5,
+        startupMode = StartupMode.WARM,
+        setupBlock = {
+            pressHome()
+            startActivityAndWait()
+            openReactiveParametersScene()
+        },
+    ) {
+        var status = reactiveParameterStatus()
+        repeat(8) {
+            clickObject(By.desc("Switch product theme"), "product theme button")
+            status = status.copy(
+                isProductB = !status.isProductB,
+                themeSwitches = status.themeSwitches + 1,
+            )
+            waitForReactiveParameterStatus(status)
+        }
+    }
+
+    @Test
+    fun reactiveParameterUnrelatedRecomposition() = benchmarkRule.measureRepeated(
+        packageName = TARGET_PACKAGE,
+        metrics = listOf(FrameTimingMetric()),
+        iterations = 5,
+        startupMode = StartupMode.WARM,
+        setupBlock = {
+            pressHome()
+            startActivityAndWait()
+            openReactiveParametersScene()
+        },
+    ) {
+        var status = reactiveParameterStatus()
+        repeat(10) {
+            clickObject(By.desc("Recompose scene"), "unrelated recomposition button")
+            status = status.copy(unrelatedRecompositions = status.unrelatedRecompositions + 1)
+            waitForReactiveParameterStatus(status)
+        }
+    }
+
+    private fun openReactiveParametersScene() {
+        // A warm activity can retain the previous iteration's scene. Reopen it to reset counters.
+        device.findObject(By.desc("Return to catalog"))?.click()
+        waitForMainScreen()
+        focusSearchField()
+        device.findObject(By.desc("Clear search"))?.click()
+        device.executeShellCommand("input text Reactive")
+        waitForObject(By.text(REACTIVE_PARAMETERS_SCENE_NAME), "reactive parameters scene result")
+        device.pressBack() // Dismiss the search keyboard before entering the scene.
+        clickObject(By.text(REACTIVE_PARAMETERS_SCENE_NAME), "reactive parameters scene")
+        val status = reactiveParameterStatus()
+        check(status.themeSwitches == 0 && status.unrelatedRecompositions == 0) {
+            "Reactive parameter scene counters did not reset: $status"
+        }
+        device.waitForIdle()
+    }
+
+    private fun reactiveParameterStatus(): ReactiveParameterStatus {
+        val text = checkNotNull(
+            waitForObject(
+                By.desc("Reactive parameter status"),
+                "reactive parameter status",
+            ).text,
+        ) { "Reactive parameter status has no text" }
+        val match = checkNotNull(REACTIVE_PARAMETER_STATUS_PATTERN.matchEntire(text)) {
+            "Unexpected reactive parameter status: $text"
+        }
+        return ReactiveParameterStatus(
+            isProductB = match.groupValues[1] == "B",
+            themeSwitches = match.groupValues[2].toInt(),
+            unrelatedRecompositions = match.groupValues[3].toInt(),
+        )
+    }
+
+    private fun waitForReactiveParameterStatus(status: ReactiveParameterStatus) {
+        // Wait for the product theme and event counters, never for reactive color updates.
+        // This permits measurements against the baseline runtime where selected colors stay stale.
+        waitForObject(By.text(status.text), "reactive parameter status ${status.text}")
+        device.waitForIdle()
+    }
+
+    private data class ReactiveParameterStatus(
+        val isProductB: Boolean,
+        val themeSwitches: Int,
+        val unrelatedRecompositions: Int,
+    ) {
+        val text: String
+            get() = "Theme: product ${if (isProductB) "B" else "A"}; " +
+                "theme switches: $themeSwitches; " +
+                "unrelated recompositions: $unrelatedRecompositions; params: 100"
+    }
+
     private fun waitForMainScreen() {
         waitForObject(By.text("Composium"), "main screen title")
         waitForObject(By.textContains("Search scenes"), "search field")
@@ -205,6 +300,10 @@ class ComposiumMacrobenchmark {
     companion object {
         private const val TARGET_PACKAGE = "com.example.ComposiumSample"
         private const val BENCHMARK_SCENE_NAME = "Benchmark 1"
+        private const val REACTIVE_PARAMETERS_SCENE_NAME = "Reactive parameters"
         private const val WAIT_TIMEOUT_MS = 5_000L
+        private val REACTIVE_PARAMETER_STATUS_PATTERN = Regex(
+            "Theme: product (A|B); theme switches: (\\d+); unrelated recompositions: (\\d+); params: 100",
+        )
     }
 }

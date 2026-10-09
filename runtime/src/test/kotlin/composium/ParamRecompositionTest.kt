@@ -79,7 +79,7 @@ class ParamRecompositionTest {
     }
 
     @Test
-    fun removingTheSelectedOptionCurrentlyKeepsItsValueUnderTheDefaultName() {
+    fun removingTheSelectedOptionFallsBackToTheDefaultValue() {
         var includeLarge by mutableStateOf(true)
         val driver = ParamTestDriver<Int>(composeRule)
         driver.setContent {
@@ -91,11 +91,11 @@ class ParamRecompositionTest {
         }
         driver.select("Large")
         composeRule.runOnIdle { includeLarge = false }
-        driver.assertObject(24, "Small", options = listOf(8 to "Small"))
+        driver.assertObject(8, "Small", options = listOf(8 to "Small"))
     }
 
     @Test
-    fun replacingTheSelectedOptionsValueCurrentlyKeepsTheOldValueUnderTheSameName() {
+    fun replacingTheSelectedOptionsValueUpdatesTheDelegatedValue() {
         var large by mutableStateOf(24)
         val driver = ParamTestDriver<Int>(composeRule)
         driver.setContent {
@@ -104,13 +104,13 @@ class ParamRecompositionTest {
         }
         driver.select("Large")
         composeRule.runOnIdle { large = 32 }
-        driver.assertObject(24, "Large", options = listOf(8 to "Small", 32 to "Large"))
+        driver.assertObject(32, "Large", options = listOf(8 to "Small", 32 to "Large"))
         driver.select("Large")
         driver.assertObject(32, "Large")
     }
 
     @Test
-    fun equalValuesBecomingDistinctCurrentlyKeepTheValueRatherThanFollowingTheClickedName() {
+    fun equalValuesBecomingDistinctFollowTheClickedName() {
         var second by mutableStateOf(8)
         val driver = ParamTestDriver<Int>(composeRule)
         driver.setContent {
@@ -119,7 +119,7 @@ class ParamRecompositionTest {
         }
         driver.select("Second")
         composeRule.runOnIdle { second = 24 }
-        driver.assertObject(8, "First", options = listOf(8 to "First", 24 to "Second"))
+        driver.assertObject(24, "Second", options = listOf(8 to "First", 24 to "Second"))
         driver.select("Second")
         driver.assertObject(24, "Second")
     }
@@ -164,7 +164,7 @@ class ParamRecompositionTest {
     }
 
     @Test
-    fun themeValueChangesCurrentlyRetainThePreviouslySelectedColorUntilAnotherClick() {
+    fun themeValueChangesUpdateTheSelectedColorWithoutAnotherClick() {
         var options by mutableStateOf(listOf(ParamOption(Color.Blue, "background"), ParamOption(Color.Red, "surface")))
         val driver = ParamTestDriver<Color>(composeRule)
         driver.setContent {
@@ -173,7 +173,7 @@ class ParamRecompositionTest {
         }
         driver.select("surface")
         composeRule.runOnIdle { options = listOf(ParamOption(Color.Green, "background"), ParamOption(Color.Yellow, "surface")) }
-        driver.assertObject(Color.Red, "surface", options = listOf(Color.Green to "background", Color.Yellow to "surface"))
+        driver.assertObject(Color.Yellow, "surface", options = listOf(Color.Green to "background", Color.Yellow to "surface"))
         driver.select("surface")
         driver.assertObject(Color.Yellow, "surface")
     }
@@ -262,7 +262,7 @@ class ParamRecompositionTest {
     }
 
     @Test
-    fun differentValuesWithCollidingHashesCurrentlyLeaveRegisteredOptionsStale() {
+    fun differentValuesWithCollidingHashesUpdateRegisteredOptions() {
         var second by mutableStateOf(CollidingValue(2))
         val driver = ParamTestDriver<CollidingValue>(composeRule)
         driver.setContent {
@@ -273,13 +273,13 @@ class ParamRecompositionTest {
             driver.Observe(choice, { choice }, { choice = it })
         }
         composeRule.runOnIdle { second = CollidingValue(3) }
-        driver.assertObject(CollidingValue(1), "One", options = listOf(CollidingValue(1) to "One", CollidingValue(2) to "Two"))
+        driver.assertObject(CollidingValue(1), "One", options = listOf(CollidingValue(1) to "One", CollidingValue(3) to "Two"))
         driver.select("Two")
-        driver.assertObject(CollidingValue(2), "Two")
+        driver.assertObject(CollidingValue(3), "Two")
     }
 
     @Test
-    fun differentLabelsWithCollidingHashesCurrentlyLeaveRegisteredLabelsStale() {
+    fun differentLabelsWithCollidingHashesUpdateRegisteredLabels() {
         var label by mutableStateOf("Aa")
         val driver = ParamTestDriver<Int>(composeRule)
         driver.setContent {
@@ -287,7 +287,7 @@ class ParamRecompositionTest {
             driver.Observe(choice, { choice }, { choice = it })
         }
         composeRule.runOnIdle { label = "BB" }
-        driver.assertObject(8, "Small", options = listOf(8 to "Small", 24 to "Aa"))
+        driver.assertObject(8, "Small", options = listOf(8 to "Small", 24 to "BB"))
     }
 
     private data class CollidingValue(val number: Int) {

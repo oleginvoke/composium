@@ -48,6 +48,11 @@ internal class ParamTestDriver<T>(
         rule.runOnIdle { writeValue(value) }
     }
 
+    /** Use inside runOnIdle to combine a value assignment with another state update. */
+    fun assignNow(value: T) {
+        writeValue(value)
+    }
+
     fun select(optionName: String, paramName: String = "choice") {
         rule.runOnIdle {
             val descriptor = scope.params.single { it.name == paramName } as ObjectParamDescriptor
