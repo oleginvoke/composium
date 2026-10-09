@@ -64,7 +64,7 @@ class ParamNullableTest {
     }
 
     @Test
-    fun allNullOptionsCurrentlyAllowActivationButKeepTheDelegatedValueNull() {
+    fun allNullOptionsCannotActivateWithoutARestorableValue() {
         val driver = ParamTestDriver<Int?>(composeRule)
         driver.setContent {
             var choice: Int? by param(listOf(null named "None", null named "Another null"))
@@ -72,7 +72,7 @@ class ParamNullableTest {
         }
         driver.assertObject(null, "Not selected", options = emptyList(), isActive = false)
         driver.activate(true)
-        driver.assertObject(null, "Not selected", options = emptyList(), isActive = true)
+        driver.assertObject(null, "Not selected", options = emptyList(), isActive = false)
     }
 
     @Test
@@ -83,7 +83,7 @@ class ParamNullableTest {
             driver.Observe(choice, { choice }, { choice = it })
         }
         driver.activate(true)
-        driver.assertObject(null, "Not selected", options = emptyList(), isActive = true)
+        driver.assertObject(null, "Not selected", options = emptyList(), isActive = false)
     }
 
     @Test
@@ -147,28 +147,27 @@ class ParamNullableTest {
     }
 
     @Test
-    fun directNullAssignmentCurrentlyDoesNotDeactivateTheParameter() {
+    fun directNullAssignmentDeactivatesAndCanBeRestoredWithOneActivation() {
         val driver = nullableChoices()
         driver.select("Large")
         driver.assign(null)
-        driver.assertObject(null, "Small", selectedValue = 8, isActive = true)
-        // An unchanged activation flag is a no-op, even though the value is null.
+        driver.assertObject(null, "Small", selectedValue = 8, isActive = false)
         driver.activate(true)
-        driver.assertObject(null, "Small", selectedValue = 8, isActive = true)
+        driver.assertObject(24, "Large", isActive = true)
         driver.activate(false)
         driver.activate(true)
         driver.assertObject(24, "Large", isActive = true)
     }
 
     @Test
-    fun directNonNullAssignmentWhileInactiveCurrentlyDoesNotActivateTheParameter() {
+    fun directNonNullAssignmentWhileInactiveActivatesTheParameter() {
         val driver = ParamTestDriver<Int?>(composeRule)
         driver.setContent {
             var choice: Int? by param(default = null, options = listOf(8 named "Small", 24 named "Large"))
             driver.Observe(choice, { choice }, { choice = it })
         }
         driver.assign(24)
-        driver.assertObject(24, "Large", isActive = false)
+        driver.assertObject(24, "Large", isActive = true)
         driver.activate(true)
         driver.assertObject(24, "Large", isActive = true)
     }

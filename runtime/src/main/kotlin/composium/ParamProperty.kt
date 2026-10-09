@@ -8,7 +8,11 @@ import kotlin.reflect.KProperty
 import kotlin.reflect.KType
 
 /** Identity distinguishes consecutive writes, including writes back to an earlier value. */
-internal class ParamValueAssignment(val optionName: String?)
+internal class ParamValueAssignment(
+    val optionName: String?,
+    val lastNonNullValue: Any?,
+    val hasNonNullAssignment: Boolean,
+)
 
 /**
  * Property delegate returned by [SceneScope.param].
@@ -34,7 +38,9 @@ class ParamProperty<T> internal constructor(
     internal var lastRegisteredName: String? = null
 
     internal var objectOptions: List<ParamOption<Any>>? = null
+    internal var unregisteredOptions: List<ParamOption<Any>>? = null
     internal var intendedOptionName: String? = null
+    internal var activationState: MutableState<Boolean>? = null
     internal var onValueAssigned: ((Any?) -> Unit)? = null
     internal val valueAssignmentState = mutableStateOf<ParamValueAssignment?>(null)
     internal var acknowledgedValueAssignment: ParamValueAssignment? = null
@@ -78,6 +84,7 @@ class ParamProperty<T> internal constructor(
 
     /**
      * Updates parameter value.
+     * Nullable assignments synchronize activity and preserve the last non-null selection.
      *
      * @param thisRef Owner object of delegated property.
      * @param property Delegated property metadata.
@@ -85,8 +92,11 @@ class ParamProperty<T> internal constructor(
      */
     override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
         // Preserve Compose's no-op policy for equal writes, including SideEffect writes.
-        if (state.value == value) return
+        val requestedActivity = value != null
+        val activityChanged = activationState?.value?.let { it != requestedActivity } == true
+        if (state.value == value && !activityChanged) return
         state.value = value
+        if (activityChanged) activationState?.value = requestedActivity
         onValueAssigned?.invoke(value)
     }
 }

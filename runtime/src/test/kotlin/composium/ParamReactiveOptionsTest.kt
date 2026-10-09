@@ -256,7 +256,7 @@ class ParamReactiveOptionsTest {
             driver.Observe(choice, { choice }, { choice = it })
         }
         driver.assign(Color.Red)
-        driver.assertObject(Color.Red, "surface", isActive = false)
+        driver.assertObject(Color.Red, "surface", isActive = true)
         driver.activate(true)
         driver.assertObject(Color.Red, "surface", isActive = true)
         composeRule.runOnIdle { options = colorOptions(Color.Green, Color.Yellow) }
@@ -273,7 +273,7 @@ class ParamReactiveOptionsTest {
         }
         driver.assign(null)
         composeRule.runOnIdle { options = colorOptions(Color.Green, Color.Yellow) }
-        driver.assertObject(null, "background", selectedValue = Color.Green, isActive = true)
+        driver.assertObject(null, "background", selectedValue = Color.Green, isActive = false)
     }
 
     @Test
