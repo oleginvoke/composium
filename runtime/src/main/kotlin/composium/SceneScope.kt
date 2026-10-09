@@ -311,6 +311,10 @@ class SceneScope internal constructor() {
         private fun resolvedSelectedName(currentValue: Any?): String? {
             if (currentValue == null) return null
 
+            matchedOptionByName(selectedNameState.value)
+                ?.takeIf { it.value == currentValue }
+                ?.let { return it.name }
+
             matchedOptionByValue(currentValue)?.let { matched ->
                 return matched.name
             }
