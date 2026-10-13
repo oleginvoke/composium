@@ -26,8 +26,4 @@ GEMINI.md
 /docs/superpowers/
 
 # Locally generated verification and performance reports
-/docs/testing/param-characterization.md
-/docs/testing/nullable-param-activation.md
-/docs/testing/param-options-performance.md
-/docs/testing/param-options-performance/
-/docs/testing/thumbnail-startup-performance.json
+/docs/testing/
