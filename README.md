@@ -9,11 +9,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Version: `1.3.0-alpha03` (pre-release)
+Version: `1.3.0-alpha04` (pre-release)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.3.0-alpha03`
-- `io.github.oleginvoke:composium-processor:1.3.0-alpha03`
+- `io.github.oleginvoke:composium:1.3.0-alpha04`
+- `io.github.oleginvoke:composium-processor:1.3.0-alpha04`
 
 It is useful for:
 - design systems and component libraries;
@@ -101,8 +101,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha03")
-    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha03")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha04")
+    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha04")
 }
 ```
 
@@ -116,7 +116,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha03")
+    implementation("io.github.oleginvoke:composium:1.3.0-alpha04")
 }
 ```
 
@@ -712,6 +712,25 @@ For referential values such as `Painter`, names act as the stable identity for e
 
 If explicit option names collide inside the same parameter, Composium will append numeric suffixes automatically until every name becomes unique.
 
+### Updating named options
+
+Use stable, unique option names when values depend on a theme or other changing scene state:
+
+```kotlin
+val background: Color by param(
+    listOf(
+        MaterialTheme.colorScheme.background named "colorScheme.background",
+        MaterialTheme.colorScheme.surface named "colorScheme.surface",
+    ),
+)
+```
+
+Selecting `colorScheme.surface` preserves that choice even when both colors are equal. When the scene recomposes with a new color scheme and supplies updated options, the parameter follows the current value of `colorScheme.surface` without another click. The initial default can be implicit or unnamed; a default matching an option by value uses that option's name.
+
+Compute theme-dependent options inside the themed composition so they receive current values. A list cached without the relevant theme keys, or mutated in place without notifying Compose, cannot provide this update. Generated names that change with the values do not establish a stable choice across themes.
+
+Programmatic assignments should use values from the declared options. A changed assignment identifies the option to follow; assigning an equal value remains a no-op. Assignments outside the options do not throw, but their retention across option updates is not guaranteed.
+
 ### Nullable parameters
 
 Nullable parameters get an extra checkbox that controls whether the value is currently `null`.
@@ -747,6 +766,8 @@ What happens in the UI:
 - nullable parameters get a checkbox in the control header;
 - unchecked means the parameter is currently `null`;
 - checked restores the value and shows its regular control.
+
+For mutable nullable parameters, assigning `null` from scene code also unchecks the checkbox; assigning a non-null value checks it. `false` and an empty string are non-null values. Disabling preserves the last non-null value or named choice, including when code assigns a value and then `null` before the next composition. Re-enabling a named choice uses its current option value, so a disabled color parameter can follow the latest theme when restored. Empty choices without a restoration value remain null and unchecked.
 
 For nullable parameters with explicit options, do not include `null` in the list yourself. Pass only non-null values and let Composium manage the null-state toggle.
 

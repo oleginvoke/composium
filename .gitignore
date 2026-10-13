@@ -1,5 +1,6 @@
 *.iml
 .gradle/
+.kotlin/
 .idea/
 .worktrees/
 build/
@@ -14,3 +15,15 @@ local.properties
 website/node_modules/
 website/dist/
 output/playwright/
+
+# Local coding-agent instructions and state
+.codex/
+.claude/
+.superpowers/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+/docs/superpowers/
+
+# Locally generated verification and performance reports
+/docs/testing/

@@ -99,6 +99,7 @@ class SceneScope internal constructor() {
         val name: String
         val typeName: String
         val activationState: MutableState<Boolean>?
+        val state: MutableState<Any?>
 
         fun toDescriptor(): ParamDescriptor
         fun snapshot(): ParamStateSnapshot
@@ -112,30 +113,11 @@ class SceneScope internal constructor() {
         val selectedName: String? = null,
     )
 
-    private data class ParamOptionsSignature(
-        val size: Int,
-        val contentHash: Int,
-    )
-
-    private fun optionsSignature(options: List<ParamOption<*>>?): ParamOptionsSignature? {
-        if (options == null) return null
-
-        var hash = 17
-        options.forEach { option ->
-            hash = 31 * hash + (option.value?.hashCode() ?: 0)
-            hash = 31 * hash + option.name.hashCode()
-        }
-        return ParamOptionsSignature(
-            size = options.size,
-            contentHash = hash,
-        )
-    }
-
     private data class ParamBindingSignature(
         val name: String,
         val defaultValue: Any?,
         val defaultName: String?,
-        val optionsSignature: ParamOptionsSignature?,
+        val options: List<ParamOption<*>>?,
         val delegatedType: KType?,
         val delegatedKClass: KClass<*>?,
         val delegatedNullable: Boolean?,
@@ -204,7 +186,7 @@ class SceneScope internal constructor() {
         override val name: String,
         override val typeName: String,
         override val activationState: MutableState<Boolean>?,
-        val state: MutableState<Any?>,
+        override val state: MutableState<Any?>,
         val lastNonNullState: MutableState<Boolean?>,
         val defaultRestoreValue: Boolean,
     ) : ParamBinding {
@@ -244,7 +226,7 @@ class SceneScope internal constructor() {
         override val name: String,
         override val typeName: String,
         override val activationState: MutableState<Boolean>?,
-        val state: MutableState<Any?>,
+        override val state: MutableState<Any?>,
         val lastNonNullState: MutableState<String?>,
         val defaultRestoreValue: String,
     ) : ParamBinding {
@@ -284,7 +266,7 @@ class SceneScope internal constructor() {
         override val name: String,
         override val typeName: String,
         override val activationState: MutableState<Boolean>?,
-        val state: MutableState<Any?>,
+        override val state: MutableState<Any?>,
         val lastNonNullState: MutableState<Any?>,
         val selectedNameState: MutableState<String?>,
         val lastNonNullSelectedNameState: MutableState<String?>,
@@ -308,8 +290,12 @@ class SceneScope internal constructor() {
             return options.isEmpty() || options.any { option -> option.name == optionName }
         }
 
-        private fun resolvedSelectedName(currentValue: Any?): String? {
+        fun resolvedSelectedName(currentValue: Any?): String? {
             if (currentValue == null) return null
+
+            matchedOptionByName(selectedNameState.value)
+                ?.takeIf { it.value == currentValue }
+                ?.let { return it.name }
 
             matchedOptionByValue(currentValue)?.let { matched ->
                 return matched.name
@@ -405,15 +391,34 @@ class SceneScope internal constructor() {
                 val binding = paramBindings[intent.paramName] ?: return
                 val activationState = binding.activationState ?: return
                 if (activationState.value != intent.isActive) {
-                    activationState.value = intent.isActive
-                    binding.onActivationChanged(intent.isActive)
+                    val owner = paramBindingOwners[intent.paramName]
+                    val pending = owner?.valueAssignmentState?.value
+                        ?.takeIf { owner.hasPendingValueAssignment && it.hasNonNullAssignment }
+                    if (intent.isActive && binding.state.value == null && pending?.lastNonNullValue != null) {
+                        // A new choice may belong to options queued for this same composition.
+                        // Preserve its pending value priority until those options are registered.
+                        binding.state.value = pending.lastNonNullValue
+                        if (binding is ObjectParamBinding) binding.selectedNameState.value = pending.optionName
+                    } else {
+                        binding.onActivationChanged(intent.isActive)
+                    }
+                    activationState.value = intent.isActive && binding.state.value != null
+                    if (binding is ObjectParamBinding) {
+                        owner?.takeIf { pending == null }?.let { owner ->
+                            owner.intendedOptionName = binding.resolvedSelectedName(binding.state.value)
+                                ?: binding.selectedNameState.value
+                            owner.acknowledgeValueAssignment()
+                        }
+                    }
                     refreshDescriptorIfStateChanged(intent.paramName)
                 }
             }
 
             is SceneParamIntent.BooleanParamChanged -> {
                 val binding = paramBindings[intent.paramName] as? BooleanParamBinding ?: return
-                if ((binding.state.value as? Boolean) != intent.value) {
+                paramBindingOwners[intent.paramName]?.acknowledgeValueAssignment()
+                if ((binding.state.value as? Boolean) != intent.value || binding.activationState?.value == false) {
+                    binding.activationState?.value = true
                     binding.state.value = intent.value
                     binding.lastNonNullState.value = intent.value
                     refreshDescriptorIfStateChanged(intent.paramName)
@@ -422,7 +427,9 @@ class SceneScope internal constructor() {
 
             is SceneParamIntent.StringParamChanged -> {
                 val binding = paramBindings[intent.paramName] as? StringParamBinding ?: return
-                if ((binding.state.value as? String) != intent.value) {
+                paramBindingOwners[intent.paramName]?.acknowledgeValueAssignment()
+                if ((binding.state.value as? String) != intent.value || binding.activationState?.value == false) {
+                    binding.activationState?.value = true
                     binding.state.value = intent.value
                     binding.lastNonNullState.value = intent.value
                     refreshDescriptorIfStateChanged(intent.paramName)
@@ -431,7 +438,15 @@ class SceneScope internal constructor() {
 
             is SceneParamIntent.ObjectParamChanged -> {
                 val binding = paramBindings[intent.paramName] as? ObjectParamBinding ?: return
-                if (binding.state.value != intent.option.value || binding.selectedNameState.value != intent.option.name) {
+                // A repeated click still supersedes an explicit assignment made before it.
+                paramBindingOwners[intent.paramName]?.let { owner ->
+                    owner.intendedOptionName = intent.option.name
+                    owner.acknowledgeValueAssignment()
+                }
+                if (binding.state.value != intent.option.value || binding.selectedNameState.value != intent.option.name ||
+                    binding.activationState?.value == false
+                ) {
+                    binding.activationState?.value = true
                     binding.state.value = intent.option.value
                     binding.lastNonNullState.value = intent.option.value
                     binding.selectedNameState.value = intent.option.name
@@ -450,6 +465,15 @@ class SceneScope internal constructor() {
                 "Use a different property name or pass a unique name to param()."
         }
 
+        if (binding is ObjectParamBinding) {
+            updateObjectOptions(binding, owner)
+        } else {
+            owner.objectOptions = null
+            owner.intendedOptionName = null
+            owner.acknowledgeValueAssignment()
+        }
+        owner.unregisteredOptions = null
+
         // Validate the new name before releasing the previous registration.
         owner.lastRegisteredName?.takeIf { it != binding.name }?.let { previousName ->
             unregisterBinding(previousName, owner)
@@ -458,6 +482,130 @@ class SceneScope internal constructor() {
         paramBindings[binding.name] = binding
         paramStateSnapshots[binding.name] = binding.snapshot()
         upsertDescriptor(binding.toDescriptor())
+    }
+
+    private fun updateObjectOptions(binding: ObjectParamBinding, owner: ParamProperty<*>) {
+        val previousOptions = owner.objectOptions
+        val value = binding.state.value
+        if (owner.hasPendingValueAssignment && value != null) {
+            owner.intendedOptionName = owner.valueAssignmentState.value?.optionName
+        }
+        if (previousOptions == null) {
+            owner.intendedOptionName = binding.resolvedSelectedName(value) ?: binding.selectedNameState.value
+        } else if (previousOptions != binding.options) {
+            if (binding.options.isEmpty() && previousOptions.isNotEmpty() && binding.activationState != null) {
+                if (value != null) binding.state.value = null
+                if (binding.lastNonNullState.value != null) binding.lastNonNullState.value = null
+                if (binding.activationState.value) binding.activationState.value = false
+            } else if (value != null) {
+                val intendedName = owner.intendedOptionName
+                val option = updatedParamOption(
+                    options = binding.options,
+                    intendedName = intendedName,
+                    preferredValueName = binding.selectedNameState.value,
+                    value = value,
+                    preferAssignedValue = owner.hasPendingValueAssignment,
+                    defaultName = binding.defaultRestoreName,
+                )
+                if (option != null) {
+                    val renamedSelection = !owner.hasPendingValueAssignment && intendedName != null &&
+                        option.name != intendedName && option.value == value &&
+                        previousOptions.any { it.name == intendedName } &&
+                        previousOptions.none { it.name == option.name }
+                    if (owner.hasPendingValueAssignment || intendedName == null ||
+                        option.name == intendedName || renamedSelection
+                    ) {
+                        owner.intendedOptionName = option.name
+                        if (binding.selectedNameState.value != option.name) binding.selectedNameState.value = option.name
+                        if (binding.lastNonNullSelectedNameState.value != option.name) {
+                            binding.lastNonNullSelectedNameState.value = option.name
+                        }
+                    }
+                    // Keep a missing intended name for a later reintroduction, but expose a valid value now.
+                    if (binding.state.value != option.value) binding.state.value = option.value
+                    if (binding.lastNonNullState.value != option.value) binding.lastNonNullState.value = option.value
+                }
+            }
+        }
+        if (binding.state.value == null && binding.activationState != null &&
+            owner.hasPendingValueAssignment && !(binding.options.isEmpty() && previousOptions?.isNotEmpty() == true)
+        ) {
+            reconcileNullAssignment(binding, owner)
+        }
+        owner.objectOptions = binding.options
+        owner.acknowledgeValueAssignment()
+    }
+
+    private fun reconcileNullAssignment(binding: ObjectParamBinding, owner: ParamProperty<*>) {
+        val assignment = owner.valueAssignmentState.value ?: return
+        val value = assignment.lastNonNullValue ?: return
+        if (binding.options.isEmpty()) {
+            owner.intendedOptionName = assignment.optionName ?: owner.intendedOptionName
+            return
+        }
+        val option = updatedParamOption(
+            options = binding.options,
+            intendedName = assignment.optionName ?: owner.intendedOptionName,
+            preferredValueName = binding.selectedNameState.value,
+            value = value,
+            preferAssignedValue = assignment.hasNonNullAssignment,
+            defaultName = binding.defaultRestoreName,
+        ) ?: return
+        if (assignment.hasNonNullAssignment || assignment.optionName == null || option.name == assignment.optionName) {
+            owner.intendedOptionName = option.name
+            if (binding.lastNonNullSelectedNameState.value != option.name) {
+                binding.lastNonNullSelectedNameState.value = option.name
+            }
+        }
+        if (binding.lastNonNullState.value != option.value) binding.lastNonNullState.value = option.value
+    }
+
+    private fun initializeValueAssignments(
+        owner: ParamProperty<*>,
+        lastBoolean: MutableState<Boolean?>,
+        lastString: MutableState<String?>,
+        lastObject: MutableState<Any?>,
+        selectedName: MutableState<String?>,
+        lastObjectName: MutableState<String?>,
+    ) {
+        owner.onValueAssigned = onAssigned@{ assigned ->
+            val options = owner.objectOptions ?: owner.unregisteredOptions
+            val nullable = owner.activationState != null
+            if (!nullable && options.isNullOrEmpty()) return@onAssigned
+            val resolvedClass = (owner.delegatedType?.classifier as? KClass<*>)
+                ?: owner.delegatedKClass ?: owner.declaredKClass
+            val boolean = options == null && resolvedClass == Boolean::class
+            val string = options == null && resolvedClass == String::class
+            val pendingNonNull = owner.hasPendingValueAssignment &&
+                owner.valueAssignmentState.value?.hasNonNullAssignment == true
+            val name = if (assigned != null) {
+                if (options.isNullOrEmpty()) selectedName.value
+                else assignedParamOptionName(options, selectedName.value, assigned)
+            } else {
+                lastObjectName.value
+            }
+            if (nullable && assigned != null) {
+                when {
+                    boolean -> lastBoolean.value = assigned as Boolean
+                    string -> lastString.value = assigned as String
+                    else -> {
+                        lastObject.value = assigned
+                        lastObjectName.value = name
+                    }
+                }
+            }
+            val lastValue = assigned ?: when {
+                boolean -> lastBoolean.value
+                string -> lastString.value
+                else -> lastObject.value
+            }
+            // Value, activity, history, and pending intent share the caller's snapshot.
+            owner.valueAssignmentState.value = ParamValueAssignment(
+                optionName = name,
+                lastNonNullValue = lastValue,
+                hasNonNullAssignment = assigned != null || pendingNonNull,
+            )
+        }
     }
 
     private fun unregisterBinding(paramName: String, owner: ParamProperty<*>) {
@@ -536,8 +684,24 @@ class SceneScope internal constructor() {
                 it.explicitName = name
                 it.declaredKClass = declaredKClass
                 it.declaredNullable = declaredNullable
+                it.activationState = isActive
+                @Suppress("UNCHECKED_CAST")
+                val initialOptions = explicitOptionsResolution?.options as? List<ParamOption<Any>>
+                it.unregisteredOptions = initialOptions
+                initializeValueAssignments(
+                    owner = it,
+                    lastBoolean = lastNonNullBooleanState,
+                    lastString = lastNonNullStringState,
+                    lastObject = lastNonNullObjectState,
+                    selectedName = selectedObjectNameState,
+                    lastObjectName = lastNonNullSelectedObjectNameState,
+                )
             }
         }
+
+        // Only changed choice assignments publish a record. Reading it here
+        // refreshes registration when the delegate is only read by a child.
+        property.valueAssignmentState.value
 
         // Release renamed bindings during disposal, before any SideEffect registers
         // this composition's names. This also allows two declarations to swap names.
@@ -566,17 +730,13 @@ class SceneScope internal constructor() {
         SideEffect { property.explicitName = name }
 
         val explicitOptionItems: List<ParamOption<T>>? = explicitOptionsResolution?.options
-        val explicitOptionsSignature = remember(explicitOptionItems) {
-            optionsSignature(explicitOptionItems)
-        }
-
         SideEffect {
             val resolvedName = property.resolvedName ?: return@SideEffect
             val signature = ParamBindingSignature(
                 name = resolvedName,
                 defaultValue = default.value as Any?,
                 defaultName = default.name,
-                optionsSignature = explicitOptionsSignature,
+                options = explicitOptionItems,
                 delegatedType = property.delegatedType,
                 delegatedKClass = property.delegatedKClass,
                 delegatedNullable = property.delegatedNullable,
@@ -588,7 +748,23 @@ class SceneScope internal constructor() {
 
             val previousName = property.lastRegisteredName
             if (property.bindingSignature == signature && previousName == resolvedName) {
-                refreshDescriptorIfStateChanged(resolvedName)
+                if (property.hasPendingValueAssignment) {
+                    val binding = paramBindings[resolvedName]
+                    if (binding is ObjectParamBinding) {
+                        if (state.value != null) {
+                            property.intendedOptionName = property.valueAssignmentState.value?.optionName
+                        } else if (binding.activationState != null) {
+                            reconcileNullAssignment(binding, property)
+                        }
+                    }
+                    property.acknowledgeValueAssignment()
+                    if (binding != null) {
+                        paramStateSnapshots[resolvedName] = binding.snapshot()
+                        upsertDescriptor(binding.toDescriptor())
+                    }
+                } else {
+                    refreshDescriptorIfStateChanged(resolvedName)
+                }
                 return@SideEffect
             }
 
@@ -872,6 +1048,8 @@ class SceneScope internal constructor() {
 
     /**
      * Declares a scene parameter from explicit [options].
+     * The selected option follows new values under its name when options change.
+     * Use stable option names and assign values from the available options.
      *
      * @param options Allowed values with names.
      * @param name Optional explicit parameter name. If `null`, delegated property name is used.
@@ -894,6 +1072,8 @@ class SceneScope internal constructor() {
 
     /**
      * Declares a scene parameter with explicit [default] and [options].
+     * The selected option follows new values under its name when options change.
+     * Use stable option names and assign values from the available options.
      *
      * @param default Initial parameter value.
      * @param options Allowed values with names.
@@ -917,6 +1097,8 @@ class SceneScope internal constructor() {
 
     /**
      * Declares a scene parameter with named [default] and explicit [options].
+     * The selected option follows new values under its name when options change.
+     * Use stable option names and assign values from the available options.
      *
      * @param default Initial parameter value together with a selection name.
      * @param options Allowed values with names.

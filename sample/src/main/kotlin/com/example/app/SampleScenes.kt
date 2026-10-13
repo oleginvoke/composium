@@ -100,11 +100,17 @@ internal val tonalNestedPlayground by scene(
     val size: ButtonSize by param(ButtonSize.Medium) { inferred ->
         inferred.reversed()
     }
+    val background: Color by param(
+        listOf(
+            MaterialTheme.colorScheme.background named "colorScheme.background",
+            MaterialTheme.colorScheme.primary named "colorScheme.primary",
+        )
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(background),
     ) {
         Box(
             modifier = Modifier
