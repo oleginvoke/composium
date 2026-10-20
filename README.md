@@ -9,11 +9,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Version: `1.3.0-alpha04` (pre-release)
+Version: `1.3.0` (stable)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.3.0-alpha04`
-- `io.github.oleginvoke:composium-processor:1.3.0-alpha04`
+- `io.github.oleginvoke:composium:1.3.0`
+- `io.github.oleginvoke:composium-processor:1.3.0`
 
 It is useful for:
 - design systems and component libraries;
@@ -101,8 +101,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha04")
-    ksp("io.github.oleginvoke:composium-processor:1.3.0-alpha04")
+    implementation("io.github.oleginvoke:composium:1.3.0")
+    ksp("io.github.oleginvoke:composium-processor:1.3.0")
 }
 ```
 
@@ -116,7 +116,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0-alpha04")
+    implementation("io.github.oleginvoke:composium:1.3.0")
 }
 ```
 

@@ -13,6 +13,7 @@ const base = '/composium/';
 const repository = 'https://github.com/oleginvoke/composium';
 const source = await readFile(resolve(root, 'README.md'), 'utf8');
 const version = getVersion(source);
+const releaseLabel = version.split('+', 1)[0].includes('-') ? 'Pre-release' : 'Stable release';
 const sections = splitReadme(source);
 const assigned = pages.flatMap(page => page.sections);
 if (assigned.length !== new Set(assigned).size || assigned.length !== sections.size || assigned.some(section => !sections.has(section))) {
@@ -112,7 +113,7 @@ const home = `<main id="main">
 <section class="hero wrap"><div class="hero-copy"><p class="eyebrow"><span class="status-dot"></span> STORYBOOK FOR ANDROID JETPACK COMPOSE</p>
 <h1>Your Compose UI.<br><em>Ready to explore.</em></h1><p class="hero-description">Turn your components into an interactive, in-app catalog. Explore real UI states, tweak parameters, and give your design system a place to live.</p>
 <div class="hero-actions"><a class="button button-primary" href="${link('docs/getting-started/')}">Get started <span aria-hidden="true">→</span></a><a class="button button-text" href="${repository}">View on GitHub ${arrow}</a></div>
-<p class="release"><span>v${version}</span> <span class="release-label">Pre-release</span><span class="release-separator">/</span> Available on Maven Central</p>
+<p class="release"><span>v${version}</span> <span class="release-label">${releaseLabel}</span><span class="release-separator">/</span> Available on Maven Central</p>
 <div class="hero-note"><span class="mono">ComposiumScreen()</span><p>One composable. Anywhere in your app.</p></div></div>
 <figure class="demo"><div class="demo-top"><span><span class="status-dot"></span> THE REAL THING</span><span>Android sample</span></div><div class="demo-stage"><div class="demo-label"><span>YOUR COMPONENTS</span><strong>A living<br>UI catalog.</strong><span class="demo-marker" aria-hidden="true">↘</span></div><div class="phone"><img id="demo-image" src="${link('assets/demo-poster.png')}" data-animation="${link('assets/composium-demo.gif')}" data-poster="${link('assets/demo-poster.png')}" alt="Composium Android catalog with nested scene groups, thumbnails, and a sample button" width="480" height="1004" fetchpriority="high"></div></div><figcaption><span>Browse scenes. Change values. See what happens.</span><button type="button" class="demo-toggle" aria-pressed="false"><span aria-hidden="true">▶</span> Play demo</button></figcaption></figure></section>
 <div class="trust-strip wrap"><span>Native Jetpack Compose</span><span>KSP discovery · optional</span><span>Android minSdk 24</span><span>Apache 2.0 · open source</span></div>
