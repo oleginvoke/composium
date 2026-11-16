@@ -1,0 +1,30 @@
+// Stage publications in an isolated file repository; never publish to Maven Central or mavenLocal.
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('stageCompatibilityArtifacts') {
+        dependsOn ':runtime:generatePomFileForMavenPublication', ':runtime:generateMetadataFileForMavenPublication',
+            ':processor:generatePomFileForMavenPublication', ':processor:generateMetadataFileForMavenPublication'
+        doLast {
+            def version = root.providers.gradleProperty('VERSION_NAME').get()
+            ['runtime': 'composium', 'processor': 'composium-processor'].each { name, artifact ->
+                def module = root.project(":$name")
+                def target = root.file(".gradle/compatibility/repository/io/github/oleginvoke/$artifact/$version")
+                root.copy {
+                    from module.file('build/publications/maven/pom-default.xml')
+                    into target
+                    rename { "${artifact}-${version}.pom" }
+                }
+                root.copy {
+                    from module.file('build/publications/maven/module.json')
+                    into target
+                    rename { "${artifact}-${version}.module" }
+                }
+                root.copy {
+                    from(name == 'runtime' ? module.file('build/outputs/aar/runtime-release.aar') : module.tasks.named('jar').get().archiveFile)
+                    into target
+                    rename { "${artifact}-${version}.${name == 'runtime' ? 'aar' : 'jar'}" }
+                }
+            }
+        }
+    }
+}

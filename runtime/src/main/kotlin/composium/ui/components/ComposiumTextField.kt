@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -106,7 +108,14 @@ internal fun ComposiumTextField(
     shape: Shape = RoundedCornerShape(12.dp),
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
     borderWidth: Dp = 1.dp,
+    initialCursorAtEnd: Boolean = false,
 ) {
+    var fieldValue by remember {
+        mutableStateOf(TextFieldValue(value, TextRange(if (initialCursorAtEnd) value.length else 0)))
+    }
+    if (fieldValue.text != value) {
+        fieldValue = fieldValue.copy(text = value)
+    }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
     val imeVisible = WindowInsets.isImeVisible
@@ -151,8 +160,11 @@ internal fun ComposiumTextField(
                 .padding(contentPadding),
         ) {
             BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
+                value = fieldValue,
+                onValueChange = { updated ->
+                    fieldValue = updated
+                    onValueChange(updated.text)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = enabled,
                 readOnly = readOnly,

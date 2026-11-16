@@ -4,7 +4,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -158,17 +162,18 @@ private fun FloatingButton(
         enabled = enabled,
         size = size,
         modifier = modifier.then(if (onDrag != null) Modifier.pointerInput(Unit) {
-                detectDragGestures(
-                    orientationLock = null,
-                    onDragStart = { down, change, overSlop ->
-                        currentOnDrag?.invoke(change.position - down.position - overSlop)
-                    },
-                    shouldAwaitTouchSlop = { true },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        currentOnDrag?.invoke(amount)
-                    },
-                )
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val start = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
+                    if (start != null) {
+                        // Include touch slop so the anchor follows the finger one-to-one.
+                        currentOnDrag?.invoke(start.position - down.position)
+                        drag(start.id) { change ->
+                            currentOnDrag?.invoke(change.positionChange())
+                            change.consume()
+                        }
+                    }
+                }
             } else Modifier),
     )
 }

@@ -20,7 +20,9 @@ kotlin {
 }
 
 dependencies {
-    compileOnly(libs.ksp.api)
+    // Compile against the oldest supported API; consumers choose their KSP plugin.
+    compileOnly(libs.processor.ksp.api)
+    implementation(libs.kotlin.stdlib)
 }
 
 val isLocalPublishOnly = gradle.startParameter.taskNames

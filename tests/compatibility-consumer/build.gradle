@@ -1,0 +1,99 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android' apply false
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'com.google.devtools.ksp' apply false
+}
+
+if (providers.gradleProperty('compat.agp').get().startsWith('8.')) {
+    apply plugin: 'org.jetbrains.kotlin.android'
+}
+def useKsp = providers.gradleProperty('compat.useKsp').get().toBoolean()
+if (useKsp) { apply plugin: 'com.google.devtools.ksp' }
+
+android {
+    namespace = 'composium.compatibility'
+    compileSdk = providers.gradleProperty('compat.compileSdk').get().toInteger()
+    defaultConfig {
+        applicationId = 'composium.compatibility'
+        minSdk = providers.gradleProperty('compat.minSdk').get().toInteger()
+        targetSdk = providers.gradleProperty('compat.targetSdk').get().toInteger()
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'boolean', 'USE_KSP', useKsp.toString()
+    }
+    buildFeatures { compose = true; buildConfig = true }
+    testOptions { unitTests.includeAndroidResources = true }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            signingConfig = signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        // Versions are intentionally pinned, and this independent fixture intentionally
+        // does not use the repository catalog. Keep API/custom-check failures enabled.
+        disable += ['GradleDependency', 'AndroidGradlePluginVersion', 'NewerVersionAvailable',
+                    'SimilarGradleDependency', 'UseTomlInstead', 'KtxExtensionAvailable', 'OldTargetApi']
+        sarifReport = false
+    }
+}
+kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11 } }
+
+dependencies {
+    implementation "io.github.oleginvoke:composium:${providers.gradleProperty('compat.version').get()}"
+    implementation "androidx.activity:activity:${providers.gradleProperty('compat.activity').get()}"
+    implementation "androidx.compose.foundation:foundation:${providers.gradleProperty('compat.compose').get()}"
+    if (useKsp) {
+        ksp "io.github.oleginvoke:composium-processor:${providers.gradleProperty('compat.version').get()}"
+    }
+    if (providers.gradleProperty('compat.bom').isPresent()) {
+        implementation platform("androidx.compose:compose-bom:${providers.gradleProperty('compat.bom').get()}")
+        implementation "androidx.core:core-ktx:${providers.gradleProperty('compat.core').get()}"
+        implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.0'
+    }
+    androidTestImplementation "androidx.compose.ui:ui-test-junit4:${providers.gradleProperty('compat.compose').get()}"
+    // The app still uses the profile's old dependencies. The test driver must also
+    // understand the newest device's input APIs (InputManager changed after API 35).
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test:runner:1.7.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+    if (providers.gradleProperty('compat.agp').get().startsWith('8.')) {
+        testImplementation 'org.robolectric:robolectric:4.14.1'
+        testImplementation 'junit:junit:4.13.2'
+        testImplementation "androidx.compose.ui:ui-test-junit4:${providers.gradleProperty('compat.compose').get()}"
+        testImplementation "androidx.compose.ui:ui-test-manifest:${providers.gradleProperty('compat.compose').get()}"
+    }
+}
+
+tasks.register('verifyCompatibilityGraph') {
+    def graph = configurations.named('releaseRuntimeClasspath')
+    doLast {
+        def versions = graph.get().incoming.resolutionResult.allComponents
+            .findAll { it.moduleVersion != null }
+            .collectEntries { [("${it.moduleVersion.group}:${it.moduleVersion.name}".toString()): it.moduleVersion.version] }
+        ['androidx.compose.ui:ui-android': 'compose', 'androidx.activity:activity': 'activity',
+         'androidx.core:core-ktx': 'core', 'org.jetbrains.kotlin:kotlin-stdlib': 'kotlin'].each { module, key ->
+            def expected = providers.gradleProperty("compat.$key").get()
+            assert versions[module] == expected : "$module: expected $expected, resolved ${versions[module]}"
+        }
+        def forbidden = ['androidx.compose.material3:material3', 'androidx.compose.material3:material3-android',
+            'androidx.compose.ui:ui-tooling', 'androidx.compose.ui:ui-tooling-android',
+            'androidx.compose.ui:ui-tooling-preview', 'androidx.compose.ui:ui-tooling-preview-android',
+            'com.google.devtools.ksp:symbol-processing-api']
+        if (!providers.gradleProperty('compat.bom').isPresent()) { forbidden += 'androidx.compose:compose-bom' }
+        assert versions.keySet().intersect(forbidden).isEmpty() : 'Unexpected runtime dependency leakage'
+        if (useKsp) {
+            def registry = file('build/generated/ksp/debug/kotlin/oleginvoke/com/composium/generated/GeneratedSceneRegistry.kt')
+            assert registry.exists() && registry.text.contains('CompatibilityScene') : 'Scene processor did not generate the registry'
+        }
+        file('build/compatibility-graph.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(versions))
+    }
+}

@@ -71,18 +71,21 @@ The library is meant to help you explore UI, not constrain how you structure it.
 
 ## Requirements
 
-- Android `minSdk 24`
-- Consumer project `compileSdk 36`
+- Android `minSdk 21`
+- Consumer project `compileSdk 34` or newer
 - JVM target `11`
-- Kotlin `2.3.21` or newer
+- Kotlin `2.0.20` or newer
+- Tested older build tools: AGP `8.5.2`, Gradle `8.7`, JDK `17`
 - `mavenCentral()` and `google()` in your consumer project
 
-If you use KSP, choose a KSP2 plugin version compatible with your Kotlin and AGP versions.
-The baseline configuration uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `8.10.1`, and Gradle `8.11.1`.
+If you use KSP, choose a plugin compatible with your Kotlin and AGP versions.
+The compatibility fixture covers KSP2 `2.0.20-1.0.25` on the older toolchain and `2.3.12` on the modern toolchain.
+The repository build uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `9.1.1`, and Gradle `9.5.1`.
+These build-tool versions are not all consumer requirements. See [dependency compatibility](docs/dependency-compatibility.md) for the runtime baseline and upgrade policy.
 
 ## Installation
 
-Set your app or host module to `compileSdk 36` before adding Composium.
+Set your app or host module to `compileSdk 34` or newer before adding Composium.
 
 Add repositories:
 

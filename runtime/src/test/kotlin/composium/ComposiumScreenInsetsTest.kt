@@ -90,9 +90,11 @@ class ComposiumScreenInsetsTest {
     fun defaultInsetsProtectStandaloneCatalogAndFloatingScene() {
         render(useDefault = true)
         val titleBefore = composeRule.onNodeWithText("Composium", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val topInsetBefore = systemInsets.getTop(Density(1f))
         dispatchInsets()
         val titleAfter = composeRule.onNodeWithText("Composium", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(titleBefore.top + 24f, titleAfter.top, 1f)
+        // Some Compose versions deliver the initial platform insets before the first assertion.
+        assertEquals(titleBefore.top + 24f - topInsetBefore, titleAfter.top, 1f)
         openScene()
         assertScenePadding(24, 30)
         assertFloatingAnchor(leftInset = 7, topInset = 24, rightInset = 20)

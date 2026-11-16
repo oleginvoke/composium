@@ -1,0 +1,18 @@
+{
+  "legacy": {
+    "gradle": "8.7", "agp": "8.5.2", "kotlin": "2.0.20", "ksp": "2.0.20-1.0.25",
+    "compileSdk": 34, "targetSdk": 34, "minSdk": 21, "compose": "1.7.8", "activity": "1.9.3", "core": "1.13.1", "useKsp": true
+  },
+  "legacy-manual": {
+    "gradle": "8.7", "agp": "8.5.2", "kotlin": "2.0.20", "ksp": "2.0.20-1.0.25",
+    "compileSdk": 34, "targetSdk": 34, "minSdk": 21, "compose": "1.7.8", "activity": "1.9.3", "core": "1.13.1", "useKsp": false
+  },
+  "modern-baseline": {
+    "gradle": "9.9.0", "agp": "9.5.1", "kotlin": "2.4.21", "ksp": "2.3.12",
+    "compileSdk": 37, "targetSdk": 37, "minSdk": 21, "compose": "1.7.8", "activity": "1.9.3", "core": "1.13.1", "useKsp": true
+  },
+  "modern": {
+    "gradle": "9.9.0", "agp": "9.5.1", "kotlin": "2.4.21", "ksp": "2.3.12",
+    "compileSdk": 37, "targetSdk": 37, "minSdk": 23, "compose": "1.12.1", "activity": "1.13.0", "core": "1.19.1", "useKsp": true, "bom": "2026.09.00"
+  }
+}

@@ -3,7 +3,6 @@ package oleginvoke.com.composium.scene_screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.DisplayMetrics
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -39,6 +38,7 @@ import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -73,6 +73,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -301,7 +303,7 @@ internal fun SceneScreen(
     }
 
     Box(
-        modifier = modifier
+        modifier = modifier.dismissScaleKeyboardOnBackgroundTap()
             .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize(),
     ) {
@@ -702,6 +704,11 @@ private fun SceneScreenContent(
         label = "scene_split_boundary_shift",
     )
 
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    val dismissKeyboard = { focusManager.clearFocus(); keyboardController?.hide(); Unit }
+
     // BoxWithConstraints fills the full screen (no top padding). The preview pane fills the
     // available area while the scene receives explicit content padding. Inspector positioning
     // is preserved by treating `availableHeightPx` as the
@@ -755,7 +762,7 @@ private fun SceneScreenContent(
                 previewHeightProvider = previewHeightProvider,
                 sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
-                    callbacks::onPreviewPaneTapped
+                    { if (keyboardVisible) dismissKeyboard() else callbacks.onPreviewPaneTapped() }
                 } else {
                     null
                 },
@@ -775,7 +782,7 @@ private fun SceneScreenContent(
                     showSplitDivider = showSplitDivider,
                     layoutMode = controlsSheet.layoutMode,
                     onBackgroundTap = if (shouldHandleSceneInspectorBackgroundTap(controlsSheet.layoutMode)) {
-                        callbacks::onExpandControls
+                        { if (keyboardVisible) dismissKeyboard() else callbacks.onExpandControls() }
                     } else {
                         null
                     },
@@ -1368,19 +1375,18 @@ private fun ScenePreviewContent(
     val settings = sceneScope.preview
     val baseDensity = LocalDensity.current
 
-    val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE / 160f
-    val resolvedDensityValue = settings.displayScaleOverride?.let { stableDensity * it } ?: baseDensity.density
+    val stableDensity = systemDefaultDisplayDensity(baseDensity.density)
+    val resolvedDensityValue = settings.displayScaleOverride?.let { resolvePreviewDensity(stableDensity, it) } ?: baseDensity.density
     val resolvedFontScale = settings.fontScaleOverride ?: baseDensity.fontScale
     val layoutDirection = if (settings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     // Insets and Composium chrome were measured in host dp. Preserve their physical bounds
     // when scene content applies this padding with its overridden density and direction.
-    val paddingDensityRatio = baseDensity.density / resolvedDensityValue
     val hostLayoutDirection = LocalLayoutDirection.current
-    val previewContentPadding = PaddingValues.Absolute(
-        left = contentPadding.calculateLeftPadding(hostLayoutDirection) * paddingDensityRatio,
-        top = contentPadding.calculateTopPadding() * paddingDensityRatio,
-        right = contentPadding.calculateRightPadding(hostLayoutDirection) * paddingDensityRatio,
-        bottom = contentPadding.calculateBottomPadding() * paddingDensityRatio,
+    val previewContentPadding = rescaleSceneContentPadding(
+        padding = contentPadding,
+        layoutDirection = hostLayoutDirection,
+        hostDensity = baseDensity.density,
+        previewDensity = resolvedDensityValue,
     )
 
     CompositionLocalProvider(

@@ -13,10 +13,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 24
+        minSdk = 21
         consumerProguardFiles("consumer-rules.pro")
         aarMetadata {
-            minCompileSdk = 36
+            minCompileSdk = 34
         }
     }
 
@@ -105,17 +105,19 @@ dependencies {
     }
 
     // Types from these artifacts are part of Composium's public API.
-    api(platform(libs.compose.bom))
+    // Do not export a BOM: it would also upgrade unrelated consumer libraries (e.g. Material3).
     api(libs.compose.runtime)
     api(libs.compose.ui)
     api(libs.compose.foundation.layout)
+    api(libs.kotlin.stdlib)
 
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
-    implementation(libs.androidx.activity)
+    implementation(libs.runtime.activity)
+    implementation(libs.androidx.runtime.core.ktx)
     implementation(libs.compose.foundation)
     implementation(libs.compose.animation)
-    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.runtime.lifecycle.compose)
 
     // Previews live in the debug source-set.
     debugImplementation(libs.androidx.ui.tooling.preview)
@@ -124,6 +126,9 @@ dependencies {
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.compose.ui.test.junit4)
+    // Repository UI tests use the sample's Compose stack. The independently built
+    // compatibility consumers exercise the published baseline on old Android as well.
+    testImplementation(platform(libs.compose.bom))
     testImplementation(libs.material3)
     testImplementation(libs.robolectric)
 }

@@ -1,0 +1,20 @@
+pluginManagement {
+    plugins {
+        id 'com.android.application' version providers.gradleProperty('compat.agp').get()
+        id 'org.jetbrains.kotlin.android' version providers.gradleProperty('compat.kotlin').get()
+        id 'org.jetbrains.kotlin.plugin.compose' version providers.gradleProperty('compat.kotlin').get()
+        id 'com.google.devtools.ksp' version providers.gradleProperty('compat.ksp').get()
+    }
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositories {
+        exclusiveContent {
+            forRepository { maven { url = uri(providers.gradleProperty('compat.repo').get()) } }
+            filter { includeGroup('io.github.oleginvoke') }
+        }
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'composium-compatibility-consumer'

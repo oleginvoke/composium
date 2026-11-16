@@ -12,7 +12,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,6 +43,7 @@ import oleginvoke.com.composium.ui.components.ComposiumChipDefaults
 import oleginvoke.com.composium.ui.components.ComposiumSwitch
 import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.ComposiumTextField
+import oleginvoke.com.composium.ui.components.ComposiumFlowRow
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 
@@ -166,10 +166,10 @@ private fun ParamCard(
                             val hasChoices = options.size > 1
 
                             if (hasChoices) {
-                                FlowRow(
+                                ComposiumFlowRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalSpacing = 6.dp,
+                                    verticalSpacing = 6.dp,
                                 ) {
                                     options.forEach { option ->
                                         ComposiumChip(
