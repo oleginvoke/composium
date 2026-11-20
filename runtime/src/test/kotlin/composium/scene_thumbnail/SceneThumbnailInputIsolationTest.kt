@@ -13,6 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.InterceptPlatformTextInput
@@ -140,7 +142,7 @@ class SceneThumbnailInputIsolationTest {
                             contentWindowInsets = WindowInsets(0),
                         )
                     }
-                    SceneThumbnailCaptureHost(
+                    CaptureTestThumbnail(
                         request = request,
                         onCaptured = { _, _ -> captured = true },
                         onFailed = { _, failure -> throw AssertionError(failure.reason, failure.throwable) },
@@ -166,7 +168,10 @@ class SceneThumbnailInputIsolationTest {
                 sceneEntry = entry,
             )
         }
-        composeRule.waitUntil(timeoutMillis = 5_000) { captured }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.waitForIdle()
+            captured
+        }
         composeRule.runOnIdle {
             assertTrue(effectExecuted, "Autofocus must actually be attempted")
             assertTrue(captured, "Input isolation must not prevent thumbnail capture")
@@ -179,7 +184,8 @@ class SceneThumbnailInputIsolationTest {
         val populatedSearch = composeRule.onNode(hasSetTextAction() and hasText("Input scene"))
         populatedSearch.assertTextEquals("Input scene")
         populatedSearch.performImeAction()
-        populatedSearch.performClick().assertIsFocused()
+        populatedSearch.performSemanticsAction(SemanticsActions.OnClick)
+        populatedSearch.assertIsFocused()
         composeRule.runOnIdle {
             assertTrue(searchInputSessions > sessionsBeforeCapture,
                 "Search must also be able to start a new input session while capture is mounted")

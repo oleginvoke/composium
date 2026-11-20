@@ -452,7 +452,7 @@ Invoke either action from an event handler or effect, not directly during compos
 
 ### Scene thumbnails
 
-The main catalog screen automatically creates thumbnails for scenes. By default, Composium renders each scene on a hidden capture surface, stores the resulting image in memory, and shows that image in the scene card thumbnail area.
+The catalog renders thumbnails on the device and keeps the finished images in memory. It reuses one ComposeView in a non-focusable window on a private virtual display, so an autofocus request in a thumbnail leaves the catalog search field and keyboard alone. Cropping and scaling run in the background while the next scene renders. During touch and scrolling, the catalog pauses new captures and image updates, then prioritizes the visible cards. The display is released when the queue drains or the catalog leaves the foreground.
 
 This keeps the catalog visual without requiring extra setup for every scene:
 
@@ -559,6 +559,14 @@ internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
 ```
 
 `param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
+
+The open scene and its configured `param(...)` values survive configuration changes such as rotation.
+Nullable parameters keep both their null state and their last non-null selection. Named choices are
+restored from the current options, so theme-dependent objects use their current values. Keep parameter
+and option names stable across configurations. Values assigned outside the options can be restored
+when Android's saved-state registry supports their type. Explicitly leaving and reopening a scene
+starts its parameters with their defaults. State you create separately inside a scene follows the
+usual Compose rules; use `rememberSaveable` for that state when it should survive recreation.
 
 ### Parameter names must be unique
 

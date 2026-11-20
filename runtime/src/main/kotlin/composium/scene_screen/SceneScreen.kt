@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -62,6 +63,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -91,6 +93,9 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneSystemSettings
+import oleginvoke.com.composium.SceneSystemSettingsSaver
+import oleginvoke.com.composium.sceneScopeSaver
 import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.SceneToolStateBinding
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
@@ -122,10 +127,18 @@ internal fun SceneScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     contentWindowInsets: WindowInsets = WindowInsets(0),
+    isActive: Boolean = true,
 ) {
     val themeController = LocalComposiumThemeController.current
-    val sceneScope = remember(sceneEntry.id) { SceneScope() }
-    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false)
+    val previewSaver = rememberActiveSceneUiSaver(SceneSystemSettingsSaver, isActive)
+    val preview = rememberSaveable(sceneEntry.id, saver = previewSaver) { SceneSystemSettings() }
+    val scopeSaver = rememberActiveSceneUiSaver(remember(preview) { sceneScopeSaver(preview) }, isActive)
+    val sceneScope = rememberSaveable(sceneEntry.id, preview, saver = scopeSaver) { SceneScope(preview) }
+    val store = rememberSceneScreenStore(
+        sceneEntry.id,
+        (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false,
+        isActive,
+    )
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     val floatingSettingsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
@@ -680,6 +693,11 @@ private fun SceneScreenContent(
     val density = LocalDensity.current
     val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
     val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
+    val layoutDirection = LocalLayoutDirection.current
+    val leftInset = with(density) { contentWindowInsets.getLeft(this, layoutDirection).toDp() }
+    val rightInset = with(density) { contentWindowInsets.getRight(this, layoutDirection).toDp() }
+    val startInset = if (layoutDirection == LayoutDirection.Ltr) leftInset else rightInset
+    val endInset = if (layoutDirection == LayoutDirection.Ltr) rightInset else leftInset
     val contentTopPadding = topInset + if (sceneEntry.scene.tools == SceneTools.None) 0.dp else SceneTopBarContentHeight
 
     val previewAlpha = animateFloatAsState(
@@ -737,7 +755,9 @@ private fun SceneScreenContent(
         }
         val previewHeightProvider = remember(previewHeight) { { previewHeight.value } }
         val tools = sceneEntry.scene.tools
-        val sceneContentPadding by remember(previewHeight, maxHeightPx, tools, topInset, bottomInset, density) {
+        val sceneContentPadding by remember(
+            previewHeight, maxHeightPx, tools, topInset, bottomInset, density, startInset, endInset,
+        ) {
             derivedStateOf {
                 calculateSceneContentPadding(
                     tools = tools,
@@ -745,6 +765,8 @@ private fun SceneScreenContent(
                     navigationBarInset = bottomInset,
                     topBarHeight = SceneTopBarContentHeight,
                     spaceBelowPreview = with(density) { (maxHeightPx - previewHeight.value).toDp() },
+                    startInset = startInset,
+                    endInset = endInset,
                 )
             }
         }
@@ -796,7 +818,8 @@ private fun SceneScreenContent(
                     bottomInset = bottomInset,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(start = startInset, end = endInset),
                 )
             }
         }
@@ -998,6 +1021,10 @@ private fun SceneInspectorPane(
                 .padding(top = contentClipOffset),
         ) {
             AnimatedContent(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = 960.dp)
+                    .fillMaxSize(),
                 targetState = selectedTab,
                 transitionSpec = {
                     val direction = initialState.transitionDirectionTo(targetState)
@@ -1090,7 +1117,9 @@ private fun SceneInspectorPane(
             SceneInspectorTabs(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 960.dp),
             )
             if (isSplitMode) {
                 SceneInspectorArmedIndicator(

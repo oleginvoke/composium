@@ -27,10 +27,10 @@ class SceneThumbnailLogicTest {
         val second = keyA.copy(sceneId = SceneKey("Buttons", "Primary::Disabled"))
         val store = SceneThumbnailStore()
         store.putFailed(first, "first failure")
-        store.putCapturing(second)
+        store.putPending(second)
 
         assertEquals(SceneThumbnailState.Failed("first failure"), store.thumbnailFor(first))
-        assertEquals(SceneThumbnailState.Capturing, store.thumbnailFor(second))
+        assertEquals(SceneThumbnailState.Pending, store.thumbnailFor(second))
         assertEquals(2, store.statesBySceneId().size)
 
         val queue = SceneThumbnailQueue()
@@ -140,26 +140,6 @@ class SceneThumbnailLogicTest {
     }
 
     @Test
-    fun unavailableSceneCaptureRetriesWhenKeyIsStillCurrent() {
-        val decision = resolveSceneThumbnailUnavailableDecision(
-            key = keyA,
-            currentKeys = setOf(keyA, keyB),
-        )
-
-        assertEquals(SceneThumbnailUnavailableDecision.Retry, decision)
-    }
-
-    @Test
-    fun unavailableSceneCaptureDropsWhenKeyIsStale() {
-        val decision = resolveSceneThumbnailUnavailableDecision(
-            key = keyA,
-            currentKeys = setOf(keyB),
-        )
-
-        assertEquals(SceneThumbnailUnavailableDecision.Drop, decision)
-    }
-
-    @Test
     fun storeEvictsLeastRecentlyUsedReadyImagesByMemoryBudget() {
         val store = SceneThumbnailStore(memoryBudgetBytes = 100)
 
@@ -218,7 +198,7 @@ class SceneThumbnailLogicTest {
         assertTrue(store.needsCapture(keyB))
 
         store.setVisibleKeys(setOf(keyB))
-        store.putCapturing(keyB)
+        store.putPending(keyB)
         store.putReady(keyB, fakeImageBitmap(), byteSizeBytes = 70)
 
         assertNull(store.thumbnailFor(keyA))
@@ -257,27 +237,6 @@ class SceneThumbnailLogicTest {
         assertNull(store.thumbnailFor(keyA))
         assertTrue(store.thumbnailFor(keyB) is SceneThumbnailState.Failed)
         assertEquals(0, store.currentMemoryBytes)
-    }
-
-    @Test
-    fun captureDoesNotRunUntilCurrentRequestHasRecordedContent() {
-        val empty = SceneThumbnailCaptureSurfaceState()
-        val recordedForOtherScene = SceneThumbnailCaptureSurfaceState(
-            key = keyB,
-            widthPx = keyA.viewportWidthPx,
-            heightPx = keyA.viewportHeightPx,
-        )
-        val recordedForCurrentScene = SceneThumbnailCaptureSurfaceState(
-            key = keyA,
-            widthPx = keyA.viewportWidthPx,
-            heightPx = keyA.viewportHeightPx,
-        )
-
-        assertFalse(canCaptureSceneThumbnail(keyA, empty))
-        assertFalse(canCaptureSceneThumbnail(keyA, recordedForOtherScene))
-        assertFalse(canCaptureSceneThumbnail(keyA, recordedForCurrentScene.copy(widthPx = 0)))
-        assertFalse(canCaptureSceneThumbnail(keyA, recordedForCurrentScene.copy(heightPx = 0)))
-        assertTrue(canCaptureSceneThumbnail(keyA, recordedForCurrentScene))
     }
 
     @Test

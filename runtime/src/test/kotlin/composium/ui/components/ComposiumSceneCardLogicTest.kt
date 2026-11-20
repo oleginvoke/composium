@@ -14,7 +14,6 @@ class ComposiumSceneCardLogicTest {
         listOf(
             null,
             SceneThumbnailState.Pending,
-            SceneThumbnailState.Capturing,
             SceneThumbnailState.Failed("timeout"),
         ).forEach { state ->
             assertEquals(

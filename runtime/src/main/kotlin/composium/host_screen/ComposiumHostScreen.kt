@@ -2,6 +2,7 @@ package oleginvoke.com.composium.host_screen
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.util.Log
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -34,13 +35,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import oleginvoke.com.composium.ComposiumRuntime
+import oleginvoke.com.composium.ComposiumAutoRegistration
 import oleginvoke.com.composium.SceneKey
 import oleginvoke.com.composium.main_screen.MainScreen
 import oleginvoke.com.composium.scene_screen.SceneScreen
@@ -51,9 +57,7 @@ import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailFailureRetryTracke
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailKey
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailQueue
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailStore
-import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailUnavailableDecision
 import oleginvoke.com.composium.scene_thumbnail.buildSceneThumbnailFailureLogMessage
-import oleginvoke.com.composium.scene_thumbnail.resolveSceneThumbnailUnavailableDecision
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Tokens
 
@@ -74,24 +78,21 @@ internal fun ComposiumHostScreen(
     val mainScreenInsets = remember(contentWindowInsets) {
         contentWindowInsets.only(WindowInsetsSides.Horizontal)
     }
-    val sceneOverlayInsets = remember(contentWindowInsets) {
-        contentWindowInsets.only(WindowInsetsSides.Horizontal)
-    }
     val transitionScaleSpec = remember {
         spring<Float>(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow,
         )
     }
-    val sceneVisibilityState = remember { MutableTransitionState(false) }
-
-    var state by remember { mutableStateOf(ComposiumHostScreenState()) }
-    val thumbnailStore = remember { SceneThumbnailStore() }
-    val thumbnailQueue = remember { SceneThumbnailQueue() }
-    val thumbnailRetryTracker = remember { SceneThumbnailFailureRetryTracker() }
+    var state by rememberSaveable(stateSaver = ComposiumHostScreenStateSaver) {
+        mutableStateOf(ComposiumHostScreenState())
+    }
+    val sceneVisibilityState = remember { MutableTransitionState(state.isSceneVisible) }
+    val configuration = Configuration(LocalConfiguration.current)
+    val thumbnailStore = remember(configuration) { SceneThumbnailStore() }
     var visibleSceneIds by remember { mutableStateOf<List<SceneKey>>(emptyList()) }
     var isMainListScrollInProgress by remember { mutableStateOf(false) }
-    var currentCaptureKey by remember { mutableStateOf<SceneThumbnailKey?>(null) }
+    var isPointerDown by remember { mutableStateOf(false) }
 
     val renderedSceneId = state.renderedSceneId
     val renderedSceneEntry = renderedSceneId?.let(scenesById::get)
@@ -105,18 +106,8 @@ internal fun ComposiumHostScreen(
         }
     }
     val thumbnailKeySet = remember(thumbnailKeys) { thumbnailKeys.toSet() }
-    val shouldPauseThumbnailCapture = isMainListScrollInProgress || blocksMainScreenInput
-    val currentCaptureEntry = currentCaptureKey?.sceneId?.let(scenesById::get)
-    val currentCaptureRequest = currentCaptureKey
-        ?.takeUnless { shouldPauseThumbnailCapture }
-        ?.let { key ->
-            currentCaptureEntry?.let { entry ->
-                SceneThumbnailCaptureRequest(
-                    key = key,
-                    sceneEntry = entry,
-                )
-            }
-        }
+    val thumbnailQueue = remember(thumbnailStore, thumbnailKeys) { SceneThumbnailQueue() }
+    val thumbnailRetryTracker = remember(thumbnailQueue) { SceneThumbnailFailureRetryTracker() }
     val thumbnailStatesBySceneId = thumbnailStore.statesBySceneId()
 
     fun openScene(sceneId: SceneKey) {
@@ -141,19 +132,16 @@ internal fun ComposiumHostScreen(
     )
 
     LaunchedEffect(sceneIds) {
+        // On process restoration the generated catalog may not have registered yet.
+        ComposiumAutoRegistration.registerGeneratedScenes()
         state = reduceComposiumHostScreen(
             state = state,
-            intent = ComposiumHostScreenIntent.AvailableScenesChanged(sceneIds.toSet()),
+            intent = ComposiumHostScreenIntent.AvailableScenesChanged(scenes.map { it.id }.toSet()),
         )
     }
 
-    LaunchedEffect(thumbnailKeys) {
+    LaunchedEffect(thumbnailQueue) {
         thumbnailStore.retain(thumbnailKeySet)
-        thumbnailQueue.retain(thumbnailKeySet)
-        thumbnailRetryTracker.retain(thumbnailKeySet)
-        if (currentCaptureKey != null && currentCaptureKey !in thumbnailKeySet) {
-            currentCaptureKey = null
-        }
         thumbnailKeys.forEach { key ->
             if (thumbnailStore.needsCapture(key)) {
                 thumbnailStore.putPending(key)
@@ -162,7 +150,7 @@ internal fun ComposiumHostScreen(
         }
     }
 
-    LaunchedEffect(visibleSceneIds, thumbnailKeys) {
+    LaunchedEffect(visibleSceneIds, thumbnailQueue) {
         val visibleSet = visibleSceneIds.toSet()
         val visibleKeys = thumbnailKeys.filter { key ->
             key.sceneId in visibleSet
@@ -172,51 +160,6 @@ internal fun ComposiumHostScreen(
         val missingKeys = visibleKeys.filter(thumbnailStore::needsCapture)
         missingKeys.forEach(thumbnailStore::putPending)
         thumbnailQueue.prioritize(missingKeys)
-    }
-
-    LaunchedEffect(shouldPauseThumbnailCapture, currentCaptureKey) {
-        val captureKey = currentCaptureKey
-        if (shouldPauseThumbnailCapture && captureKey != null) {
-            thumbnailStore.putPending(captureKey)
-            thumbnailQueue.prioritize(listOf(captureKey))
-            currentCaptureKey = null
-        }
-    }
-
-    LaunchedEffect(thumbnailKeys, shouldPauseThumbnailCapture, currentCaptureKey) {
-        if (shouldPauseThumbnailCapture || currentCaptureKey != null) return@LaunchedEffect
-        var nextKey = thumbnailQueue.awaitNext()
-        while (!thumbnailStore.needsCapture(nextKey)) {
-            nextKey = thumbnailQueue.awaitNext()
-        }
-        thumbnailStore.putCapturing(nextKey)
-        currentCaptureKey = nextKey
-    }
-
-    // Keep the key and entry from the same composition, even if an earlier effect starts work.
-    val captureEntryKey = currentCaptureKey
-    LaunchedEffect(captureEntryKey, currentCaptureEntry, thumbnailKeySet) {
-        val captureKey = captureEntryKey ?: return@LaunchedEffect
-        if (currentCaptureEntry == null) {
-            when (
-                resolveSceneThumbnailUnavailableDecision(
-                    key = captureKey,
-                    currentKeys = thumbnailKeySet,
-                )
-            ) {
-                SceneThumbnailUnavailableDecision.Retry -> {
-                    thumbnailStore.putPending(captureKey)
-                    thumbnailQueue.sync(listOf(captureKey))
-                }
-
-                SceneThumbnailUnavailableDecision.Drop -> {
-                    thumbnailStore.remove(captureKey)
-                    thumbnailQueue.remove(captureKey)
-                    thumbnailRetryTracker.clear(captureKey)
-                }
-            }
-            currentCaptureKey = null
-        }
     }
 
     SideEffect {
@@ -247,52 +190,54 @@ internal fun ComposiumHostScreen(
             .fillMaxSize()
             .background(Tokens.colors.background),
     ) {
-        SceneThumbnailCaptureHost(
-            request = currentCaptureRequest,
-            onCaptured = { key, result ->
-                thumbnailRetryTracker.clear(key)
-                thumbnailStore.putReady(
-                    key = key,
-                    image = result.image,
-                    byteSizeBytes = result.byteSizeBytes,
-                    captureScale = result.captureScale,
-                )
-                if (currentCaptureKey == key) {
-                    currentCaptureKey = null
-                }
-            },
-            onFailed = { key, failure ->
-                val decision = thumbnailRetryTracker.recordFailure(key)
-                val attemptNumber = thumbnailRetryTracker.failureCountFor(key)
-                val sceneEntry = scenesById[key.sceneId]
-                Log.w(
-                    SceneThumbnailLogTag,
-                    buildSceneThumbnailFailureLogMessage(
+        if (!blocksMainScreenInput && thumbnailKeys.isNotEmpty()) {
+            SceneThumbnailCaptureHost(
+                queue = thumbnailQueue,
+                requestFor = { key ->
+                    if (key in thumbnailKeySet && thumbnailStore.needsCapture(key)) {
+                        scenesById[key.sceneId]?.let { SceneThumbnailCaptureRequest(key, it) }
+                    } else null
+                },
+                isPaused = { isMainListScrollInProgress || isPointerDown },
+                onCaptured = { key, result ->
+                    thumbnailRetryTracker.clear(key)
+                    thumbnailStore.putReady(
                         key = key,
-                        sceneName = sceneEntry?.scene?.name,
-                        sceneGroup = sceneEntry?.scene?.group,
-                        reason = failure.reason,
-                        attemptNumber = attemptNumber,
-                        maxAttemptCount = thumbnailRetryTracker.maxAttemptCount,
-                        decision = decision,
-                    ),
-                    failure.throwable,
-                )
-                when (decision) {
-                    SceneThumbnailFailureDecision.Retry -> {
-                        thumbnailStore.putPending(key)
-                        thumbnailQueue.prioritize(listOf(key))
-                    }
+                        image = result.image,
+                        byteSizeBytes = result.byteSizeBytes,
+                        captureScale = result.captureScale,
+                    )
+                },
+                onFailed = { key, failure ->
+                    val decision = thumbnailRetryTracker.recordFailure(key)
+                    val attemptNumber = thumbnailRetryTracker.failureCountFor(key)
+                    val sceneEntry = scenesById[key.sceneId]
+                    Log.w(
+                        SceneThumbnailLogTag,
+                        buildSceneThumbnailFailureLogMessage(
+                            key = key,
+                            sceneName = sceneEntry?.scene?.name,
+                            sceneGroup = sceneEntry?.scene?.group,
+                            reason = failure.reason,
+                            attemptNumber = attemptNumber,
+                            maxAttemptCount = thumbnailRetryTracker.maxAttemptCount,
+                            decision = decision,
+                        ),
+                        failure.throwable,
+                    )
+                    when (decision) {
+                        SceneThumbnailFailureDecision.Retry -> {
+                            thumbnailStore.putPending(key)
+                            thumbnailQueue.prioritize(listOf(key))
+                        }
 
-                    SceneThumbnailFailureDecision.Fail -> {
-                        thumbnailStore.putFailed(key, failure.reason)
+                        SceneThumbnailFailureDecision.Fail -> {
+                            thumbnailStore.putFailed(key, failure.reason)
+                        }
                     }
-                }
-                if (currentCaptureKey == key) {
-                    currentCaptureKey = null
-                }
-            },
-        )
+                },
+            )
+        }
 
         saveableStateHolder.SaveableStateProvider("route_main") {
             MainScreen(
@@ -300,6 +245,19 @@ internal fun ComposiumHostScreen(
                 onSceneSelected = ::openScene,
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(Tokens.colors.surface)
+                    .pointerInput(Unit) {
+                        try {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    isPointerDown = event.changes.any { it.pressed }
+                                }
+                            }
+                        } finally {
+                            isPointerDown = false
+                        }
+                    }
                     .windowInsetsPadding(mainScreenInsets),
                 contentWindowInsets = contentWindowInsets,
                 thumbnailStates = thumbnailStatesBySceneId,
@@ -334,8 +292,7 @@ internal fun ComposiumHostScreen(
                         animationSpec = tween(240),
                     ),
                 modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(sceneOverlayInsets),
+                    .fillMaxSize(),
                 label = "scene_overlay",
             ) {
                 saveableStateHolder.SaveableStateProvider(
@@ -344,6 +301,7 @@ internal fun ComposiumHostScreen(
                     key(renderedSceneId) {
                         SceneScreen(
                             sceneEntry = renderedSceneEntry,
+                            isActive = state.isSceneVisible,
                             onBack = {
                                 // An outgoing scene may still exist during its exit animation.
                                 if (state.selectedSceneId == renderedSceneEntry.id) closeScene()

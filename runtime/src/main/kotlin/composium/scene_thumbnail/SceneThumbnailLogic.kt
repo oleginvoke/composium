@@ -30,7 +30,6 @@ internal data class SceneThumbnailKey(
 
 internal sealed interface SceneThumbnailState {
     data object Pending : SceneThumbnailState
-    data object Capturing : SceneThumbnailState
 
     data class Ready(
         val image: ImageBitmap,
@@ -46,12 +45,6 @@ internal sealed interface SceneThumbnailState {
 internal data class SceneThumbnailCaptureFailure(
     val reason: String,
     val throwable: Throwable,
-)
-
-internal data class SceneThumbnailCaptureSurfaceState(
-    val key: SceneThumbnailKey? = null,
-    val widthPx: Int = 0,
-    val heightPx: Int = 0,
 )
 
 internal data class SceneThumbnailContentBounds(
@@ -88,11 +81,6 @@ internal data class SceneThumbnailCardLayout(
 internal enum class SceneThumbnailFailureDecision {
     Retry,
     Fail,
-}
-
-internal enum class SceneThumbnailUnavailableDecision {
-    Retry,
-    Drop,
 }
 
 internal class SceneThumbnailFailureRetryTracker(
@@ -161,24 +149,6 @@ internal fun buildSceneThumbnailFailureLogMessage(
         append(", target=").append(key.targetWidthPx).append('x').append(key.targetHeightPx)
         append(", reason=").append(reason)
     }
-
-internal fun resolveSceneThumbnailUnavailableDecision(
-    key: SceneThumbnailKey,
-    currentKeys: Set<SceneThumbnailKey>,
-): SceneThumbnailUnavailableDecision =
-    if (key in currentKeys) {
-        SceneThumbnailUnavailableDecision.Retry
-    } else {
-        SceneThumbnailUnavailableDecision.Drop
-    }
-
-internal fun canCaptureSceneThumbnail(
-    key: SceneThumbnailKey,
-    captureSurfaceState: SceneThumbnailCaptureSurfaceState,
-): Boolean =
-    captureSurfaceState.key == key &&
-        captureSurfaceState.widthPx > 0 &&
-        captureSurfaceState.heightPx > 0
 
 internal fun findSceneThumbnailContentBounds(
     pixels: IntArray,
@@ -300,12 +270,10 @@ internal class SceneThumbnailQueue {
     private val pendingKeys = ArrayDeque<SceneThumbnailKey>()
     private val pendingSet = linkedSetOf<SceneThumbnailKey>()
     private val workAvailable = Channel<Unit>(Channel.CONFLATED)
+    val hasWork: Boolean get() = pendingKeys.isNotEmpty()
 
-    suspend fun awaitNext(): SceneThumbnailKey {
-        while (true) {
-            next()?.let { return it }
-            workAvailable.receive()
-        }
+    suspend fun awaitWork() {
+        while (!hasWork) workAvailable.receive()
     }
 
     fun sync(keys: List<SceneThumbnailKey>) {
@@ -384,7 +352,6 @@ internal class SceneThumbnailStore(
         when (states[key]) {
             is SceneThumbnailState.Ready,
             is SceneThumbnailState.Failed,
-            SceneThumbnailState.Capturing,
             -> false
 
             SceneThumbnailState.Pending,
@@ -393,13 +360,9 @@ internal class SceneThumbnailStore(
         }
 
     fun putPending(key: SceneThumbnailKey) {
-        if (states[key] == null || states[key] == SceneThumbnailState.Capturing) {
+        if (states[key] == null) {
             states[key] = SceneThumbnailState.Pending
         }
-    }
-
-    fun putCapturing(key: SceneThumbnailKey) {
-        states[key] = SceneThumbnailState.Capturing
     }
 
     fun putReady(

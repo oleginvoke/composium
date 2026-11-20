@@ -174,7 +174,6 @@ internal fun sceneThumbnailPreviewPresentation(
     when (state) {
         is SceneThumbnailState.Ready -> SceneThumbnailPreviewPresentation.Ready
         is SceneThumbnailState.Failed,
-        SceneThumbnailState.Capturing,
         SceneThumbnailState.Pending,
         null,
         -> SceneThumbnailPreviewPresentation.StaticPlaceholder

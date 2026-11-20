@@ -40,10 +40,10 @@ internal fun SceneFloatingToolsOverlay(
         modifier = modifier,
         contentAlignment = AbsoluteAlignment.TopLeft,
     ) {
-        // ComposiumHostScreen already consumes the horizontal system insets around SceneScreen.
-        // Top and bottom remain unconsumed so scene content can draw edge to edge there.
         val safeInsets = SceneFloatingToolsSafeInsets(
+            left = contentWindowInsets.getLeft(density, layoutDirection),
             top = contentWindowInsets.getTop(density),
+            right = contentWindowInsets.getRight(density, layoutDirection),
             bottom = contentWindowInsets.getBottom(density),
         )
         val initialPairBounds = calculateSceneFloatingToolsPlacementBounds(

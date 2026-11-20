@@ -9,6 +9,13 @@ import org.junit.Test
 class CompatibilitySmokeTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
+    @Test fun thumbnailRunsOnAPrivateDisplay() {
+        val catalogDisplay = rule.activity.window.decorView.display.displayId
+        rule.waitUntil(timeoutMillis = 10_000) {
+            sceneDisplayId?.let { it != catalogDisplay } == true
+        }
+    }
+
     @Test fun generatedRegistryAndSceneControlsWork() {
         if (BuildConfig.USE_KSP) {
             val registry = Class.forName("oleginvoke.com.composium.generated.GeneratedSceneRegistry")

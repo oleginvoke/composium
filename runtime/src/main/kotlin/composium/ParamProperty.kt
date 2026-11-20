@@ -42,6 +42,7 @@ class ParamProperty<T> internal constructor(
     internal var intendedOptionName: String? = null
     internal var activationState: MutableState<Boolean>? = null
     internal var onValueAssigned: ((Any?) -> Unit)? = null
+    internal var onDelegateProvided: (() -> Unit)? = null
     internal val valueAssignmentState = mutableStateOf<ParamValueAssignment?>(null)
     internal var acknowledgedValueAssignment: ParamValueAssignment? = null
     internal val hasPendingValueAssignment: Boolean
@@ -70,6 +71,9 @@ class ParamProperty<T> internal constructor(
             delegatedKClass = rt.classifier as? KClass<*>
             delegatedNullable = rt.isMarkedNullable
         }
+
+        // Resolve saved choices after delegated type/name metadata and before scene code reads them.
+        onDelegateProvided?.invoke()
 
         return this
     }

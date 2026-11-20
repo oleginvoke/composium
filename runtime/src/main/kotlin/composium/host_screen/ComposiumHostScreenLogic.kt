@@ -1,11 +1,21 @@
 package oleginvoke.com.composium.host_screen
 
+import androidx.compose.runtime.saveable.listSaver
 import oleginvoke.com.composium.SceneKey
 
 internal data class ComposiumHostScreenState(
     val selectedSceneId: SceneKey? = null,
     val renderedSceneId: SceneKey? = null,
     val isSceneVisible: Boolean = false,
+)
+
+// Save the destination, not an in-flight entrance/exit animation.
+internal val ComposiumHostScreenStateSaver = listSaver<ComposiumHostScreenState, String>(
+    save = { state -> state.selectedSceneId?.let { listOf(it.group, it.name) } ?: emptyList() },
+    restore = { saved ->
+        val sceneId = saved.takeIf { it.size == 2 }?.let { SceneKey(it[0], it[1]) }
+        ComposiumHostScreenState(sceneId, sceneId, isSceneVisible = sceneId != null)
+    },
 )
 
 internal sealed interface ComposiumHostScreenIntent {
