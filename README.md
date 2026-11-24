@@ -9,11 +9,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Version: `1.3.0` (stable)
+Version: `1.3.1` (stable)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.3.0`
-- `io.github.oleginvoke:composium-processor:1.3.0`
+- `io.github.oleginvoke:composium:1.3.1`
+- `io.github.oleginvoke:composium-processor:1.3.1`
 
 It is useful for:
 - design systems and component libraries;
@@ -81,7 +81,7 @@ The library is meant to help you explore UI, not constrain how you structure it.
 If you use KSP, choose a plugin compatible with your Kotlin and AGP versions.
 The compatibility fixture covers KSP2 `2.0.20-1.0.25` on the older toolchain and `2.3.12` on the modern toolchain.
 The repository build uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `9.1.1`, and Gradle `9.5.1`.
-These build-tool versions are not all consumer requirements. See [dependency compatibility](docs/dependency-compatibility.md) for the runtime baseline and upgrade policy.
+See [dependency compatibility](https://github.com/oleginvoke/composium/blob/v1.3.1/docs/dependency-compatibility.md) for the runtime baseline and upgrade policy.
 
 ## Runtime telemetry
 
@@ -135,8 +135,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0")
-    ksp("io.github.oleginvoke:composium-processor:1.3.0")
+    implementation("io.github.oleginvoke:composium:1.3.1")
+    ksp("io.github.oleginvoke:composium-processor:1.3.1")
 }
 ```
 
@@ -150,7 +150,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0")
+    implementation("io.github.oleginvoke:composium:1.3.1")
 }
 ```
 
