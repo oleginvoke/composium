@@ -15,13 +15,13 @@ class SceneThumbnailQueueTest {
     fun waitingConsumerStartsWhenWorkArrivesWithoutAdvancingTime() = runTest {
         val queue = SceneThumbnailQueue()
         val key = SceneThumbnailKey(SceneKey("sample", "First"), false)
-        val next = async { queue.awaitNext() }
+        val available = async { queue.awaitWork() }
         runCurrent()
-        assertFalse(next.isCompleted)
+        assertFalse(available.isCompleted)
         queue.sync(listOf(key))
         runCurrent()
-        assertTrue(next.isCompleted, "Enqueue must wake the consumer without a polling delay")
-        assertEquals(key, next.await())
+        assertTrue(available.isCompleted, "Enqueue must wake the consumer without a polling delay")
+        assertEquals(key, queue.next())
         assertEquals(0L, testScheduler.currentTime)
     }
 
@@ -32,26 +32,27 @@ class SceneThumbnailQueueTest {
         val second = SceneThumbnailKey(SceneKey("sample", "Second"), false)
         queue.sync(listOf(first))
         queue.remove(first)
-        val next = async { queue.awaitNext() }
+        val available = async { queue.awaitWork() }
         runCurrent()
-        assertFalse(next.isCompleted)
+        assertFalse(available.isCompleted)
         queue.sync(listOf(first, second))
         queue.prioritize(listOf(second))
         runCurrent()
-        assertTrue(next.isCompleted)
-        assertEquals(second, next.await())
-        assertEquals(first, queue.awaitNext())
+        assertTrue(available.isCompleted)
+        assertEquals(second, queue.next())
+        assertEquals(first, queue.next())
     }
 
     @Test
     fun cancellingAnIdleConsumerDoesNotLoseFutureWork() = runTest {
         val queue = SceneThumbnailQueue()
-        val abandoned = async { queue.awaitNext() }
+        val abandoned = async { queue.awaitWork() }
         runCurrent()
         abandoned.cancel()
         runCurrent()
         val key = SceneThumbnailKey(SceneKey("sample", "Resumed"), false)
         queue.sync(listOf(key))
-        assertEquals(key, queue.awaitNext())
+        queue.awaitWork()
+        assertEquals(key, queue.next())
     }
 }

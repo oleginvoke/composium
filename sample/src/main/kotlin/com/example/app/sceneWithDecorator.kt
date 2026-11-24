@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +52,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -117,9 +120,13 @@ internal fun sceneWithDecorator(
             SamplePreviewTheme(
                 previewTheme = previewTheme,
             ) {
+                val layoutDirection = LocalLayoutDirection.current
                 Column(
                     modifier = Modifier
-                        .padding(horizontal = 16.dp)
+                        .padding(
+                            start = contentPadding.calculateStartPadding(layoutDirection) + 16.dp,
+                            end = contentPadding.calculateEndPadding(layoutDirection) + 16.dp,
+                        )
                         .fillMaxWidth()
                         .then(
                             if (scrollable) {

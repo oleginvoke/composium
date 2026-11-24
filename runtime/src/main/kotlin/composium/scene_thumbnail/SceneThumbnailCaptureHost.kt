@@ -1,230 +1,181 @@
 package oleginvoke.com.composium.scene_thumbnail
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.view.View
-import android.view.ViewGroup
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCompositionContext
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.round
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import oleginvoke.com.composium.SceneEntry
-import oleginvoke.com.composium.SceneScope
-import oleginvoke.com.composium.SceneToolStateBinding
-import oleginvoke.com.composium.ui.theme.ComposiumTheme
-import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
+import oleginvoke.com.composium.telemetry.ThumbnailRun
 
 internal data class SceneThumbnailCaptureRequest(
     val key: SceneThumbnailKey,
     val sceneEntry: SceneEntry,
 )
 
-internal data class SceneThumbnailCaptureResult(
-    val image: ImageBitmap,
-    val byteSizeBytes: Int,
-    val captureScale: Float,
-)
-
 @Composable
 internal fun SceneThumbnailCaptureHost(
-    request: SceneThumbnailCaptureRequest?,
+    queue: SceneThumbnailQueue,
+    requestFor: (SceneThumbnailKey) -> SceneThumbnailCaptureRequest?,
+    isPaused: () -> Boolean,
     onCaptured: (SceneThumbnailKey, SceneThumbnailCaptureResult) -> Unit,
     onFailed: (SceneThumbnailKey, SceneThumbnailCaptureFailure) -> Unit,
-    modifier: Modifier = Modifier,
+    startRun: () -> ThumbnailRun? = { null },
+    hasVisibleReady: () -> Boolean = { false },
 ) {
-    val captureRequest = request ?: return
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val themeController = LocalComposiumThemeController.current
-    val sceneScope = remember(captureRequest.key) {
-        val isDarkTheme = captureRequest.key.isDarkTheme
-        SceneScope().apply {
-            // Read the capture's theme without letting thumbnail effects control the host.
-            host.theme.binding = SceneToolStateBinding(
-                read = { isDarkTheme },
-                change = {},
-            )
-        }
-    }
-    val installedContent = remember { SceneThumbnailInstalledContent() }
-    var captureView by remember(captureRequest.key) { mutableStateOf<ComposeView?>(null) }
-    var captureSurfaceState by remember(captureRequest.key) {
-        mutableStateOf(SceneThumbnailCaptureSurfaceState())
-    }
+    val view = LocalView.current
+    val parent = rememberCompositionContext()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var origin by remember(view) { mutableStateOf<IntOffset?>(null) }
+    Spacer(Modifier.onGloballyPositioned { origin = it.positionInWindow().round() })
+    if (origin == null) return
 
-    LaunchedEffect(captureRequest.key, captureView, captureSurfaceState) {
-        val view = captureView ?: return@LaunchedEffect
-        if (!canCaptureSceneThumbnail(captureRequest.key, captureSurfaceState)) {
-            return@LaunchedEffect
-        }
-
-        val result = runCatching {
-            withFrameNanos { }
-            withFrameNanos { }
-            val rawBitmap = view.drawToBitmap()
-            rawBitmap.toSceneThumbnailCaptureResult(
-                maxWidthPx = captureRequest.key.targetWidthPx,
-                maxHeightPx = captureRequest.key.targetHeightPx,
-                captureScale = captureRequest.key.captureScale,
-            )
-        }
-
-        result
-            .onSuccess { captureResult ->
-                onCaptured(captureRequest.key, captureResult)
-            }
-            .onFailure { throwable ->
-                if (throwable is CancellationException) throw throwable
-                onFailed(
-                    captureRequest.key,
-                    throwable.toSceneThumbnailCaptureFailure(),
-                )
-            }
-    }
-
-    val width = with(density) { captureRequest.key.viewportWidthPx.toDp() }
-    val height = with(density) { captureRequest.key.viewportHeightPx.toDp() }
-
-    AndroidView(
-        factory = {
-            ComposeView(context).apply {
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                isClickable = false
-                isFocusable = false
-                // isFocusable only covers this wrapper, not its AndroidComposeView child.
-                // A thumbnail's FocusRequester must not steal focus from catalog search.
-                descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            }
-        },
-        update = { view ->
-            captureView = view
-            if (installedContent.key != captureRequest.key) {
-                installedContent.key = captureRequest.key
-                view.setContent {
-                    ComposiumTheme(darkTheme = captureRequest.key.isDarkTheme) {
-                        CompositionLocalProvider(
-                            LocalComposiumThemeController provides themeController,
-                        ) {
-                            SceneThumbnailRenderSurface(
-                                sceneEntry = captureRequest.sceneEntry,
-                                sceneScope = sceneScope,
-                                captureScale = captureRequest.key.captureScale,
-                            )
+    val insets by rememberUpdatedState(thumbnailInsets(view) { checkNotNull(origin) })
+    val currentRequestFor by rememberUpdatedState(requestFor)
+    val paused by rememberUpdatedState(isPaused)
+    val captured by rememberUpdatedState(onCaptured)
+    val failed by rememberUpdatedState(onFailed)
+    val newRun by rememberUpdatedState(startRun)
+    val visibleReady by rememberUpdatedState(hasVisibleReady)
+    LaunchedEffect(queue, parent, lifecycle, view) {
+        withContext(Dispatchers.Main.immediate) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    queue.awaitWork()
+                    val run = newRun()
+                    val observer = run?.let {
+                        launch {
+                            snapshotFlow { visibleReady() }.first { ready -> ready }
+                            it.visibleReady()
+                        }
+                    }
+                    var completed = false
+                    try {
+                        snapshotFlow { !paused() }.first { it }
+                        captureBatch(
+                            queue = queue,
+                            view = view,
+                            parent = parent,
+                            insets = { insets(it) },
+                            requestFor = { currentRequestFor(it) },
+                            isPaused = { paused() },
+                            onCaptured = { key, result ->
+                                captured(key, result)
+                                run?.let { it.captured++ }
+                            },
+                            onFailed = { key, failure ->
+                                failed(key, failure)
+                                run?.let { it.failures++ }
+                            },
+                        )
+                        completed = true
+                    } finally {
+                        observer?.cancel()
+                        if (run != null) {
+                            if (visibleReady()) run.visibleReady()
+                            run.finish(completed)
                         }
                     }
                 }
             }
-        },
-        modifier = modifier
-            .size(width = width, height = height)
-            .clipToBounds()
-            .onGloballyPositioned { coordinates ->
-                val size = coordinates.size
-                val nextState = SceneThumbnailCaptureSurfaceState(
-                    key = captureRequest.key,
-                    widthPx = size.width,
-                    heightPx = size.height,
-                )
-                if (captureSurfaceState != nextState) {
-                    captureSurfaceState = nextState
+        }
+    }
+}
+
+private suspend fun captureBatch(
+    queue: SceneThumbnailQueue,
+    view: View,
+    parent: CompositionContext,
+    insets: (SceneThumbnailKey) -> WindowInsetsCompat,
+    requestFor: (SceneThumbnailKey) -> SceneThumbnailCaptureRequest?,
+    isPaused: () -> Boolean,
+    onCaptured: (SceneThumbnailKey, SceneThumbnailCaptureResult) -> Unit,
+    onFailed: (SceneThumbnailKey, SceneThumbnailCaptureFailure) -> Unit,
+) {
+    val inFlight = linkedSetOf<SceneThumbnailKey>()
+    val buffers = SceneThumbnailBuffers()
+    try {
+        coroutineScope {
+            var window: SceneThumbnailWindow? = null
+            var processing: Job? = null
+            try {
+                while (queue.hasWork) {
+                    if (isPaused()) {
+                        window?.clearContent()
+                        snapshotFlow { !isPaused() }.first { it }
+                    }
+                    val key = queue.next() ?: break
+                    if (key in inFlight) continue
+                    val request = requestFor(key) ?: continue
+                    inFlight.add(key)
+                    try {
+                        if (window == null || window.width != key.viewportWidthPx || window.height != key.viewportHeightPx) {
+                            window?.close()
+                            window = null
+                            window = SceneThumbnailWindow.open(view, parent, key.viewportWidthPx, key.viewportHeightPx) {
+                                insets(key)
+                            }
+                        }
+                        // The previous worker owns the other slot. Join before handing it this frame.
+                        val frame = buffers.nextFrame(window.width, window.height)
+                        window.draw(request, frame)
+                        processing?.join()
+                        processing = launch {
+                            val result = try {
+                                buffers.process(frame, key)
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (failure: Exception) {
+                                inFlight.remove(key)
+                                onFailed(key, failure.toSceneThumbnailCaptureFailure())
+                                return@launch
+                            }
+                            snapshotFlow { !isPaused() }.first { it }
+                            inFlight.remove(key)
+                            onCaptured(key, result)
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        // A failed draw may have taken the spare slot. Finish its sibling before reuse.
+                        processing?.join()
+                        window?.close()
+                        window = null
+                        inFlight.remove(key)
+                        onFailed(key, failure.toSceneThumbnailCaptureFailure())
+                    }
                 }
-            },
-    )
-}
-
-private class SceneThumbnailInstalledContent {
-    var key: SceneThumbnailKey? = null
-}
-
-private fun ComposeView.drawToBitmap(): Bitmap {
-    check(width > 0 && height > 0) {
-        "Capture view is not measured"
-    }
-    val bitmap = createBitmap(width, height)
-    draw(Canvas(bitmap))
-    return bitmap
-}
-
-private fun Bitmap.toSceneThumbnailCaptureResult(
-    maxWidthPx: Int,
-    maxHeightPx: Int,
-    captureScale: Float,
-): SceneThumbnailCaptureResult {
-    val bounds = visibleContentBounds()
-        ?: run {
-            recycle()
-            error("Scene has no visible content")
+            } finally {
+                window?.close()
+            }
         }
-    val cropped = copyBounds(bounds)
-    recycle()
-
-    val targetSize = calculateSceneThumbnailScaledSize(
-        contentWidthPx = cropped.width,
-        contentHeightPx = cropped.height,
-        maxWidthPx = maxWidthPx,
-        maxHeightPx = maxHeightPx,
-    )
-    val thumbnailBitmap = if (
-        targetSize.widthPx == cropped.width &&
-        targetSize.heightPx == cropped.height
-    ) {
-        cropped
-    } else {
-        cropped.scale(targetSize.widthPx, targetSize.heightPx).also {
-            cropped.recycle()
-        }
+    } finally {
+        // Cancellation on navigation or onStop leaves unfinished keys available on return.
+        queue.prioritize(inFlight.toList())
+        buffers.close()
     }
-    return SceneThumbnailCaptureResult(
-        image = thumbnailBitmap.asImageBitmap(),
-        byteSizeBytes = thumbnailBitmap.width * thumbnailBitmap.height * 4,
-        captureScale = captureScale,
-    )
-}
-
-private fun Bitmap.visibleContentBounds(): SceneThumbnailContentBounds? {
-    val pixels = IntArray(width * height)
-    getPixels(
-        pixels,
-        0,
-        width,
-        0,
-        0,
-        width,
-        height,
-    )
-    return findSceneThumbnailContentBounds(
-        pixels = pixels,
-        widthPx = width,
-        heightPx = height,
-    )
-}
-
-private fun Bitmap.copyBounds(bounds: SceneThumbnailContentBounds): Bitmap {
-    val cropped = createBitmap(bounds.widthPx, bounds.heightPx)
-    Canvas(cropped).drawBitmap(
-        this,
-        -bounds.leftPx.toFloat(),
-        -bounds.topPx.toFloat(),
-        null,
-    )
-    return cropped
 }

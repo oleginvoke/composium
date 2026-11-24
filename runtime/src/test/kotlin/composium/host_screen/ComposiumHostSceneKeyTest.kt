@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.ComposiumRuntime
 import oleginvoke.com.composium.Scene
+import oleginvoke.com.composium.SceneScope
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
 import org.junit.Rule
 import org.junit.Test
@@ -37,6 +38,51 @@ import org.robolectric.annotation.Config
 class ComposiumHostSceneKeyTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun openSceneAndItsSaveableContentSurviveActivityStateRestoration() {
+        ComposiumRuntime.register(counterScene("Restoration::group", "Still open"))
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent {
+            ComposiumTheme(darkTheme = false) {
+                ComposiumHostScreen(contentWindowInsets = WindowInsets(0))
+            }
+        }
+        clickCatalogItem("Restoration::group")
+        clickCatalogItem("Still open")
+        composeRule.onNodeWithTag("counter").performClick().performClick()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithTag("counter").assertTextEquals("2")
+        closeScene()
+        clickCatalogItem("Still open")
+        composeRule.onNodeWithTag("counter").assertTextEquals("2")
+    }
+
+    @Test
+    fun explicitlyReopeningSceneResetsToolsToTheirDefaults() {
+        lateinit var scope: SceneScope
+        ComposiumRuntime.register(Scene("Revisit tools", "Revisit counter", thumbnail = null) {
+            scope = this
+            Box(Modifier.size(48.dp))
+        })
+        composeRule.setContent {
+            ComposiumTheme(darkTheme = false) { ComposiumHostScreen() }
+        }
+        clickCatalogItem("Revisit tools")
+        clickCatalogItem("Revisit counter")
+        composeRule.onNodeWithContentDescription("Open properties").performClick()
+        composeRule.onNodeWithText("Environment").performClick()
+        composeRule.runOnIdle {
+            scope.preview.rtl = true
+            scope.host.closeScene()
+        }
+        composeRule.waitForIdle()
+        clickCatalogItem("Revisit counter")
+        composeRule.onNodeWithContentDescription("Open properties").assertExists()
+        composeRule.runOnIdle { org.junit.Assert.assertFalse(scope.preview.rtl) }
+    }
 
     @Test
     fun separatorScenesNavigateAndRestoreTheirOwnState() {

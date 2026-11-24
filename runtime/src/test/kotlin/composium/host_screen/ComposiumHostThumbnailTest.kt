@@ -48,13 +48,12 @@ class ComposiumHostThumbnailTest {
                 ComposiumHostScreen(contentWindowInsets = WindowInsets(0))
             }
         }
-        repeat(12) {
-            composeRule.mainClock.advanceTimeBy(200)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.waitForIdle()
+            thumbnailExecutions > 0
         }
 
         composeRule.runOnIdle {
-            assertTrue(thumbnailExecutions > 0, "Capture queue must actually run")
             assertEquals(0, disabledExecutions)
         }
         composeRule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Without thumbnail"))

@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -197,6 +199,8 @@ internal fun MainScreen(
             onListScrollInProgressChanged = onListScrollInProgressChanged,
             extraTopPaddingDp = listViewportLayout.extraTopPaddingDp,
             modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = 960.dp)
                 .fillMaxSize()
                 .padding(top = listViewportLayout.topOffsetDp.dp),
         )
@@ -205,9 +209,12 @@ internal fun MainScreen(
             isDarkTheme = themeController.isDarkTheme,
             callbacks = callbacks,
             statusBarInsets = contentWindowInsets,
-            modifier = Modifier.onSizeChanged { size ->
-                topBarHeightDp = with(density) { size.height.toDp().value }
-            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = 960.dp)
+                .onSizeChanged { size ->
+                    topBarHeightDp = with(density) { size.height.toDp().value }
+                },
         )
     }
 }
@@ -220,7 +227,7 @@ private fun MainScreenTopBar(
     statusBarInsets: WindowInsets = WindowInsets(0),
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(statusBarInsets.onlyTopAndHorizontal())
@@ -231,38 +238,56 @@ private fun MainScreenTopBar(
                 bottom = MainScreenTopBarBottomPaddingDp.dp,
             ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        if (maxWidth >= 600.dp) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 ComposiumText(
                     text = "Composium",
-                    style = TextStyle(
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 26.sp,
-                    ),
+                    style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
                     color = Tokens.colors.onSurface,
                 )
+                SearchStoriesField(
+                    value = query,
+                    onValueChange = callbacks::onQueryChange,
+                    modifier = Modifier.weight(1f),
+                )
+                ComposiumThemeToggle(isDark = isDarkTheme, onToggle = callbacks::onThemeChange)
             }
-            ComposiumThemeToggle(
-                isDark = isDarkTheme,
-                onToggle = callbacks::onThemeChange,
-            )
+        } else {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    ComposiumText(
+                        text = "Composium",
+                        style = TextStyle(
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 26.sp,
+                        ),
+                        color = Tokens.colors.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ComposiumThemeToggle(
+                        isDark = isDarkTheme,
+                        onToggle = callbacks::onThemeChange,
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                SearchStoriesField(
+                    value = query,
+                    onValueChange = callbacks::onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        SearchStoriesField(
-            value = query,
-            onValueChange = callbacks::onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 

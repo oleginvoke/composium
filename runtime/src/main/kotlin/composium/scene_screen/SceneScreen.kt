@@ -3,7 +3,6 @@ package oleginvoke.com.composium.scene_screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.DisplayMetrics
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
@@ -39,11 +38,13 @@ import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -62,6 +63,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -73,6 +75,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -89,6 +94,9 @@ import kotlinx.coroutines.launch
 import oleginvoke.com.composium.LocalScenePreviewContainer
 import oleginvoke.com.composium.SceneEntry
 import oleginvoke.com.composium.SceneScope
+import oleginvoke.com.composium.SceneSystemSettings
+import oleginvoke.com.composium.SceneSystemSettingsSaver
+import oleginvoke.com.composium.sceneScopeSaver
 import oleginvoke.com.composium.SceneTools
 import oleginvoke.com.composium.SceneToolStateBinding
 import oleginvoke.com.composium.eyedropper.ColorEyedropperHost
@@ -99,6 +107,7 @@ import oleginvoke.com.composium.ui.components.ComposiumIconButton
 import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
 import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.ComposiumThemeToggle
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
@@ -120,10 +129,19 @@ internal fun SceneScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     contentWindowInsets: WindowInsets = WindowInsets(0),
+    isActive: Boolean = true,
 ) {
     val themeController = LocalComposiumThemeController.current
-    val sceneScope = remember(sceneEntry.id) { SceneScope() }
-    val store = rememberSceneScreenStore(sceneEntry.id, (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false)
+    val telemetry = LocalCatalogTelemetry.current
+    val previewSaver = rememberActiveSceneUiSaver(SceneSystemSettingsSaver, isActive)
+    val preview = rememberSaveable(sceneEntry.id, saver = previewSaver) { SceneSystemSettings() }
+    val scopeSaver = rememberActiveSceneUiSaver(remember(preview) { sceneScopeSaver(preview) }, isActive)
+    val sceneScope = rememberSaveable(sceneEntry.id, preview, saver = scopeSaver) { SceneScope(preview) }
+    val store = rememberSceneScreenStore(
+        sceneEntry.id,
+        (sceneEntry.scene.tools as? SceneTools.Floating)?.actionsInitiallyExpanded ?: false,
+        isActive,
+    )
     val state = store.state
     val floatingToolsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
     val floatingSettingsPosition = remember(sceneEntry.id) { mutableStateOf<Offset?>(null) }
@@ -134,7 +152,7 @@ internal fun SceneScreen(
     val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
-    val callbacks = remember(store, onBack, themeController.onThemeChange) {
+    val callbacks = remember(store, onBack, themeController.onThemeChange, telemetry) {
         object : SceneScreenCallbacks {
             override fun onBack() {
                 val currentState = store.state
@@ -189,6 +207,7 @@ internal fun SceneScreen(
             }
 
             override fun onToggleEyedropper() {
+                if (!store.state.isEyedropperVisible) telemetry?.feature("eyedropper")
                 store.dispatch(SceneScreenIntent.ToggleEyedropper)
             }
 
@@ -301,7 +320,7 @@ internal fun SceneScreen(
     }
 
     Box(
-        modifier = modifier
+        modifier = modifier.dismissScaleKeyboardOnBackgroundTap()
             .onConsumedWindowInsetsChanged { consumedInsets = it }
             .fillMaxSize(),
     ) {
@@ -678,6 +697,11 @@ private fun SceneScreenContent(
     val density = LocalDensity.current
     val topInset = with(density) { contentWindowInsets.getTop(this).toDp() }
     val bottomInset = with(density) { contentWindowInsets.getBottom(this).toDp() }
+    val layoutDirection = LocalLayoutDirection.current
+    val leftInset = with(density) { contentWindowInsets.getLeft(this, layoutDirection).toDp() }
+    val rightInset = with(density) { contentWindowInsets.getRight(this, layoutDirection).toDp() }
+    val startInset = if (layoutDirection == LayoutDirection.Ltr) leftInset else rightInset
+    val endInset = if (layoutDirection == LayoutDirection.Ltr) rightInset else leftInset
     val contentTopPadding = topInset + if (sceneEntry.scene.tools == SceneTools.None) 0.dp else SceneTopBarContentHeight
 
     val previewAlpha = animateFloatAsState(
@@ -701,6 +725,11 @@ private fun SceneScreenContent(
         animationSpec = Motion.tweenStandard(),
         label = "scene_split_boundary_shift",
     )
+
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    val dismissKeyboard = { focusManager.clearFocus(); keyboardController?.hide(); Unit }
 
     // BoxWithConstraints fills the full screen (no top padding). The preview pane fills the
     // available area while the scene receives explicit content padding. Inspector positioning
@@ -730,7 +759,9 @@ private fun SceneScreenContent(
         }
         val previewHeightProvider = remember(previewHeight) { { previewHeight.value } }
         val tools = sceneEntry.scene.tools
-        val sceneContentPadding by remember(previewHeight, maxHeightPx, tools, topInset, bottomInset, density) {
+        val sceneContentPadding by remember(
+            previewHeight, maxHeightPx, tools, topInset, bottomInset, density, startInset, endInset,
+        ) {
             derivedStateOf {
                 calculateSceneContentPadding(
                     tools = tools,
@@ -738,6 +769,8 @@ private fun SceneScreenContent(
                     navigationBarInset = bottomInset,
                     topBarHeight = SceneTopBarContentHeight,
                     spaceBelowPreview = with(density) { (maxHeightPx - previewHeight.value).toDp() },
+                    startInset = startInset,
+                    endInset = endInset,
                 )
             }
         }
@@ -755,7 +788,7 @@ private fun SceneScreenContent(
                 previewHeightProvider = previewHeightProvider,
                 sceneContentPadding = sceneContentPadding,
                 onBackgroundTap = if (controlsSheet.layoutMode == SceneInspectorLayoutMode.Split) {
-                    callbacks::onPreviewPaneTapped
+                    { if (keyboardVisible) dismissKeyboard() else callbacks.onPreviewPaneTapped() }
                 } else {
                     null
                 },
@@ -775,7 +808,7 @@ private fun SceneScreenContent(
                     showSplitDivider = showSplitDivider,
                     layoutMode = controlsSheet.layoutMode,
                     onBackgroundTap = if (shouldHandleSceneInspectorBackgroundTap(controlsSheet.layoutMode)) {
-                        callbacks::onExpandControls
+                        { if (keyboardVisible) dismissKeyboard() else callbacks.onExpandControls() }
                     } else {
                         null
                     },
@@ -789,7 +822,8 @@ private fun SceneScreenContent(
                     bottomInset = bottomInset,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .padding(start = startInset, end = endInset),
                 )
             }
         }
@@ -991,6 +1025,10 @@ private fun SceneInspectorPane(
                 .padding(top = contentClipOffset),
         ) {
             AnimatedContent(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = 960.dp)
+                    .fillMaxSize(),
                 targetState = selectedTab,
                 transitionSpec = {
                     val direction = initialState.transitionDirectionTo(targetState)
@@ -1083,7 +1121,9 @@ private fun SceneInspectorPane(
             SceneInspectorTabs(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 960.dp),
             )
             if (isSplitMode) {
                 SceneInspectorArmedIndicator(
@@ -1368,19 +1408,18 @@ private fun ScenePreviewContent(
     val settings = sceneScope.preview
     val baseDensity = LocalDensity.current
 
-    val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE / 160f
-    val resolvedDensityValue = settings.displayScaleOverride?.let { stableDensity * it } ?: baseDensity.density
+    val stableDensity = systemDefaultDisplayDensity(baseDensity.density)
+    val resolvedDensityValue = settings.displayScaleOverride?.let { resolvePreviewDensity(stableDensity, it) } ?: baseDensity.density
     val resolvedFontScale = settings.fontScaleOverride ?: baseDensity.fontScale
     val layoutDirection = if (settings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     // Insets and Composium chrome were measured in host dp. Preserve their physical bounds
     // when scene content applies this padding with its overridden density and direction.
-    val paddingDensityRatio = baseDensity.density / resolvedDensityValue
     val hostLayoutDirection = LocalLayoutDirection.current
-    val previewContentPadding = PaddingValues.Absolute(
-        left = contentPadding.calculateLeftPadding(hostLayoutDirection) * paddingDensityRatio,
-        top = contentPadding.calculateTopPadding() * paddingDensityRatio,
-        right = contentPadding.calculateRightPadding(hostLayoutDirection) * paddingDensityRatio,
-        bottom = contentPadding.calculateBottomPadding() * paddingDensityRatio,
+    val previewContentPadding = rescaleSceneContentPadding(
+        padding = contentPadding,
+        layoutDirection = hostLayoutDirection,
+        hostDensity = baseDensity.density,
+        previewDensity = resolvedDensityValue,
     )
 
     CompositionLocalProvider(
@@ -1409,18 +1448,20 @@ private fun ScenePreviewContent(
 @Composable
 private fun SceneScreenSoftInputModeGuard() {
     val context = LocalContext.current
-
-    DisposableEffect(context) {
-        val window = context.findSceneScreenActivity()?.window
-        if (window == null) {
-            onDispose {}
-        } else {
-            val previousSoftInputMode = window.attributes.softInputMode
-            window.setSoftInputMode(previousSoftInputMode.withSoftInputAdjustResize())
-
-            onDispose {
-                window.setSoftInputMode(previousSoftInputMode)
-            }
+    val view = LocalView.current
+    DisposableEffect(context, view) {
+        val window = context.findSceneScreenActivity()?.window ?: return@DisposableEffect onDispose {}
+        val previousMode = window.attributes.softInputMode
+        val wasScrollContainer = view.isScrollContainer
+        // On the first layout after recreation Android can resolve an unspecified host mode
+        // again. A Compose scrollable is invisible to that choice unless its View participates.
+        view.isScrollContainer = true
+        window.setSoftInputMode(previousMode.withSoftInputAdjustResize())
+        onDispose {
+            view.isScrollContainer = wasScrollContainer
+            // setSoftInputMode(0) alone leaves the previous LayoutParams value in place.
+            window.attributes.softInputMode = previousMode
+            window.setSoftInputMode(previousMode)
         }
     }
 }

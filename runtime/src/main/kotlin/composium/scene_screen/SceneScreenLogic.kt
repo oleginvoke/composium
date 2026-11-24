@@ -1,11 +1,14 @@
 package oleginvoke.com.composium.scene_screen
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import oleginvoke.com.composium.SceneTools
@@ -362,10 +365,15 @@ internal fun reduceSceneScreen(
 
 @Stable
 internal class SceneScreenStore(
-    initialState: SceneScreenState = SceneScreenState(),
+    private val stateHolder: MutableState<SceneScreenState>,
 ) {
-    var state by mutableStateOf(initialState)
-        private set
+    constructor(initialState: SceneScreenState = SceneScreenState()) : this(mutableStateOf(initialState))
+
+    var state: SceneScreenState
+        get() = stateHolder.value
+        private set(value) {
+            stateHolder.value = value
+        }
 
     fun dispatch(intent: SceneScreenIntent) {
         val reducedState = reduceSceneScreen(
@@ -379,9 +387,54 @@ internal class SceneScreenStore(
 }
 
 @Composable
-internal fun rememberSceneScreenStore(key: Any?, actionsInitiallyExpanded: Boolean = false): SceneScreenStore {
-    return remember(key) { SceneScreenStore(SceneScreenState(isFloatingToolsMinimized = !actionsInitiallyExpanded)) }
+internal fun rememberSceneScreenStore(
+    key: Any?,
+    actionsInitiallyExpanded: Boolean = false,
+    isActive: Boolean = true,
+): SceneScreenStore {
+    val saver = rememberActiveSceneUiSaver(SceneScreenStateSaver, isActive)
+    val state = rememberSaveable(key, stateSaver = saver) {
+        mutableStateOf(SceneScreenState(isFloatingToolsMinimized = !actionsInitiallyExpanded))
+    }
+    return remember(state) { SceneScreenStore(state) }
 }
+
+// Configuration changes restore the current tools. Explicitly leaving a scene keeps the
+// existing behavior: the next visit starts with its default tools and environment.
+@Composable
+internal fun <Original, Saveable : Any> rememberActiveSceneUiSaver(
+    saver: Saver<Original, Saveable>,
+    isActive: Boolean,
+): Saver<Original, Saveable> {
+    val active = rememberUpdatedState(isActive)
+    return remember(saver) {
+        Saver(
+            save = { value -> if (active.value) with(saver) { save(value) } else null },
+            restore = saver::restore,
+        )
+    }
+}
+
+private val SceneScreenStateSaver = listSaver<SceneScreenState, Any>(
+    save = { state ->
+        listOf(
+            state.controlsSheet.layoutMode.name,
+            state.controlsSheet.selectedTab.name,
+            state.controlsSheet.splitFraction,
+            state.isFloatingToolsMinimized,
+        )
+    },
+    restore = { saved ->
+        SceneScreenState(
+            controlsSheet = ControlsSheetUiState(
+                layoutMode = SceneInspectorLayoutMode.valueOf(saved[0] as String),
+                selectedTab = SceneInspectorTab.valueOf(saved[1] as String),
+                splitFraction = saved[2] as Float,
+            ),
+            isFloatingToolsMinimized = saved[3] as Boolean,
+        )
+    },
+)
 
 private fun Float.clampDraggedSplitFraction(): Float {
     return coerceIn(

@@ -9,11 +9,11 @@ Composium is an Android Jetpack Compose library for building an in-app UI catalo
 
 One of the core ideas of the library is that it gives you a ready-to-embed `ComposiumScreen()` composable. You can place this screen anywhere in your app: in a debug-only route, a separate activity, an internal tools section, or any custom navigation graph. `ComposiumScreen()` will render the scenes that you described in your project and turn them into a browsable interactive catalog.
 
-Version: `1.3.0` (stable)
+Version: `1.3.1` (stable)
 
 Artifacts:
-- `io.github.oleginvoke:composium:1.3.0`
-- `io.github.oleginvoke:composium-processor:1.3.0`
+- `io.github.oleginvoke:composium:1.3.1`
+- `io.github.oleginvoke:composium-processor:1.3.1`
 
 It is useful for:
 - design systems and component libraries;
@@ -71,18 +71,52 @@ The library is meant to help you explore UI, not constrain how you structure it.
 
 ## Requirements
 
-- Android `minSdk 24`
-- Consumer project `compileSdk 36`
+- Android `minSdk 21`
+- Consumer project `compileSdk 34` or newer
 - JVM target `11`
-- Kotlin `2.3.21` or newer
+- Kotlin `2.0.20` or newer
+- Tested older build tools: AGP `8.5.2`, Gradle `8.7`, JDK `17`
 - `mavenCentral()` and `google()` in your consumer project
 
-If you use KSP, choose a KSP2 plugin version compatible with your Kotlin and AGP versions.
-The baseline configuration uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `8.10.1`, and Gradle `8.11.1`.
+If you use KSP, choose a plugin compatible with your Kotlin and AGP versions.
+The compatibility fixture covers KSP2 `2.0.20-1.0.25` on the older toolchain and `2.3.12` on the modern toolchain.
+The repository build uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `9.1.1`, and Gradle `9.5.1`.
+See [dependency compatibility](https://github.com/oleginvoke/composium/blob/v1.3.1/docs/dependency-compatibility.md) for the runtime baseline and upgrade policy.
+
+## Runtime telemetry
+
+Opening the catalog sends usage events to the Composium maintainer's Scarf collection by default.
+To disable collection for the entire app, add this entry inside the existing `<application>`
+element in `app/src/main/AndroidManifest.xml` and rebuild. To disable collection for one build
+variant, add the entry to that variant's manifest instead.
+
+```xml
+<meta-data
+    android:name="composium.telemetry.enabled"
+    android:value="false" />
+```
+
+If your app used the previous `composium_telemetry_enabled` resource, move the opt-out
+to the manifest when updating. The manifest setting takes effect before the first catalog event.
+
+The runtime sends `catalog_opened` once per catalog visit and `feature_used` on the first
+use of each tool in that visit (opening a scene, editing a parameter, changing the theme,
+RTL, font or display scale, and the eyedropper). Rotation retains those counters.
+`thumbnail_run` records catalog size, cached thumbnails, capture and failure counts, elapsed
+time, completion or interruption, and the time range until a visible scene has a ready
+thumbnail, when observed.
+
+Events carry UTC action time, library version, Android API level, device model when available,
+estimated emulator status, window width class, orientation, and a sample/consumer label.
+Scene names, parameter values, application IDs, and persistent user identifiers are omitted.
+[Scarf](https://docs.scarf.sh/custom-telemetry/) receives the HTTPS request and can derive
+network and company metadata. A background thread sends events from an in-memory queue of
+up to 16. When a send fails, Composium drops the event and skips sends for one minute.
+Events that arrive while the queue is full are also dropped. Delivery errors stay out of Logcat.
 
 ## Installation
 
-Set your app or host module to `compileSdk 36` before adding Composium.
+Set your app or host module to `compileSdk 34` or newer before adding Composium.
 
 Add repositories:
 
@@ -101,8 +135,8 @@ plugins {
 }
 
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0")
-    ksp("io.github.oleginvoke:composium-processor:1.3.0")
+    implementation("io.github.oleginvoke:composium:1.3.1")
+    ksp("io.github.oleginvoke:composium-processor:1.3.1")
 }
 ```
 
@@ -116,7 +150,7 @@ Automatic discovery collects scenes declared in that showcase module; it does no
 
 ```kotlin
 dependencies {
-    implementation("io.github.oleginvoke:composium:1.3.0")
+    implementation("io.github.oleginvoke:composium:1.3.1")
 }
 ```
 
@@ -449,7 +483,7 @@ Invoke either action from an event handler or effect, not directly during compos
 
 ### Scene thumbnails
 
-The main catalog screen automatically creates thumbnails for scenes. By default, Composium renders each scene on a hidden capture surface, stores the resulting image in memory, and shows that image in the scene card thumbnail area.
+The catalog renders thumbnails on the device and keeps the finished images in memory. It reuses one ComposeView in a non-focusable window on a private virtual display, so an autofocus request in a thumbnail leaves the catalog search field and keyboard alone. Cropping and scaling run in the background while the next scene renders. During touch and scrolling, the catalog pauses new captures and image updates, then prioritizes the visible cards. The display is released when the queue drains or the catalog leaves the foreground.
 
 This keeps the catalog visual without requiring extra setup for every scene:
 
@@ -556,6 +590,14 @@ internal val buttonPlayground by scene(group = "Buttons") { contentPadding ->
 ```
 
 `param(...)` delegates can be declared as `var`. This lets the scene update a parameter from its own code while Composium still exposes the same value in the settings panel.
+
+The open scene and its configured `param(...)` values survive configuration changes such as rotation.
+Nullable parameters keep both their null state and their last non-null selection. Named choices are
+restored from the current options, so theme-dependent objects use their current values. Keep parameter
+and option names stable across configurations. Values assigned outside the options can be restored
+when Android's saved-state registry supports their type. Explicitly leaving and reopening a scene
+starts its parameters with their defaults. State you create separately inside a scene follows the
+usual Compose rules; use `rememberSaveable` for that state when it should survive recreation.
 
 ### Parameter names must be unique
 

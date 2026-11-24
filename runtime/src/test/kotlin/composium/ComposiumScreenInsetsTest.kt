@@ -1,8 +1,10 @@
 package oleginvoke.com.composium
 
+import android.app.Activity
 import android.graphics.Rect
 import android.os.Build
 import android.view.View
+import android.view.WindowManager.LayoutParams
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,7 +30,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -77,11 +78,10 @@ class ComposiumScreenInsetsTest {
         }
         render()
         val list = composeRule.onNode(hasScrollToIndexAction())
-        // One metadata row precedes the flat scene entries.
-        list.performScrollToIndex(ComposiumRuntime.scenes.size)
+        list.performScrollToNode(hasText(sceneName))
         val before = composeRule.onNodeWithText(sceneName, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         composeRule.runOnIdle { parentPadding.value = PaddingValues(bottom = 12.dp) }
-        list.performScrollToIndex(ComposiumRuntime.scenes.size)
+        list.performScrollToNode(hasText(sceneName))
         val after = composeRule.onNodeWithText(sceneName, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals("Consuming part of the bottom inset must not push the last card farther up", before.bottom, after.bottom, 1f)
     }
@@ -90,12 +90,18 @@ class ComposiumScreenInsetsTest {
     fun defaultInsetsProtectStandaloneCatalogAndFloatingScene() {
         render(useDefault = true)
         val titleBefore = composeRule.onNodeWithText("Composium", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val topInsetBefore = systemInsets.getTop(Density(1f))
         dispatchInsets()
         val titleAfter = composeRule.onNodeWithText("Composium", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(titleBefore.top + 24f, titleAfter.top, 1f)
+        // Some Compose versions deliver the initial platform insets before the first assertion.
+        assertEquals(titleBefore.top + 24f - topInsetBefore, titleAfter.top, 1f)
         openScene()
         assertScenePadding(24, 30)
         assertFloatingAnchor(leftInset = 7, topInset = 24, rightInset = 20)
+        val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
+        val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
+        assertEquals(screen.left, scene.left, 1f)
+        assertEquals(screen.right, scene.right, 1f)
     }
 
     @Test
@@ -106,6 +112,41 @@ class ComposiumScreenInsetsTest {
         openScene()
         assertScenePadding(24, 30)
         assertFloatingAnchor(leftInset = 40, topInset = 24, rightInset = 20)
+    }
+
+    @Test
+    @Config(sdk = [35], qualifiers = "land")
+    fun landscapeUsesTheWiderCameraInsetForSceneContentAndTopBar() {
+        render(useDefault = true, tools = SceneTools.TopBar)
+        dispatchInsets(cutoutLeft = 40)
+        openScene()
+        assertEquals(40.dp, checkNotNull(scenePadding).calculateLeftPadding(LayoutDirection.Ltr))
+        assertEquals(20.dp, checkNotNull(scenePadding).calculateRightPadding(LayoutDirection.Ltr))
+        val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
+        val back = composeRule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
+        assertEquals(screen.left + 40f + 12f, back.left, 1f)
+    }
+
+    @Test
+    fun sceneRegistersItsComposeViewForImeResizeAndRestoresTheHostOnExit() {
+        render(tools = SceneTools.TopBar)
+        val window = (ownerView.context as Activity).window
+        val initialMode = window.attributes.softInputMode
+        val wasScrollContainer = ownerView.isScrollContainer
+        openScene()
+        composeRule.runOnIdle {
+            assertEquals(true, ownerView.isScrollContainer)
+            assertEquals(
+                LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+                window.attributes.softInputMode and LayoutParams.SOFT_INPUT_MASK_ADJUST,
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.onNodeWithTag("scene").assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(wasScrollContainer, ownerView.isScrollContainer)
+            assertEquals(initialMode, window.attributes.softInputMode)
+        }
     }
 
     @Test
@@ -175,8 +216,10 @@ class ComposiumScreenInsetsTest {
         assertFloatingAnchor(leftInset = 7, topInset = 24, rightInset = 20, direction = LayoutDirection.Rtl)
         val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
         val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
-        assertEquals(screen.left + 7f, scene.left, 1f)
-        assertEquals(screen.right - 20f, scene.right, 1f)
+        assertEquals(screen.left + 3f, scene.left, 1f)
+        assertEquals(screen.right - 8f, scene.right, 1f)
+        assertEquals(4.dp, checkNotNull(scenePadding).calculateLeftPadding(LayoutDirection.Ltr))
+        assertEquals(12.dp, checkNotNull(scenePadding).calculateRightPadding(LayoutDirection.Ltr))
     }
 
     @Test
@@ -225,7 +268,11 @@ class ComposiumScreenInsetsTest {
         assertEquals(expectedLeft, settings.left, 1f)
         assertEquals(screen.top + topInset + 12f, settings.top, 1f)
         val scene = composeRule.onNodeWithTag("scene").fetchSemanticsNode().boundsInRoot
-        assertEquals(screen.left + leftInset, scene.left, 1f)
+        // The background reaches the window edge; scene content owns the remaining safe padding.
+        assertEquals(screen.left + leftInset,
+            scene.left + checkNotNull(scenePadding).calculateLeftPadding(LayoutDirection.Ltr).value, 1f)
+        assertEquals(screen.right - rightInset,
+            scene.right - checkNotNull(scenePadding).calculateRightPadding(LayoutDirection.Ltr).value, 1f)
     }
 
     private fun openScene() {

@@ -48,7 +48,7 @@ class SceneThumbnailThemeTest {
             CompositionLocalProvider(
                 LocalComposiumThemeController provides ComposiumThemeController(dark),
             ) {
-                SceneThumbnailCaptureHost(
+                CaptureTestThumbnail(
                     request = captureRequest,
                     onCaptured = { key, result ->
                         val pixels = result.image.toPixelMap()
@@ -59,20 +59,26 @@ class SceneThumbnailThemeTest {
                 )
             }
         }
-        advanceCaptureFrames()
+        fun awaitCapture(darkTheme: Boolean) {
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.waitForIdle()
+                darkTheme in captures
+            }
+        }
+        awaitCapture(false)
         composeRule.runOnIdle {
             assertEquals(Color.Red, captures[false])
             dark = true
             captureRequest = request(entry, dark = true)
         }
-        advanceCaptureFrames()
+        awaitCapture(true)
         composeRule.runOnIdle {
             assertEquals(Color.Blue, captures[true])
             captures.remove(false)
             dark = false
             captureRequest = request(entry, dark = false)
         }
-        advanceCaptureFrames()
+        awaitCapture(false)
         composeRule.runOnIdle { assertEquals(Color.Red, captures[false]) }
     }
 
@@ -96,14 +102,17 @@ class SceneThumbnailThemeTest {
             CompositionLocalProvider(
                 LocalComposiumThemeController provides ComposiumThemeController(false) { themeRequests++ },
             ) {
-                SceneThumbnailCaptureHost(
+                CaptureTestThumbnail(
                     request = request(entry, dark = true),
                     onCaptured = { _, _ -> captured = true },
                     onFailed = { _, failure -> throw AssertionError(failure.reason, failure.throwable) },
                 )
             }
         }
-        composeRule.waitUntil(timeoutMillis = 5_000) { captured }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.waitForIdle()
+            captured
+        }
         composeRule.runOnIdle {
             assertTrue(scope.host.theme.isDark)
             scope.host.theme.setDark(false)
@@ -128,11 +137,4 @@ class SceneThumbnailThemeTest {
         ),
         sceneEntry = entry,
     )
-
-    private fun advanceCaptureFrames() {
-        repeat(12) {
-            composeRule.mainClock.advanceTimeBy(200)
-            composeRule.waitForIdle()
-        }
-    }
 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import kotlinx.coroutines.flow.filterNotNull
@@ -19,6 +20,7 @@ import oleginvoke.com.composium.scene_screen.SceneParamsState
 import kotlin.internal.NoInfer
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+import kotlin.jvm.javaObjectType
 
 /**
  * Scope available inside [Scene.content].
@@ -27,13 +29,16 @@ import kotlin.reflect.KType
  * Parameter names must be unique among active declarations within this scope.
  * Registering a different parameter with an occupied name throws [IllegalStateException].
  */
-class SceneScope internal constructor() {
+class SceneScope internal constructor(
+    internal val preview: SceneSystemSettings = SceneSystemSettings(),
+    restoredParameters: Map<String, SceneParamSavedState> = emptyMap(),
+) {
+    private val restoredParameters = restoredParameters.toMutableMap()
 
     /** State and commands for the Composium UI hosting this scene. */
     val host: SceneHost = SceneHost()
 
     internal val params: SnapshotStateList<ParamDescriptor> = mutableStateListOf()
-    internal val preview: SceneSystemSettings = SceneSystemSettings()
 
     private val paramBindings: MutableMap<String, ParamBinding> = hashMapOf()
     private val paramBindingOwners: MutableMap<String, ParamProperty<*>> = hashMapOf()
@@ -457,6 +462,77 @@ class SceneScope internal constructor() {
         }
     }
 
+    internal fun saveParameters(saverScope: SaverScope): Map<String, Any?> {
+        val saved = restoredParameters.mapValuesTo(mutableMapOf<String, Any?>()) { it.value.toSaveableList() }
+        paramBindings.forEach { (name, binding) ->
+            val owner = paramBindingOwners[name]
+            val pending = owner?.valueAssignmentState?.value?.takeIf { owner.hasPendingValueAssignment }
+            val value = binding.state.value
+            val lastValue = pending?.lastNonNullValue ?: when (binding) {
+                is BooleanParamBinding -> binding.lastNonNullState.value
+                is StringParamBinding -> binding.lastNonNullState.value
+                is ObjectParamBinding -> binding.lastNonNullState.value
+            }
+            val objectBinding = binding as? ObjectParamBinding
+            fun saveValue(value: Any?, optionName: String?): Any? = value?.takeIf { candidate ->
+                // Recreate listed objects from the current options, including theme-dependent values.
+                val listed = objectBinding?.options?.any { it.name == optionName && it.value == candidate } == true
+                !listed && saverScope.canBeSaved(candidate)
+            }
+            val selectedName = objectBinding?.resolvedSelectedName(value)
+            val lastName = if (pending?.hasNonNullAssignment == true) {
+                pending.optionName ?: objectBinding?.resolvedSelectedName(lastValue)
+            } else {
+                objectBinding?.lastNonNullSelectedNameState?.value
+            }
+            saved[name] = SceneParamSavedState(
+                typeName = binding.typeName,
+                isActive = binding.activationState?.value,
+                isNull = value == null,
+                value = saveValue(value, selectedName),
+                lastNonNullValue = saveValue(lastValue, lastName),
+                selectedName = selectedName,
+                lastNonNullName = lastName,
+                intendedName = if (pending?.hasNonNullAssignment == true) pending.optionName else owner?.intendedOptionName,
+            ).toSaveableList()
+        }
+        return saved
+    }
+
+    private fun restoreParameter(binding: ParamBinding, owner: ParamProperty<*>) {
+        val saved = restoredParameters.remove(binding.name) ?: return
+        if (saved.typeName != binding.typeName) return
+        when (binding) {
+            is BooleanParamBinding -> {
+                binding.lastNonNullState.value = saved.lastNonNullValue as? Boolean ?: binding.lastNonNullState.value
+                binding.state.value = if (saved.isNull) null else saved.value as? Boolean ?: binding.state.value
+            }
+            is StringParamBinding -> {
+                binding.lastNonNullState.value = saved.lastNonNullValue as? String ?: binding.lastNonNullState.value
+                binding.state.value = if (saved.isNull) null else saved.value as? String ?: binding.state.value
+            }
+            is ObjectParamBinding -> {
+                val expectedClass = owner.delegatedKClass ?: owner.declaredKClass
+                fun compatible(value: Any?): Any? = value?.takeIf { expectedClass?.javaObjectType?.isInstance(it) != false }
+                val selected = binding.options.firstOrNull { it.name == saved.selectedName }
+                val fallback = binding.options.firstOrNull { it.name == binding.defaultRestoreName }
+                    ?: binding.options.firstOrNull()
+                val last = binding.options.firstOrNull { it.name == saved.lastNonNullName }
+                val value = compatible(saved.value) ?: selected?.value
+                    ?: fallback?.value ?: binding.defaultRestoreValue
+                binding.state.value = if (saved.isNull) null else value
+                binding.lastNonNullState.value = compatible(saved.lastNonNullValue) ?: last?.value
+                    ?: fallback?.value ?: binding.defaultRestoreValue
+                binding.selectedNameState.value = selected?.name ?: fallback?.name ?: saved.selectedName
+                binding.lastNonNullSelectedNameState.value = saved.lastNonNullName ?: last?.name ?: fallback?.name
+                owner.intendedOptionName = saved.intendedName ?: saved.selectedName
+                // Treat the restored choice as an existing selection when registration reconciles options.
+                owner.objectOptions = binding.options
+            }
+        }
+        binding.activationState?.value = saved.isActive == true && binding.state.value != null
+    }
+
     private fun registerBinding(binding: ParamBinding, owner: ParamProperty<*>) {
         val existingOwner = paramBindingOwners[binding.name]
         check(existingOwner == null || existingOwner === owner) {
@@ -730,44 +806,8 @@ class SceneScope internal constructor() {
         SideEffect { property.explicitName = name }
 
         val explicitOptionItems: List<ParamOption<T>>? = explicitOptionsResolution?.options
-        SideEffect {
-            val resolvedName = property.resolvedName ?: return@SideEffect
-            val signature = ParamBindingSignature(
-                name = resolvedName,
-                defaultValue = default.value as Any?,
-                defaultName = default.name,
-                options = explicitOptionItems,
-                delegatedType = property.delegatedType,
-                delegatedKClass = property.delegatedKClass,
-                delegatedNullable = property.delegatedNullable,
-                declaredKClass = property.declaredKClass,
-                declaredNullable = property.declaredNullable,
-                autoOptionsOrderIdentity = autoOptionsOrder,
-                globalAutoOptionsOrderVersion = globalAutoOptionsOrderVersion,
-            )
 
-            val previousName = property.lastRegisteredName
-            if (property.bindingSignature == signature && previousName == resolvedName) {
-                if (property.hasPendingValueAssignment) {
-                    val binding = paramBindings[resolvedName]
-                    if (binding is ObjectParamBinding) {
-                        if (state.value != null) {
-                            property.intendedOptionName = property.valueAssignmentState.value?.optionName
-                        } else if (binding.activationState != null) {
-                            reconcileNullAssignment(binding, property)
-                        }
-                    }
-                    property.acknowledgeValueAssignment()
-                    if (binding != null) {
-                        paramStateSnapshots[resolvedName] = binding.snapshot()
-                        upsertDescriptor(binding.toDescriptor())
-                    }
-                } else {
-                    refreshDescriptorIfStateChanged(resolvedName)
-                }
-                return@SideEffect
-            }
-
+        fun createBinding(resolvedName: String): ParamBinding {
             val optionItems: List<ParamOption<T>>? = explicitOptionItems
             val resolvedTypeKClass =
                 (property.delegatedType?.classifier as? KClass<*>) ?: property.delegatedKClass ?: property.declaredKClass
@@ -881,7 +921,7 @@ class SceneScope internal constructor() {
             fun resolvedTypeName(baseName: String): String =
                 if (resolvedNullableType) "$baseName?" else baseName
 
-            val binding: ParamBinding = when {
+            return when {
                 optionValues == null && isBooleanType -> {
                     val defaultBoolean = (default.value as? Boolean) ?: false
                     @Suppress("UNCHECKED_CAST")
@@ -993,6 +1033,55 @@ class SceneScope internal constructor() {
                     )
                 }
             }
+        }
+
+        property.onDelegateProvided = {
+            property.resolvedName?.takeIf { it in restoredParameters }?.let { resolvedName ->
+                restoreParameter(createBinding(resolvedName), property)
+            }
+        }
+        // Explicitly named parameters can also be used without Kotlin delegation.
+        if (name != null) property.onDelegateProvided?.invoke()
+
+        SideEffect {
+            val resolvedName = property.resolvedName ?: return@SideEffect
+            val signature = ParamBindingSignature(
+                name = resolvedName,
+                defaultValue = default.value as Any?,
+                defaultName = default.name,
+                options = explicitOptionItems,
+                delegatedType = property.delegatedType,
+                delegatedKClass = property.delegatedKClass,
+                delegatedNullable = property.delegatedNullable,
+                declaredKClass = property.declaredKClass,
+                declaredNullable = property.declaredNullable,
+                autoOptionsOrderIdentity = autoOptionsOrder,
+                globalAutoOptionsOrderVersion = globalAutoOptionsOrderVersion,
+            )
+
+            val previousName = property.lastRegisteredName
+            if (property.bindingSignature == signature && previousName == resolvedName) {
+                if (property.hasPendingValueAssignment) {
+                    val binding = paramBindings[resolvedName]
+                    if (binding is ObjectParamBinding) {
+                        if (state.value != null) {
+                            property.intendedOptionName = property.valueAssignmentState.value?.optionName
+                        } else if (binding.activationState != null) {
+                            reconcileNullAssignment(binding, property)
+                        }
+                    }
+                    property.acknowledgeValueAssignment()
+                    if (binding != null) {
+                        paramStateSnapshots[resolvedName] = binding.snapshot()
+                        upsertDescriptor(binding.toDescriptor())
+                    }
+                } else {
+                    refreshDescriptorIfStateChanged(resolvedName)
+                }
+                return@SideEffect
+            }
+
+            val binding = createBinding(resolvedName)
 
             registerBinding(binding, property)
             property.bindingSignature = signature

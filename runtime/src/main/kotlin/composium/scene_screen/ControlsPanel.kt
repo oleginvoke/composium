@@ -12,7 +12,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,12 +37,14 @@ import oleginvoke.com.composium.BooleanParamDescriptor
 import oleginvoke.com.composium.ObjectParamDescriptor
 import oleginvoke.com.composium.ParamDescriptor
 import oleginvoke.com.composium.StringParamDescriptor
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
 import oleginvoke.com.composium.ui.components.ComposiumCheckbox
 import oleginvoke.com.composium.ui.components.ComposiumChip
 import oleginvoke.com.composium.ui.components.ComposiumChipDefaults
 import oleginvoke.com.composium.ui.components.ComposiumSwitch
 import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.ComposiumTextField
+import oleginvoke.com.composium.ui.components.ComposiumFlowRow
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
 
@@ -87,6 +88,7 @@ private fun ParamCard(
     modifier: Modifier = Modifier,
 ) {
     val isActive = paramDescriptor.activation?.isActive != false
+    val telemetry = LocalCatalogTelemetry.current
     val shape = Tokens.shapes.large
     val shadowElevation: Dp = if (isActive) 14.dp else 8.dp
     val containerColor = if (isActive) {
@@ -130,6 +132,7 @@ private fun ParamCard(
                         checked = activation.isActive,
                         size = 20.dp,
                         onCheckedChange = { next ->
+                            telemetry?.feature("edit_parameter")
                             callbacks.onParamActivationChange(
                                 paramName = paramDescriptor.name,
                                 isActive = next,
@@ -153,6 +156,7 @@ private fun ParamCard(
                             ComposiumSwitch(
                                 checked = paramDescriptor.value,
                                 onCheckedChange = { value ->
+                                    telemetry?.feature("edit_parameter")
                                     callbacks.onBooleanParamChange(
                                         paramName = paramDescriptor.name,
                                         value = value,
@@ -166,10 +170,10 @@ private fun ParamCard(
                             val hasChoices = options.size > 1
 
                             if (hasChoices) {
-                                FlowRow(
+                                ComposiumFlowRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalSpacing = 6.dp,
+                                    verticalSpacing = 6.dp,
                                 ) {
                                     options.forEach { option ->
                                         ComposiumChip(
@@ -177,6 +181,7 @@ private fun ParamCard(
                                             text = option.name,
                                             selected = option.name == paramDescriptor.selectedOption.name,
                                             onClick = {
+                                                telemetry?.feature("edit_parameter")
                                                 callbacks.onObjectParamChange(
                                                     paramName = paramDescriptor.name,
                                                     option = option,
@@ -198,6 +203,7 @@ private fun ParamCard(
                             ComposiumTextField(
                                 value = paramDescriptor.value,
                                 onValueChange = { value ->
+                                    telemetry?.feature("edit_parameter")
                                     callbacks.onStringParamChange(
                                         paramName = paramDescriptor.name,
                                         value = value,
