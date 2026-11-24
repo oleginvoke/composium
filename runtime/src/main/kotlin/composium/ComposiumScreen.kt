@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import oleginvoke.com.composium.host_screen.ComposiumHostScreen
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
+import oleginvoke.com.composium.telemetry.rememberCatalogTelemetry
 import oleginvoke.com.composium.ui.theme.ComposiumTheme
 import oleginvoke.com.composium.ui.theme.ComposiumThemeController
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
@@ -78,11 +80,13 @@ fun ComposiumScreen(
     val internalIsDark by oleginvoke.com.composium.ui.theme.isDarkTheme
         .collectAsStateWithLifecycle()
     val effectiveIsDark = isDarkTheme ?: internalIsDark
+    val telemetry = rememberCatalogTelemetry()
 
-    val themeController = remember(effectiveIsDark, isDarkTheme, onThemeChange) {
+    val themeController = remember(effectiveIsDark, isDarkTheme, onThemeChange, telemetry) {
         ComposiumThemeController(
             isDarkTheme = effectiveIsDark,
             onThemeChange = { newValue ->
+                telemetry?.feature("theme")
                 if (isDarkTheme == null) {
                     oleginvoke.com.composium.ui.theme.isDarkTheme.value = newValue
                 }
@@ -98,6 +102,7 @@ fun ComposiumScreen(
             ComposiumAutoRegistration.registerGeneratedScenes()
         }
         CompositionLocalProvider(
+            LocalCatalogTelemetry provides telemetry,
             LocalComposiumThemeController provides themeController,
             LocalScenePreviewContainer provides scenePreviewDecorator,
         ) {

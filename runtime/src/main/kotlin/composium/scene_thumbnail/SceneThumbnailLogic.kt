@@ -348,6 +348,8 @@ internal class SceneThumbnailStore(
     fun statesBySceneId(): Map<SceneKey, SceneThumbnailState> =
         states.entries.associate { (key, state) -> key.sceneId to state }
 
+    fun isReady(key: SceneThumbnailKey): Boolean = states[key] is SceneThumbnailState.Ready
+
     fun needsCapture(key: SceneThumbnailKey): Boolean =
         when (states[key]) {
             is SceneThumbnailState.Ready,

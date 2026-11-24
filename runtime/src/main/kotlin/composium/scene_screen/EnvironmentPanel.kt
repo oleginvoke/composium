@@ -83,6 +83,7 @@ import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.TextFieldDefaults
 import oleginvoke.com.composium.ui.components.ComposiumTextField
 import oleginvoke.com.composium.ui.theme.Tokens
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
 
 @Composable
 internal fun EnvironmentPanel(
@@ -219,6 +220,7 @@ private fun EnvironmentIslandCard(
 
 @Composable
 private fun ToggleSettingRow(item: EnvironmentItem.Toggle) {
+    val telemetry = LocalCatalogTelemetry.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -231,13 +233,17 @@ private fun ToggleSettingRow(item: EnvironmentItem.Toggle) {
         )
         ComposiumSwitch(
             checked = item.checked,
-            onCheckedChange = item.onCheckedChange,
+            onCheckedChange = {
+                if (item.key == "rtl") telemetry?.feature("rtl")
+                item.onCheckedChange(it)
+            },
         )
     }
 }
 
 @Composable
 internal fun ScaleSettingCard(item: EnvironmentItem.Scale) {
+    val telemetry = LocalCatalogTelemetry.current
     val shownValue = item.selectedValue ?: item.systemValue
     var editing by rememberSaveable(item.key) { mutableStateOf(false) }
     var draft by rememberSaveable(item.key, item.selectedValue, item.systemValue) {
@@ -249,12 +255,14 @@ internal fun ScaleSettingCard(item: EnvironmentItem.Scale) {
     var editorHadFocus by remember(editing) { mutableStateOf(false) }
     val commit = {
         if (parsed != null) {
+            telemetry?.feature(item.key)
             item.onValueSelected(parsed)
             editing = false
             focusManager.clearFocus()
         }
     }
     val choose: (Float) -> Unit = { value ->
+        telemetry?.feature(item.key)
         item.onValueSelected(value)
         draft = formatScaleValue(value)
         editing = false
@@ -308,6 +316,7 @@ internal fun ScaleSettingCard(item: EnvironmentItem.Scale) {
                         Modifier.width(32.dp).height(controlHeight).testTag("${item.key}_reset")
                             .clickable(role = Role.Button, interactionSource = systemInteraction, indication = null) {
                                 item.onUseSystem()
+                                telemetry?.feature(item.key)
                                 draft = formatScaleValue(item.systemValue)
                                 editing = false
                                 focusManager.clearFocus()

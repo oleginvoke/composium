@@ -14,6 +14,7 @@ android {
 
     defaultConfig {
         minSdk = 21
+        buildConfigField("String", "COMPOSIUM_VERSION", "\"${providers.gradleProperty("VERSION_NAME").get()}\"")
         consumerProguardFiles("consumer-rules.pro")
         aarMetadata {
             minCompileSdk = 34

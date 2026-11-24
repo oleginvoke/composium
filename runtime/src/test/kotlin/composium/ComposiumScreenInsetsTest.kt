@@ -1,8 +1,10 @@
 package oleginvoke.com.composium
 
+import android.app.Activity
 import android.graphics.Rect
 import android.os.Build
 import android.view.View
+import android.view.WindowManager.LayoutParams
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -110,6 +112,41 @@ class ComposiumScreenInsetsTest {
         openScene()
         assertScenePadding(24, 30)
         assertFloatingAnchor(leftInset = 40, topInset = 24, rightInset = 20)
+    }
+
+    @Test
+    @Config(sdk = [35], qualifiers = "land")
+    fun landscapeUsesTheWiderCameraInsetForSceneContentAndTopBar() {
+        render(useDefault = true, tools = SceneTools.TopBar)
+        dispatchInsets(cutoutLeft = 40)
+        openScene()
+        assertEquals(40.dp, checkNotNull(scenePadding).calculateLeftPadding(LayoutDirection.Ltr))
+        assertEquals(20.dp, checkNotNull(scenePadding).calculateRightPadding(LayoutDirection.Ltr))
+        val screen = composeRule.onNodeWithTag("screen").fetchSemanticsNode().boundsInRoot
+        val back = composeRule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
+        assertEquals(screen.left + 40f + 12f, back.left, 1f)
+    }
+
+    @Test
+    fun sceneRegistersItsComposeViewForImeResizeAndRestoresTheHostOnExit() {
+        render(tools = SceneTools.TopBar)
+        val window = (ownerView.context as Activity).window
+        val initialMode = window.attributes.softInputMode
+        val wasScrollContainer = ownerView.isScrollContainer
+        openScene()
+        composeRule.runOnIdle {
+            assertEquals(true, ownerView.isScrollContainer)
+            assertEquals(
+                LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+                window.attributes.softInputMode and LayoutParams.SOFT_INPUT_MASK_ADJUST,
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.onNodeWithTag("scene").assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(wasScrollContainer, ownerView.isScrollContainer)
+            assertEquals(initialMode, window.attributes.softInputMode)
+        }
     }
 
     @Test

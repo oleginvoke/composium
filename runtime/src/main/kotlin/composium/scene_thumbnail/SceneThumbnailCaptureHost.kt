@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import oleginvoke.com.composium.SceneEntry
+import oleginvoke.com.composium.telemetry.ThumbnailRun
 
 internal data class SceneThumbnailCaptureRequest(
     val key: SceneThumbnailKey,
@@ -43,6 +44,8 @@ internal fun SceneThumbnailCaptureHost(
     isPaused: () -> Boolean,
     onCaptured: (SceneThumbnailKey, SceneThumbnailCaptureResult) -> Unit,
     onFailed: (SceneThumbnailKey, SceneThumbnailCaptureFailure) -> Unit,
+    startRun: () -> ThumbnailRun? = { null },
+    hasVisibleReady: () -> Boolean = { false },
 ) {
     val view = LocalView.current
     val parent = rememberCompositionContext()
@@ -56,22 +59,47 @@ internal fun SceneThumbnailCaptureHost(
     val paused by rememberUpdatedState(isPaused)
     val captured by rememberUpdatedState(onCaptured)
     val failed by rememberUpdatedState(onFailed)
+    val newRun by rememberUpdatedState(startRun)
+    val visibleReady by rememberUpdatedState(hasVisibleReady)
     LaunchedEffect(queue, parent, lifecycle, view) {
         withContext(Dispatchers.Main.immediate) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
                     queue.awaitWork()
-                    snapshotFlow { !paused() }.first { it }
-                    captureBatch(
-                        queue = queue,
-                        view = view,
-                        parent = parent,
-                        insets = { insets(it) },
-                        requestFor = { currentRequestFor(it) },
-                        isPaused = { paused() },
-                        onCaptured = { key, result -> captured(key, result) },
-                        onFailed = { key, failure -> failed(key, failure) },
-                    )
+                    val run = newRun()
+                    val observer = run?.let {
+                        launch {
+                            snapshotFlow { visibleReady() }.first { ready -> ready }
+                            it.visibleReady()
+                        }
+                    }
+                    var completed = false
+                    try {
+                        snapshotFlow { !paused() }.first { it }
+                        captureBatch(
+                            queue = queue,
+                            view = view,
+                            parent = parent,
+                            insets = { insets(it) },
+                            requestFor = { currentRequestFor(it) },
+                            isPaused = { paused() },
+                            onCaptured = { key, result ->
+                                captured(key, result)
+                                run?.let { it.captured++ }
+                            },
+                            onFailed = { key, failure ->
+                                failed(key, failure)
+                                run?.let { it.failures++ }
+                            },
+                        )
+                        completed = true
+                    } finally {
+                        observer?.cancel()
+                        if (run != null) {
+                            if (visibleReady()) run.visibleReady()
+                            run.finish(completed)
+                        }
+                    }
                 }
             }
         }

@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -106,6 +107,7 @@ import oleginvoke.com.composium.ui.components.ComposiumIconButton
 import oleginvoke.com.composium.ui.components.ComposiumPreviewCanvas
 import oleginvoke.com.composium.ui.components.ComposiumText
 import oleginvoke.com.composium.ui.components.ComposiumThemeToggle
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
 import oleginvoke.com.composium.ui.theme.Motion
 import oleginvoke.com.composium.ui.theme.Tokens
@@ -130,6 +132,7 @@ internal fun SceneScreen(
     isActive: Boolean = true,
 ) {
     val themeController = LocalComposiumThemeController.current
+    val telemetry = LocalCatalogTelemetry.current
     val previewSaver = rememberActiveSceneUiSaver(SceneSystemSettingsSaver, isActive)
     val preview = rememberSaveable(sceneEntry.id, saver = previewSaver) { SceneSystemSettings() }
     val scopeSaver = rememberActiveSceneUiSaver(remember(preview) { sceneScopeSaver(preview) }, isActive)
@@ -149,7 +152,7 @@ internal fun SceneScreen(
     val eyedropperState = rememberColorEyedropperState()
     val paramsCallbacks: SceneParamsCallbacks = sceneScope.paramsCallbacks
 
-    val callbacks = remember(store, onBack, themeController.onThemeChange) {
+    val callbacks = remember(store, onBack, themeController.onThemeChange, telemetry) {
         object : SceneScreenCallbacks {
             override fun onBack() {
                 val currentState = store.state
@@ -204,6 +207,7 @@ internal fun SceneScreen(
             }
 
             override fun onToggleEyedropper() {
+                if (!store.state.isEyedropperVisible) telemetry?.feature("eyedropper")
                 store.dispatch(SceneScreenIntent.ToggleEyedropper)
             }
 
@@ -1444,18 +1448,20 @@ private fun ScenePreviewContent(
 @Composable
 private fun SceneScreenSoftInputModeGuard() {
     val context = LocalContext.current
-
-    DisposableEffect(context) {
-        val window = context.findSceneScreenActivity()?.window
-        if (window == null) {
-            onDispose {}
-        } else {
-            val previousSoftInputMode = window.attributes.softInputMode
-            window.setSoftInputMode(previousSoftInputMode.withSoftInputAdjustResize())
-
-            onDispose {
-                window.setSoftInputMode(previousSoftInputMode)
-            }
+    val view = LocalView.current
+    DisposableEffect(context, view) {
+        val window = context.findSceneScreenActivity()?.window ?: return@DisposableEffect onDispose {}
+        val previousMode = window.attributes.softInputMode
+        val wasScrollContainer = view.isScrollContainer
+        // On the first layout after recreation Android can resolve an unspecified host mode
+        // again. A Compose scrollable is invisible to that choice unless its View participates.
+        view.isScrollContainer = true
+        window.setSoftInputMode(previousMode.withSoftInputAdjustResize())
+        onDispose {
+            view.isScrollContainer = wasScrollContainer
+            // setSoftInputMode(0) alone leaves the previous LayoutParams value in place.
+            window.attributes.softInputMode = previousMode
+            window.setSoftInputMode(previousMode)
         }
     }
 }

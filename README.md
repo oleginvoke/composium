@@ -83,6 +83,37 @@ The compatibility fixture covers KSP2 `2.0.20-1.0.25` on the older toolchain and
 The repository build uses Kotlin `2.3.21`, KSP `2.3.9`, AGP `9.1.1`, and Gradle `9.5.1`.
 These build-tool versions are not all consumer requirements. See [dependency compatibility](docs/dependency-compatibility.md) for the runtime baseline and upgrade policy.
 
+## Runtime telemetry
+
+Opening the catalog sends usage events to the Composium maintainer's Scarf collection by default.
+To disable collection for the entire app, add this entry inside the existing `<application>`
+element in `app/src/main/AndroidManifest.xml` and rebuild. To disable collection for one build
+variant, add the entry to that variant's manifest instead.
+
+```xml
+<meta-data
+    android:name="composium.telemetry.enabled"
+    android:value="false" />
+```
+
+If your app used the previous `composium_telemetry_enabled` resource, move the opt-out
+to the manifest when updating. The manifest setting takes effect before the first catalog event.
+
+The runtime sends `catalog_opened` once per catalog visit and `feature_used` on the first
+use of each tool in that visit (opening a scene, editing a parameter, changing the theme,
+RTL, font or display scale, and the eyedropper). Rotation retains those counters.
+`thumbnail_run` records catalog size, cached thumbnails, capture and failure counts, elapsed
+time, completion or interruption, and the time range until a visible scene has a ready
+thumbnail, when observed.
+
+Events carry UTC action time, library version, Android API level, device model when available,
+estimated emulator status, window width class, orientation, and a sample/consumer label.
+Scene names, parameter values, application IDs, and persistent user identifiers are omitted.
+[Scarf](https://docs.scarf.sh/custom-telemetry/) receives the HTTPS request and can derive
+network and company metadata. A background thread sends events from an in-memory queue of
+up to 16. When a send fails, Composium drops the event and skips sends for one minute.
+Events that arrive while the queue is full are also dropped. Delivery errors stay out of Logcat.
+
 ## Installation
 
 Set your app or host module to `compileSdk 34` or newer before adding Composium.

@@ -37,6 +37,7 @@ import oleginvoke.com.composium.BooleanParamDescriptor
 import oleginvoke.com.composium.ObjectParamDescriptor
 import oleginvoke.com.composium.ParamDescriptor
 import oleginvoke.com.composium.StringParamDescriptor
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
 import oleginvoke.com.composium.ui.components.ComposiumCheckbox
 import oleginvoke.com.composium.ui.components.ComposiumChip
 import oleginvoke.com.composium.ui.components.ComposiumChipDefaults
@@ -87,6 +88,7 @@ private fun ParamCard(
     modifier: Modifier = Modifier,
 ) {
     val isActive = paramDescriptor.activation?.isActive != false
+    val telemetry = LocalCatalogTelemetry.current
     val shape = Tokens.shapes.large
     val shadowElevation: Dp = if (isActive) 14.dp else 8.dp
     val containerColor = if (isActive) {
@@ -130,6 +132,7 @@ private fun ParamCard(
                         checked = activation.isActive,
                         size = 20.dp,
                         onCheckedChange = { next ->
+                            telemetry?.feature("edit_parameter")
                             callbacks.onParamActivationChange(
                                 paramName = paramDescriptor.name,
                                 isActive = next,
@@ -153,6 +156,7 @@ private fun ParamCard(
                             ComposiumSwitch(
                                 checked = paramDescriptor.value,
                                 onCheckedChange = { value ->
+                                    telemetry?.feature("edit_parameter")
                                     callbacks.onBooleanParamChange(
                                         paramName = paramDescriptor.name,
                                         value = value,
@@ -177,6 +181,7 @@ private fun ParamCard(
                                             text = option.name,
                                             selected = option.name == paramDescriptor.selectedOption.name,
                                             onClick = {
+                                                telemetry?.feature("edit_parameter")
                                                 callbacks.onObjectParamChange(
                                                     paramName = paramDescriptor.name,
                                                     option = option,
@@ -198,6 +203,7 @@ private fun ParamCard(
                             ComposiumTextField(
                                 value = paramDescriptor.value,
                                 onValueChange = { value ->
+                                    telemetry?.feature("edit_parameter")
                                     callbacks.onStringParamChange(
                                         paramName = paramDescriptor.name,
                                         value = value,

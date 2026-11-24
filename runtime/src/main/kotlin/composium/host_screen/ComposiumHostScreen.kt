@@ -59,6 +59,8 @@ import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailQueue
 import oleginvoke.com.composium.scene_thumbnail.SceneThumbnailStore
 import oleginvoke.com.composium.scene_thumbnail.buildSceneThumbnailFailureLogMessage
 import oleginvoke.com.composium.ui.theme.LocalComposiumThemeController
+import oleginvoke.com.composium.telemetry.LocalCatalogTelemetry
+import oleginvoke.com.composium.telemetry.ThumbnailRun
 import oleginvoke.com.composium.ui.theme.Tokens
 
 @Composable
@@ -67,6 +69,7 @@ internal fun ComposiumHostScreen(
     contentWindowInsets: WindowInsets = WindowInsets(0),
 ) {
     val scenes = ComposiumRuntime.scenes
+    val telemetry = LocalCatalogTelemetry.current
     val themeController = LocalComposiumThemeController.current
     val saveableStateHolder = rememberSaveableStateHolder()
     val scenesById by remember {
@@ -113,6 +116,7 @@ internal fun ComposiumHostScreen(
     fun openScene(sceneId: SceneKey) {
         // Also block accessibility activation of catalog items during the scene's exit.
         if (state.renderedSceneId != null) return
+        telemetry?.feature("open_scene")
         state = reduceComposiumHostScreen(
             state = state,
             intent = ComposiumHostScreenIntent.SceneSelected(sceneId),
@@ -193,6 +197,12 @@ internal fun ComposiumHostScreen(
         if (!blocksMainScreenInput && thumbnailKeys.isNotEmpty()) {
             SceneThumbnailCaptureHost(
                 queue = thumbnailQueue,
+                startRun = {
+                    telemetry?.let { ThumbnailRun(it, scenes.size, thumbnailKeys.count(thumbnailStore::isReady)) }
+                },
+                hasVisibleReady = {
+                    visibleSceneIds.any { thumbnailStore.isReady(SceneThumbnailKey(it, themeController.isDarkTheme)) }
+                },
                 requestFor = { key ->
                     if (key in thumbnailKeySet && thumbnailStore.needsCapture(key)) {
                         scenesById[key.sceneId]?.let { SceneThumbnailCaptureRequest(key, it) }
