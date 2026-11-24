@@ -12,6 +12,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ComposiumSample"
         tools:targetApi="36">
+        <meta-data
+            android:name="composium.telemetry.enabled"
+            android:value="false" />
+
         <activity
             android:name="com.example.app.MainActivity"
             android:exported="true"
