@@ -32,7 +32,7 @@ It is useful for:
     <img src="https://github.com/user-attachments/assets/d246e248-bda4-461a-9f2e-1dccd84633a2">
 </p>
 <p align="center">
-    <img src="assets/composium-demo.gif" alt="Opening a boarding pass in Composium, switching from Midnight to Classic, editing the fare, adjusting font size, enabling dark theme, and moving the floating tools" width="240">
+    <img src="assets/composium-demo.gif" alt="A boarding pass switches from Midnight to Classic as the fare and font size change. After toggling dark mode on and off, the floating eyedropper samples colors from the ticket." width="240">
 </p>
 
 ## Why Composium
